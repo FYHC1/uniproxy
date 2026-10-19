@@ -26,6 +26,10 @@ GET /api/export/backup -> JSON attachment contains credentials; explicit confirm
 
 Admin Authorization Bearer token optional only loopback; required public binding. UI token entry after 401 and keep in sessionStorage not URL. Default API port9090; Vite5173 allowed dev Origin. Static compiled frontend served by Go embedded internal/webui/assets/dist. No CORS wildcard. Public Host/Origin checks guard CSRF/DNS rebinding, no raw core controller exposed. No demo nodes on startup.
 
+## Display names
+
+Group, node, pool, listener and subscription names are 1–160 runes and must not contain control characters. The ceiling applies to the stored display name only: an imported upstream label longer than that is shortened on a rune boundary with a trailing "…" instead of dropping the node, so preview shows exactly what will be saved. A label longer than 1024 runes or containing control characters stays invalid input. Labels are presentation only; identity is the fingerprint. Names derived by the server (for example a batch dedicated listener from its node name) reserve room for their suffix instead of producing a value the limit rejects. Validation errors name the field that is actually wrong.
+
 ## Current validation bounds
 
 Listener host must be literal IP, port1024..65535 excluding admin; credential max255bytes, username no colon/control. SOCKS/mixed native UDP is loopback-only because pinned core UDP does not authenticate packets; UDP with in-user pool forbidden. Pool interval10..86400sec, timeout500..30000ms, tolerance0..10000ms. Subscription interval5..10080minutes. Settings timeout500..30000ms, concurrency1..32, download1024..104857600bytes, health interval30..86400sec, port range1024..65535. Snapshot max32MiB; backup request max40MiB; regular JSON request max12MiB, imports5MiB. A manual Stop suspends automatic apply until explicit runtime Apply; restart resumes desired config. Tasks require appliedRevision==desiredRevision and discard results across configuration generation changes.

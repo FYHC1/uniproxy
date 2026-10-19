@@ -4,7 +4,6 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -566,7 +565,9 @@ func (a *App) batchListeners(w http.ResponseWriter, r *http.Request) (any, error
 			}
 			used[port] = true
 			now := model.Now()
-			l := model.Listener{ID: ID(), Name: fmt.Sprintf("%s · 独享", s.Nodes[idx].Name), Kind: "node", TargetID: id, Protocol: b.Protocol, Host: b.Host, Port: port, UDP: b.UDP, Enabled: true, Users: b.Users, CreatedAt: now, UpdatedAt: now}
+			// A node label may already sit at the name ceiling, so the suffix is
+			// appended through derivedName instead of producing an invalid listener.
+			l := model.Listener{ID: ID(), Name: derivedName(s.Nodes[idx].Name, " · 独享"), Kind: "node", TargetID: id, Protocol: b.Protocol, Host: b.Host, Port: port, UDP: b.UDP, Enabled: true, Users: b.Users, CreatedAt: now, UpdatedAt: now}
 			s.Listeners = append(s.Listeners, l)
 			out = append(out, publicListener(l))
 		}

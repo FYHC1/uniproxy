@@ -59,6 +59,23 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 	if strings.TrimSpace(r.Content) == "" {
 		return nil, bad("导入内容不能为空")
 	}
+	// Reject unusable metadata before any network request, so a long name or bad
+	// group label cannot turn a completed download into a late validation error.
+	// The subscription name only applies to subscription imports.
+	if r.Mode == "subscriptions" {
+		if name := strings.TrimSpace(r.Name); name != "" && !nameOK(name) {
+			return nil, nameError("订阅")
+		}
+	}
+	for _, name := range r.GroupNames {
+		if !nameOK(strings.TrimSpace(name)) {
+			return nil, nameError("自定义分组")
+		}
+	}
+	// Interval is subscription-only metadata; other modes keep ignoring it.
+	if r.Mode == "subscriptions" && r.IntervalMinutes != 0 && (r.IntervalMinutes < 5 || r.IntervalMinutes > 10080) {
+		return nil, bad("订阅更新间隔必须为 5–10080 分钟")
+	}
 	fetched := []fetchedImport{}
 	combined := model.ParseResult{Nodes: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
 	if r.Mode == "subscriptions" {
@@ -145,7 +162,8 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 				name := strings.TrimSpace(r.Name)
 				if name == "" {
 					u, _ := url.Parse(f.URL)
-					name = u.Hostname()
+					// A legal hostname can exceed the display-name ceiling.
+					name = truncateRunes(u.Hostname(), maxNameRunes)
 				}
 				interval := r.IntervalMinutes
 				if interval == 0 {

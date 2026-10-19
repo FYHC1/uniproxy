@@ -359,16 +359,20 @@ func writeMockStatus(w io.Writer, request *http.Request, status int) {
 	response.Write(w)
 }
 
+// freePort returns a loopback port where both TCP and UDP can bind. It scans a
+// fixed low range instead of asking the OS for an ephemeral port: on Windows the
+// dynamic range overlaps excluded ranges, so ":0" often yields a port whose UDP
+// twin is unavailable and the helper failed intermittently.
 func freePort(t *testing.T) int {
 	t.Helper()
-	for i := 0; i < 100; i++ {
-		socket, err := net.Listen("tcp4", "127.0.0.1:0")
+	for port := 21000; port < 48000; port++ {
+		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
+		tcp, err := net.Listen("tcp4", addr)
 		if err != nil {
-			t.Fatal(err)
+			continue
 		}
-		port := socket.Addr().(*net.TCPAddr).Port
-		udp, err := net.ListenPacket("udp4", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-		socket.Close()
+		udp, err := net.ListenPacket("udp4", addr)
+		tcp.Close()
 		if err != nil {
 			continue
 		}

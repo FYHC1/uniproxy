@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/uniproxy/uniproxy/internal/model"
 )
@@ -25,12 +26,19 @@ func normalizeNative(input map[string]any) (model.ParsedNode, error) {
 		r.fail("missing required port")
 	}
 	name := r.text("name", false)
-	if containsControl(name) || len(name) > 1024 {
+	// A label beyond this bound is not a plausible display name; keep rejecting
+	// it as malformed input. Anything merely longer than the API ceiling is
+	// shortened instead, so preview and save agree on what can be stored.
+	if containsControl(name) || utf8.RuneCountInString(name) > maxNodeNameRunes {
 		r.fail("invalid node name")
 	}
-	if name == "" {
+	// A whitespace-only label would fail the API name rule after a successful
+	// preview, so fall back to the canonical address label. Meaningful labels are
+	// preserved byte-for-byte, including deliberate leading/trailing spaces.
+	if strings.TrimSpace(name) == "" {
 		name = defaultName(protocol, server, port)
 	}
+	name = truncateName(name, MaxNodeNameRunes)
 	out := map[string]any{"type": protocol, "server": server, "port": port}
 	if r.has("tfo") {
 		copyBool(r, out, "tfo")

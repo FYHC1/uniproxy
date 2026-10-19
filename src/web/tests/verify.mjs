@@ -32,8 +32,25 @@ let listenerPayload;
 let previewCount = 0;
 const importMocks = {preview:null,commit:null};
 let nextId = 0;
-const browserPath = chromium.executablePath();
-const browser = await chromium.launch(existsSync(browserPath) ? {headless:true} : {headless:true,channel:'chrome'});
+// Playwright's bundled browser is optional here. Prefer it, then an explicit
+// override, then a system Chrome/Edge install (Windows paths differ from the
+// per-user path Playwright's channel lookup assumes).
+const launch = (() => {
+  const bundled = chromium.executablePath();
+  if (existsSync(bundled)) return {headless:true};
+  const explicit = process.env.PLAYWRIGHT_CHROME_PATH;
+  if (explicit && existsSync(explicit)) return {headless:true,executablePath:explicit};
+  const candidates = [
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+    '/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser'
+  ];
+  for (const candidate of candidates) if (existsSync(candidate)) return {headless:true,executablePath:candidate};
+  return {headless:true,channel:'chrome'};
+})();
+const browser = await chromium.launch(launch);
 const context = await browser.newContext({viewport:{width:1440,height:1000},reducedMotion:'reduce'});
 const page = await context.newPage();
 page.on('pageerror',error => errors.push(error.message));

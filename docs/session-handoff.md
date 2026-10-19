@@ -1,26 +1,26 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-10-19 23:22（Asia/Shanghai）；23:18核对产物，23:21复核用户PID/哈希未变、测试19090无监听。M10订阅下载/紧凑池/分组节点管理已完成和暂存；没有部署本次新版，没有改动用户运行服务、DB、主密钥或原始节点文件。**
+**最后核对：2026-10-20 01:10（Asia/Shanghai）。M11首次入库GitHub + 全面复查修复已完成并重新暂存；用户运行进程仍为2026-10-19 23:25启动的旧构建，未部署、未停止服务、未改动DB/主密钥/原始节点文件。**
 
 ## 30秒摘要
 
 - 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32；不是Node/sing-box早期草案。
-- M0–M10完成，最新R19–R21是订阅Fake-IP下载/诊断、紧凑代理池与点击分组管理节点。详情见[最新验收](<subscription-groups-verification.md>)和[计划](<development-plan.md>)，不要重做旧任务。
-- **当前用户已运行M9代理池构建（启动22:30），本次M10新版未部署。** 前轮22:27快照已经过期；本轮未替用户执行此前升级，仅只读观察到文件/进程变化。
-- 本轮修复下载阶段Fake-IP被拦截的问题（不是解析器吃掉节点）；仅全Fake-IP域名做受信任公共DoH复核，仍校验公网/TLS。池6条分页/单池双栏/真实统计，组名直接打开20条分页节点管理。
-- 本轮实际通过：**32 API浏览器、31工具、safehttp23函数、app新增14函数、fixture、Go全量+vet、真实本机内核、Windows暂存进程、Linux两架构构建**。裸主机新客户端根HEAD HTTP200+TLS通过；未请求私有订阅路径/正文或真实节点，race/Docker/Linux实跑/压测未做。
+- M0–M11完成。M11：仓库初始化并推送私有GitHub仓库，全面复查后修复7项缺陷。详情见[复查验收](<repository-review-verification.md>)、[M10验收](<subscription-groups-verification.md>)和[计划](<development-plan.md>)，不要重做旧任务。
+- **当前用户运行的是2026-10-19 23:25:57启动的旧构建（PID 5248，SHA256 22596106…），M10/M11新版均未部署。** 本轮未替用户升级，仅只读核对进程与文件。
+- M11修复：长节点名导致批量端口整批失败、预览/保存名称口径不一致、订阅元数据下载后才校验、监听页/节点页把待同步地址显示为监听中、活动记录按字节截断产生乱码、测试脚本写死浏览器路径、文档含个人绝对路径。
+- M11实际通过：**32 API浏览器、32工具、Go全量 -p1、vet、gofmt、严格TS、fixture UI、真实本机内核链路、构建后进程/CLI/manifest、Windows暂存+Linux两架构**。未请求私有订阅路径/正文或真实节点；race/Docker/Linux实跑/压测未做。
 - 下一步仅在用户批准后部署最新版/用户验收，或接受新的明确任务；不要擅自停服务、删除节点或换数据目录。
 
 先读：[需求](<requirements.md>) → [决策](<decisions.md>) → [开发指南](<development-guide.md>)。本文PID/哈希有时效性，未来操作前重新核对。
 
 ## 1. 当前工作区与用户实例
 
-| 项目 | 2026-10-19 23:21观察 |
+| 项目 | 2026-10-20 01:10观察 |
 |---|---|
-| 工作区 | C:/CustomFiles/CodeProjects/Github/uniproxy |
-| 版本控制 | 根目录仍无.git；没有可宣称的commit/tag/PR，本轮未初始化 |
-| 用户应用 | PID29280，启动22:30:36，[bin/uniproxy.exe](<../bin/uniproxy.exe>)，无CLI参数 |
-| 子内核 | PID25908，父29280，启动22:30:40，[bin/mihomo.exe](<../bin/mihomo.exe>)，-f -从stdin读配置 |
+| 工作区 | 本仓库根目录（会话启动时由运行环境提供；文档不记录个人绝对路径） |
+| 版本控制 | 已初始化 git 并推送私有 GitHub 仓库；初始提交 `7829f25`；本轮修复改动另行提交 |
+| 用户应用 | PID5248，启动2026-10-19 23:25:57，[bin/uniproxy.exe](<../bin/uniproxy.exe>)，无CLI参数 |
+| 子内核 | PID32296，父5248，启动23:26:02，[bin/mihomo.exe](<../bin/mihomo.exe>)，-f -从stdin读配置 |
 | 数据线索 | 子内核-d指向[bin/data/core](<../bin/data/core/>)，用户数据预计[bin/data](<../bin/data/>)；没有读取DB/密钥，升级前仍需核对启动环境/CWD |
 | 其他目录 | 根[data](<../data/>)来自更早测试，不能与用户数据混用或自行清理 |
 | 管理端口 | 默认9090；本轮未请求用户运行API，未把默认值当监听事实 |
@@ -32,16 +32,16 @@
 
 | 产物 | 字节数 / mtime | SHA256 |
 |---|---|---|
-| [当前M9运行文件](<../bin/uniproxy.exe>) | 19663360 / 22:19:38 | 2F3FB93D7A2844322075ED4110B7B01A7EBB8A0773866371A96439CBDF8C8CB4 |
-| [Windows M10新版](<../bin/updates/uniproxy.exe>) | 19779584 / 23:16:57 | 22596106E243811EC3FCB81A5C39A982643D731D9782CBAC8EDC49F1F1DC81AB |
-| [Linux amd64 M10](<../bin/updates/linux-amd64/uniproxy>) | 19329562 / 23:16:59 | FF6E9AFE8C3A9020DD5A9C7FE422FDA7BB4CEBB3CFB7546E2104F6A31CA12DCC |
-| [Linux arm64 M10](<../bin/updates/linux-arm64/uniproxy>) | 18210677 / 23:17:01 | 6ECB5AEB5F3C7F64C9A2EB41AEEB2C824E524F4091FBE63CEB3C31CC1A6504FF |
+| [当前运行文件](<../bin/uniproxy.exe>) | 19779584 / 2026-10-19 23:16:57 | 22596106E243811EC3FCB81A5C39A982643D731D9782CBAC8EDC49F1F1DC81AB |
+| [Windows M11新版](<../bin/updates/uniproxy.exe>) | 19785216 / 2026-10-20 01:20:45 | 829CC2FB63FC45ED86327F6ACFD9B173E92D3F3B1D3E9FC89B4829845173FC17 |
+| [Linux amd64 M11](<../bin/updates/linux-amd64/uniproxy>) | 19336092 / 01:20:47 | E575DD2BFA7DAC36B1C38262B4FC417CE8FF23A2F17DDA0491C6ADD3F72826A0 |
+| [Linux arm64 M11](<../bin/updates/linux-arm64/uniproxy>) | 18211591 / 01:20:50 | CD6293487A1524F0D972A59881ABEB5EC9E0CFE92ABD5B939B5BD61DB4FD466A |
 
 仍报告0.1.0，不可用health/version字符串辨认补丁；health200只是存活，不代表core/config ready。哈希不是签名或自动升级授权。
 
 历史20:31：应用PID27412、核心14788，当时运行文件19565056字节/SHA256 B2F45BFD28154D156A7F91F84678FFE983B3D07ADFC4279097743B3B2B405778，暂存为4A8FC2F8…；这些均不作为当前运行事实。
 
-## 2. 当前关键实现语义（M9保留，M10补充）
+## 2. 当前关键实现语义（M9保留，M10补充，M11修订）
 
 ### 代理池选择
 
@@ -85,6 +85,14 @@ DELETE /api/pools/{id}/members/{nodeId}
 
 本轮有界域名证据：系统DNS、固定公共DoH、原域名TLS1.3、[新客户端根HEAD](<../tests/integration/subscription_host_test.go>)返回200+校验TLS。**没访问私有订阅路径、没读正文，不能称用户完整订阅导入/远端节点已验证。** 主机诊断环境变量默认空。
 
+### M11：显示名称与运行状态一致性
+
+显示名称（分组/节点/池/监听/订阅）统一1–160字符且禁控制字符，但该上限只约束“保存的显示名”：[导入器](<../internal/importer/native.go>)对超过160字符的上游标签按字符边界截断加“…”，超过1024字符或含控制字符仍判无效输入，空白标签回退协议+地址。因此预览展示的就是保存结果，不再出现“预览通过、确认导入失败”。
+
+服务端派生名称必须为后缀预留空间：[批量独立监听](<../internal/app/http.go>)用[derivedName](<../internal/app/validate.go>)生成“<节点名> · 独享”，接近上限时截断而不是让整批400。名称类校验错误点名字段（节点/监听/分组/订阅名称、监听地址、监听端口、订阅URL、间隔），不再把名称问题伪装成端口问题。订阅名称/分组名/刷新间隔在下载前校验，且只在订阅模式生效。
+
+监听运行状态由[listenerState](<../src/web/poolView.ts>)统一判定，池卡片、监听页、节点页共用；`appliedRevision`与`revision`不一致或dirty/applying时不得显示“监听中”。活动记录按字符边界截断，禁止产生非法UTF-8。
+
 ### M10：紧凑池与分组管理
 
 [池页](<../src/web/PoolsPage.tsx>)用真实统计+策略/状态过滤；[卡片](<../src/web/PoolCard.tsx>)单池宽屏双栏、6节点分页/限高、2入口后明确展开、节点details、真实成功失败未知/中位延迟，revision mismatch显示状态待同步而不是旧地址在线。
@@ -97,7 +105,7 @@ DELETE /api/pools/{id}/members/{nodeId}
 
 前轮Clash中转/拖入/节点过滤已完成，不能误开旧待办：
 
-- [私有Clash文件](<C:/CustomFiles/CodeProjects/Project/networkTools/work/baseapk/skyvora-clash.yaml>)328定义、178中转、325唯一节点；3别名等价。**这是前轮授权离线测试事实，本轮未读取或重测该文件，也没使用真实凭据联网。**
+- 前轮授权离线验证的私有Clash文件（路径不写入仓库）共328定义、178中转、325唯一节点；3别名等价。**这是历史授权离线测试事实，本轮未读取或重测该文件，也没使用真实凭据联网。**
 - 旧失败是拒绝dialer-proxy和128详情 cap提前停止扫描，不是GFW判断；解析继续扫描并统计totalErrors。
 - 稳定DialerID/DialerIdentity保留上下游身份；缺失/禁用中转阻断，不得删dialer字段直连。原生Config不得直接透传不可信dialer-proxy。
 - 导出保留安全占位避免builtin/缺失引用捕获；公共response副本才清除私有身份字段；来源归属/备份恢复不误删共享节点。
@@ -106,18 +114,17 @@ DELETE /api/pools/{id}/members/{nodeId}
 
 ## 4. 本轮验证与限制
 
-完整命令和边界：[最新验收](<subscription-groups-verification.md>)；[M9验收](<pool-workflow-verification.md>)作为历史保留。
+完整命令、缺陷清单与边界：[M11复查验收](<repository-review-verification.md>)；[M10验收](<subscription-groups-verification.md>)、[M9验收](<pool-workflow-verification.md>)作为历史保留。
 
-- 严格TS、生产Vite、Windows暂存构建、Linux amd64/arm64交叉编译通过。
-- node工具31/31；内存构建fixture浏览器通过（含375/390/768/1024，零未捕获错误）。
-- 真实API浏览器32/32，最终56.4秒；[fixture隔离器](<../tests/browser/fixtures.ts>)限制19090/missing core、唯一名称、文档地址、仅清理测试归属对象。
-- Go全量-p1 -count1通过并go vet通过，显式UNIPROXY_TEST_CORE_PATH与UNIPROXY_TEST_APP_PATH本轮暂存路径，私有路径与裸主机变量都为空，避免日常回归隐式联网。
-- 新真实本机链路验证一次创建→认证转发→实际延迟任务→移除最后成员拒绝→同端口重新纳入。历史core TCP/SOCKS/mixed/UDP/策略/长连接回归也在本轮全量执行。
-- 本轮独立UI/下载审查2个中等问题均修复：混合版本监听误标在线、fec0::/10站点本地漏拦截；对应回归通过。无已知剩余高/中项，不是全面安全担保。前轮3项交互修复保留。
-- 文档校验20份、307个本地链接，无缺失目标或未闭合围栏；23:21用户PID/哈希不变，19090测试服务已退出。
-- 未做：本轮私有文件/完整订阅正文测试、真实公网节点全协议握手/吞吐、Linux/Docker实跑、race、目标硬件容量压测。
+- 严格TS（含noUnused）、生产Vite（build:web，未覆盖运行exe）、Windows暂存构建、Linux amd64/arm64交叉编译通过。
+- node工具32/32；内存构建fixture浏览器通过（含375/390/768/1024，零未捕获错误）。
+- 真实API浏览器32/32，55.8秒；[fixture隔离器](<../tests/browser/fixtures.ts>)限制19090/missing core、唯一名称、文档地址、仅清理测试归属对象。
+- Go全量 -p1 -count1 通过，go vet与gofmt通过；真实内核链路用显式UNIPROXY_TEST_CORE_PATH（本地bin/mihomo.exe），构建后进程/CLI/manifest用UNIPROXY_TEST_APP_PATH指向暂存exe；私有文件与裸主机变量为空。
+- 真实本机链路验证 HTTP/mixed转发、URLTest、限速测速、禁用即拒、池原子创建/空池拒绝/同端口重新纳入、13协议配置校验。
+- 复查发现并修复7项：长名称批量端口整批失败、预览/保存名称口径不一致、订阅元数据下载后才校验、监听页/节点页待同步误标监听中、活动记录字节截断乱码、测试脚本写死浏览器路径、文档个人绝对路径。均有回归或行为复测。
+- 未做：私有订阅正文、真实公网节点握手/吞吐、Linux/Docker实跑、race、容量压测。
 
-本轮一次strict tsc撞到并行GroupNodesDialog尚未生成，确认在途写任务完成后重测通过；最终Go/fixture/E2E均成功。Vite单chunk509.25kB/gzip150.31kB触发500kB非失败警告，未修改阈值掩盖，分包是后续优化。前轮fake-core int/float和中间帧断言调查保留在M9验收，不误当本轮新故障。
+Vite单chunk 509.25kB/gzip 150.33kB仍触发500kB非失败警告，未修改阈值掩盖；分包是后续优化。当前运行文件与暂存构建哈希不同，说明部署未发生。
 
 ## 5. 不可破坏的安全/兼容边界
 
@@ -130,7 +137,7 @@ DELETE /api/pools/{id}/members/{nodeId}
 
 ## 6. 明确下一步及接续
 
-1. 本次开发完成；最新源码已构建到暂存目录，未执行部署。用户若希望马上使用，先确认允许停机、准确CWD/数据目录和一致备份，再正常退出旧服务、替换原位置、原数据启动、刷新Web。
+1. 本次复查与修复完成；最新源码已构建到暂存目录，未执行部署。用户若希望马上使用，先确认允许停机、准确CWD/数据目录和一致备份，再正常退出旧服务、替换原位置、原数据启动、刷新Web。
 2. 若继续开发，按[计划](<development-plan.md>)或新用户要求限定范围，不重做已完成功能；先读[根入口](<../AGENTS.md>)及本快照。
-3. 三个本轮写任务（safehttp、分组UI、app测试）全部完成并释放，两类独立只读审查已收集；后台构建/测试均已收集，用户服务不是残留，不清理它。
-4. 收尾继续更新计划/本快照/变更/决策与实际测试状态，核对产物与运行差异；不宣称Git提交、部署或未经实测的平台成功。
+3. 本轮无并行写任务、无后台任务；用户服务不是残留，不清理它。仓库已推送私有GitHub，修复改动仍需提交推送。
+4. 收尾继续更新计划/本快照/变更/决策与实际测试状态，核对产物与运行差异；不宣称部署或未经实测的平台成功。

@@ -21,27 +21,30 @@ import (
 
 // Reserve a contiguous test-only TCP/UDP range simultaneously, then release it.
 // No production listeners, databases, or core processes are involved.
+//
+// Ephemeral allocation (":0") is deliberately not used as the starting point:
+// on Windows the dynamic range overlaps Hyper-V/WinNAT excluded ranges, so a
+// freshly allocated port frequently has no usable neighbours and the whole
+// helper failed intermittently. Scanning a fixed low range is stable and still
+// free of any real service (unprivileged, above 1024, below the dynamic range).
 func poolTestPortRange(t *testing.T, size int) int {
 	t.Helper()
-	for attempt := 0; attempt < 64; attempt++ {
-		first, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatal(err)
-		}
-		base := first.Addr().(*net.TCPAddr).Port
-		tcp := []net.Listener{first}
+	if size < 1 {
+		t.Fatal("port range size must be positive")
+	}
+	const low, high = 21000, 48000
+	for base := low; base+size-1 <= high; base += size {
+		tcp := []net.Listener{}
 		udp := []net.PacketConn{}
-		ok := base >= 1024 && base+size-1 <= 65535
-		for i := 0; ok && i < size; i++ {
+		ok := true
+		for i := 0; i < size; i++ {
 			addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(base+i))
-			if i > 0 {
-				l, err := net.Listen("tcp", addr)
-				if err != nil {
-					ok = false
-					break
-				}
-				tcp = append(tcp, l)
+			l, err := net.Listen("tcp", addr)
+			if err != nil {
+				ok = false
+				break
 			}
+			tcp = append(tcp, l)
 			p, err := net.ListenPacket("udp", addr)
 			if err != nil {
 				ok = false
@@ -59,7 +62,7 @@ func poolTestPortRange(t *testing.T, size int) int {
 			return base
 		}
 	}
-	t.Fatal("could not obtain isolated TCP/UDP test ports")
+	t.Fatalf("could not obtain %d isolated TCP/UDP test ports", size)
 	return 0
 }
 

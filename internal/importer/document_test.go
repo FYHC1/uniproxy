@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -263,5 +264,29 @@ func TestPartialInputAndLineNumbers(t *testing.T) {
 	n := parseOne(t, "\ufeffhttp://example.com:8080#東京%20server")
 	if n.Name != "東京 server" {
 		t.Fatal("BOM/UTF-8 label handling failed")
+	}
+}
+
+func TestLongDisplayNameIsShortenedNotDropped(t *testing.T) {
+	// Upstream labels are presentation only; identity is the fingerprint. A label
+	// longer than the management API ceiling must not silently drop the node, and
+	// preview must show exactly the label that would be stored.
+	for _, name := range []string{strings.Repeat("长", 161), strings.Repeat("a", 300)} {
+		node := parseOne(t, "socks5://u:p@127.0.0.1:1080#"+url.PathEscape(name))
+		if runes := []rune(node.Name); len(runes) != MaxNodeNameRunes || runes[len(runes)-1] != '…' {
+			t.Fatalf("label not shortened on a rune boundary: %d runes", len(runes))
+		}
+		if node.Server != "127.0.0.1" || node.Port != 1080 {
+			t.Fatal("shortening a label must not change routing metadata")
+		}
+	}
+	// A short label is preserved byte-for-byte, including multi-byte characters.
+	if node := parseOne(t, "socks5://u:p@127.0.0.1:1080#"+url.PathEscape("东京节点")); node.Name != "东京节点" {
+		t.Fatalf("short label changed: %q", node.Name)
+	}
+	// Implausible labels stay rejected instead of being silently truncated.
+	result := Parse("socks5://u:p@127.0.0.1:1080#" + url.PathEscape(strings.Repeat("a", 1025)))
+	if len(result.Nodes) != 0 || len(result.Errors) != 1 {
+		t.Fatalf("oversized label should remain invalid: %+v", result.Errors)
 	}
 }

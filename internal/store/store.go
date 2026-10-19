@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/uniproxy/uniproxy/internal/model"
 	_ "modernc.org/sqlite"
@@ -145,8 +146,11 @@ func (s *Store) Save(state model.State) error {
 func (s *Store) Activity(level, message string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if len(message) > 2000 {
-		message = message[:2000]
+	// Byte slicing can split a multi-byte rune and store invalid UTF-8, which then
+	// reaches the UI as replacement characters. Bound by runes instead, and only
+	// when the text is actually too long in runes.
+	if utf8.RuneCountInString(message) > 2000 {
+		message = string([]rune(message)[:2000])
 	}
 	_, _ = s.db.Exec("INSERT INTO activities(level,message,created_at) VALUES(?,?,?)", level, message, model.Now())
 	_, _ = s.db.Exec("DELETE FROM activities WHERE id NOT IN (SELECT id FROM activities ORDER BY id DESC LIMIT 200)")

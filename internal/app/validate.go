@@ -7,12 +7,18 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 )
 
 var idPattern = regexp.MustCompile("^[a-zA-Z0-9_-]{1,80}$")
 var colorPattern = regexp.MustCompile("^#[0-9a-fA-F]{6}$")
+
+// maxNameRunes is the single display-name ceiling for groups, nodes, pools,
+// listeners and subscriptions. Derived names must reserve room for their suffix
+// instead of producing a value this limit rejects.
+const maxNameRunes = 160
 
 func control(v string) bool {
 	for _, c := range v {
@@ -23,7 +29,40 @@ func control(v string) bool {
 	return false
 }
 func nameOK(v string) bool {
-	return len(strings.TrimSpace(v)) > 0 && utf8.RuneCountInString(v) <= 160 && !control(v)
+	return len(strings.TrimSpace(v)) > 0 && utf8.RuneCountInString(v) <= maxNameRunes && !control(v)
+}
+
+// nameError reports a precise reason so a rejected save does not look like an
+// unrelated field (for example a listener name looking like a port problem).
+func nameError(label string) error {
+	return bad(label + "名称无效：需 1–" + strconv.Itoa(maxNameRunes) + " 个字符且不能包含控制字符")
+}
+
+// truncateRunes shortens a display label on a rune boundary.
+func truncateRunes(value string, limit int) string {
+	if limit < 1 || utf8.RuneCountInString(value) <= limit {
+		return value
+	}
+	return string([]rune(value)[:limit])
+}
+
+// derivedName appends a suffix while keeping the total within maxNameRunes.
+func derivedName(base, suffix string) string {
+	if utf8.RuneCountInString(suffix) >= maxNameRunes {
+		return string([]rune(suffix)[:maxNameRunes])
+	}
+	room := maxNameRunes - utf8.RuneCountInString(suffix)
+	runes := []rune(strings.TrimSpace(base))
+	if len(runes) == 0 {
+		return strings.TrimSpace(suffix)
+	}
+	if len(runes) > room {
+		if room <= 1 {
+			return string(runes[:max(room, 0)]) + suffix
+		}
+		runes = append(runes[:room-1], '…')
+	}
+	return string(runes) + suffix
 }
 func loopback(host string) bool { ip := net.ParseIP(host); return ip != nil && ip.IsLoopback() }
 func validURL(v string) bool {
@@ -83,8 +122,11 @@ func ValidateState(s model.State, adminPort int) error {
 		if e := checkID(n.ID); e != nil {
 			return e
 		}
-		if !nameOK(n.Name) || n.Port < 1 || n.Port > 65535 || n.Server == "" || control(n.Server) || strings.ContainsAny(n.Server, " /") || strings.ContainsRune(n.Server, 92) {
-			return bad("节点名称、服务器或端口无效")
+		if !nameOK(n.Name) {
+			return nameError("节点")
+		}
+		if n.Port < 1 || n.Port > 65535 || n.Server == "" || control(n.Server) || strings.ContainsAny(n.Server, " /") || strings.ContainsRune(n.Server, 92) {
+			return bad("节点服务器地址或端口无效")
 		}
 		if !contains([]string{"vless", "vmess", "trojan", "ss", "hysteria", "hysteria2", "tuic", "ssh", "socks5", "http"}, n.Protocol) {
 			return bad("不支持的节点协议")
@@ -151,8 +193,14 @@ func ValidateState(s model.State, adminPort int) error {
 		if e := checkID(l.ID); e != nil {
 			return e
 		}
-		if !nameOK(l.Name) || net.ParseIP(l.Host) == nil || l.Port < 1024 || l.Port > 65535 {
-			return bad("监听名称、IP 或端口无效（端口范围 1024–65535）")
+		if !nameOK(l.Name) {
+			return nameError("监听")
+		}
+		if net.ParseIP(l.Host) == nil {
+			return bad("监听地址必须是 IP 地址，不能使用域名")
+		}
+		if l.Port < 1024 || l.Port > 65535 {
+			return bad("监听端口必须为 1024–65535")
 		}
 		if l.Port == adminPort {
 			return bad("代理端口不能与管理端口相同")
@@ -219,8 +267,14 @@ func ValidateState(s model.State, adminPort int) error {
 		if e := checkID(sub.ID); e != nil {
 			return e
 		}
-		if !nameOK(sub.Name) || !validURL(sub.URL) || sub.IntervalMinutes < 5 || sub.IntervalMinutes > 10080 {
-			return bad("订阅名称、URL 或更新间隔无效（5–10080 分钟）")
+		if !nameOK(sub.Name) {
+			return nameError("订阅")
+		}
+		if !validURL(sub.URL) {
+			return bad("订阅地址必须是 HTTP(S) URL，且不能包含用户信息或片段")
+		}
+		if sub.IntervalMinutes < 5 || sub.IntervalMinutes > 10080 {
+			return bad("订阅更新间隔必须为 5–10080 分钟")
 		}
 		if e := checkGroups(sub.GroupIDs); e != nil {
 			return e

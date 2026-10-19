@@ -4,7 +4,7 @@ import {address,checkHttpUrl,formatDate,isIP,isLoopback,poolMembers,runtimeLabel
 import {emptyNodeGroupFilter,matchesNodeFilter,matchesNodeGroups,nodeRelay} from '../nodeFilters.ts';
 import {changePoolSelection,constrainPoolSelection,poolSelectionScope,selectedPoolNodes,withoutDeletedPoolNodes} from '../poolSelection.ts';
 import {selectScope} from '../selection.ts';
-import {nodeLatencyText,poolListenerState,poolNodeMetrics} from '../poolView.ts';
+import {listenerIsLive,listenerState,nodeLatencyText,poolListenerState,poolNodeMetrics} from '../poolView.ts';
 import {MAX_IMPORT_BYTES,MAX_IMPORT_ERROR_DETAILS,canDropLocalFile,captureDroppedFiles,importErrorSummary,isFileTransfer,readLocalImport,validateImportContent} from '../importUtils.ts';
 
 const nodes = [
@@ -261,3 +261,20 @@ test('pool latency distinguishes unknown, measured zero and failed last result h
   assert.equal(nodeLatencyText({status:'unknown',latencyMs:42}),'尚未检测');
 });
 
+
+test('listener state is shared by every page and never claims a stale revision is live',()=>{
+  const listener={id:'l1',enabled:true};
+  const runtime={available:true,running:true,dirty:false,applying:false,appliedRevision:3,listeners:[{id:'l1',listening:true,error:''}]};
+  assert.equal(listenerState(listener,runtime,3).label,'监听中');
+  assert.equal(listenerIsLive(listener,runtime,3),true);
+  // The runtime snapshot describes a different configuration, so "live" is not knowable.
+  assert.equal(listenerState(listener,runtime,4).label,'状态待同步');
+  assert.equal(listenerIsLive(listener,runtime,4),false);
+  assert.equal(listenerState(listener,{...runtime,dirty:true},3).label,'配置待应用');
+  assert.equal(listenerIsLive(listener,{...runtime,dirty:true},3),false);
+  assert.equal(listenerState({...listener,enabled:false},runtime,3).label,'已停用');
+  assert.equal(listenerIsLive({...listener,enabled:false},runtime,3),false);
+  assert.equal(listenerState(listener,{...runtime,listeners:[{id:'l1',listening:true,error:'bind failed'}]},3).label,'未监听');
+  // The pool card keeps using the same function through its alias.
+  assert.equal(poolListenerState(listener,runtime,4).label,listenerState(listener,runtime,4).label);
+});

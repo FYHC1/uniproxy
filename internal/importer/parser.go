@@ -27,6 +27,13 @@ const (
 	maxDocumentValues = 250000
 	maxBase64Depth    = 4
 	maxIssues         = 128
+	// MaxNodeNameRunes matches the management API display-name ceiling. Imported
+	// labels are presentation only (identity is the fingerprint), so a longer
+	// upstream label is shortened instead of dropping an otherwise valid node.
+	MaxNodeNameRunes = 160
+	// maxNodeNameRunes rejects implausible labels outright; it is a malformed
+	// input guard, not the storage limit.
+	maxNodeNameRunes = 1024
 )
 
 // Parse accepts URI lists, base64 subscriptions, Clash YAML/JSON, or sing-box
@@ -410,4 +417,15 @@ func Fingerprint(node model.ParsedNode) string {
 
 func defaultName(protocol, server string, port int) string {
 	return protocol + "://" + net.JoinHostPort(server, strconv.Itoa(port))
+}
+
+// truncateName shortens a display label on a rune boundary so preview and the
+// management API agree on what can be stored. Control characters are rejected
+// by the caller; identity never derives from this label.
+func truncateName(value string, limit int) string {
+	if limit < 1 || utf8.RuneCountInString(value) <= limit {
+		return value
+	}
+	runes := []rune(value)
+	return string(runes[:limit-1]) + "…"
 }
