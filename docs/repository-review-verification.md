@@ -42,7 +42,7 @@
 - 订阅预览对回环地址返回明确内网拦截说明且不写入状态。
 - 静态资源路径穿越尝试（`/../`、`%2e%2e`）未返回仓库文件。
 
-## 3. 发现并修复的缺陷（共 8 项）
+## 3. 发现并修复的缺陷（共 9 项）
 
 ### 3.1 批量分配独立端口对接近名称上限的节点整批失败
 
@@ -92,6 +92,12 @@
 
 修复：改为不含个人路径的描述；复查 `docs`、README、CHANGELOG、AGENTS 已无 Windows 绝对路径。
 
+### 3.9 测试基础设施并发不稳定（核心版本探测超时）
+
+`go test ./...` 并行运行各包时，核心包的 mock 进程首次 exec 可能因杀毒扫描/磁盘争用超过 5 秒，被 `inspectBinary` 判为“版本探测超时”，导致 `TestLifecycleValidateApplyReloadStop` 间歇失败。
+
+修复：版本探测预算从 5 秒提高到 20 秒（仍为有界预算），并把 app 与 core 的测试端口段设为互不重叠、随机起点，避免并行包测试抢同一端口。修复后连续多次并行全量测试通过。
+
 ## 4. 新增回归测试
 
 | 位置 | 覆盖 |
@@ -106,9 +112,9 @@
 
 | 产物 | 字节 | 时间 | SHA256 |
 |---|---|---|---|
-| `bin/updates/uniproxy.exe` | 19785216 | 2026-10-20 01:20:45 | `829CC2FB63FC45ED86327F6ACFD9B173E92D3F3B1D3E9FC89B4829845173FC17` |
-| `bin/updates/linux-amd64/uniproxy` | 19336092 | 01:20:47 | `E575DD2BFA7DAC36B1C38262B4FC417CE8FF23A2F17DDA0491C6ADD3F72826A0` |
-| `bin/updates/linux-arm64/uniproxy` | 18211591 | 01:20:50 | `CD6293487A1524F0D972A59881ABEB5EC9E0CFE92ABD5B939B5BD61DB4FD466A` |
+| `bin/updates/uniproxy.exe` | 19785216 | 2026-10-20 01:42:34 | `510CAE7FE157938A8F5060AE5B66363E73A73EFF9CE90F3F63CABF20CB147317` |
+| `bin/updates/linux-amd64/uniproxy` | 19335940 | 01:42:37 | `0C901F935D2346B201931336EF2EE7EF9771436D0F9BAA91C791C45F78E658F7` |
+| `bin/updates/linux-arm64/uniproxy` | 18211567 | 01:42:39 | `229771A0D1AB43CF2882BE6EAA9F502B9C28A8250352394E6FF9CA56C7826BFA` |
 
 当前运行中的 `bin/uniproxy.exe` 仍是 `22596106…`（19779584 字节，2026-10-19 23:16:57），**本轮未替换、未停止服务**。用户进程 PID 5248（父 25700，2026-10-19 23:25:57 启动），子内核 PID 32296。
 

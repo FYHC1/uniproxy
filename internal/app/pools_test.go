@@ -3,6 +3,8 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,18 +24,28 @@ import (
 // Reserve a contiguous test-only TCP/UDP range simultaneously, then release it.
 // No production listeners, databases, or core processes are involved.
 //
-// Ephemeral allocation (":0") is deliberately not used as the starting point:
-// on Windows the dynamic range overlaps Hyper-V/WinNAT excluded ranges, so a
-// freshly allocated port frequently has no usable neighbours and the whole
-// helper failed intermittently. Scanning a fixed low range is stable and still
-// free of any real service (unprivileged, above 1024, below the dynamic range).
+// Two constraints shape this helper. Ephemeral allocation (":0") is not a usable
+// starting point because on Windows the dynamic range overlaps Hyper-V/WinNAT
+// reserved ranges, so a freshly assigned port often has no free neighbours. A
+// fixed low range is stable per process but collides across packages, because
+// "go test ./..." runs package test binaries in parallel. Randomized candidate
+// bases inside a wide unprivileged band avoid both problems; the bind attempt
+// itself remains the authority on availability.
 func poolTestPortRange(t *testing.T, size int) int {
 	t.Helper()
 	if size < 1 {
-		t.Fatal("port range size must be positive")
+		t.Fatalf("port range size must be positive")
 	}
-	const low, high = 21000, 48000
-	for base := low; base+size-1 <= high; base += size {
+	// This band is disjoint from the core package's fixture band, so parallel
+	// package test binaries cannot be handed the same port. It stays below the
+	// Windows dynamic range (49152+) and above privileged ports.
+	const low, high = 20000, 34000
+	if size > high-low {
+		t.Fatalf("requested port range of %d exceeds the test band", size)
+	}
+	spread := high - low - size
+	for attempt := 0; attempt < 200; attempt++ {
+		base := low + testPortOffset(spread, attempt)
 		tcp := []net.Listener{}
 		udp := []net.PacketConn{}
 		ok := true
@@ -45,18 +57,18 @@ func poolTestPortRange(t *testing.T, size int) int {
 				break
 			}
 			tcp = append(tcp, l)
-			p, err := net.ListenPacket("udp", addr)
+			packet, err := net.ListenPacket("udp", addr)
 			if err != nil {
 				ok = false
 				break
 			}
-			udp = append(udp, p)
+			udp = append(udp, packet)
 		}
 		for _, l := range tcp {
 			_ = l.Close()
 		}
-		for _, p := range udp {
-			_ = p.Close()
+		for _, packet := range udp {
+			_ = packet.Close()
 		}
 		if ok {
 			return base
@@ -64,6 +76,21 @@ func poolTestPortRange(t *testing.T, size int) int {
 	}
 	t.Fatalf("could not obtain %d isolated TCP/UDP test ports", size)
 	return 0
+}
+
+// testPortOffset spreads concurrently running package test binaries over the
+// candidate band. crypto/rand keeps it unpredictable without touching global
+// math/rand state, and the caller still verifies every port by binding it.
+func testPortOffset(spread, attempt int) int {
+	if spread <= 0 {
+		return 0
+	}
+	var b [4]byte
+	if _, err := rand.Read(b[:]); err == nil {
+		offset := int(binary.BigEndian.Uint32(b[:]) % uint32(spread+1))
+		return (offset + attempt) % (spread + 1)
+	}
+	return (attempt * 7919) % (spread + 1)
 }
 
 func poolTestSetRange(t *testing.T, a *App, start, end int) {

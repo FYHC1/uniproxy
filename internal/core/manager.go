@@ -264,7 +264,11 @@ func (m *Manager) inspectBinary(ctx context.Context) error {
 		m.setBinaryStatus(m.binaryError == nil, m.binaryVersion)
 		return m.binaryError
 	}
-	inspectCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// A version probe is a one-line print, but the first exec of a freshly written
+	// binary can be slow when an antivirus scanner inspects it or the disk is busy.
+	// A five second cap produced spurious "core unavailable" results on such hosts,
+	// so allow a realistic cold-start budget while staying bounded.
+	inspectCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 	output := &boundedLog{limit: 16 << 10}
 	cmd := m.command(inspectCtx, resolved, "-v")

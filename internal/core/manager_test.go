@@ -3,11 +3,13 @@ package core
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -360,12 +362,21 @@ func writeMockStatus(w io.Writer, request *http.Request, status int) {
 }
 
 // freePort returns a loopback port where both TCP and UDP can bind. It scans a
-// fixed low range instead of asking the OS for an ephemeral port: on Windows the
-// dynamic range overlaps excluded ranges, so ":0" often yields a port whose UDP
-// twin is unavailable and the helper failed intermittently.
+// wide unprivileged band from a random offset instead of asking the OS for an
+// ephemeral port: on Windows the dynamic range overlaps reserved ranges, so ":0"
+// often yields a port whose UDP twin is unavailable. The random start keeps
+// concurrently running package test binaries from converging on one port.
 func freePort(t *testing.T) int {
 	t.Helper()
-	for port := 21000; port < 48000; port++ {
+	// Disjoint from the app package's fixture band so parallel package test
+	// binaries cannot be handed the same port; still below the dynamic range.
+	const low, high = 35000, 49000
+	start := low
+	if seed, err := rand.Int(rand.Reader, big.NewInt(high-low)); err == nil {
+		start = low + int(seed.Int64())
+	}
+	for i := 0; i < high-low; i++ {
+		port := low + (start-low+i)%(high-low)
 		addr := net.JoinHostPort("127.0.0.1", strconv.Itoa(port))
 		tcp, err := net.Listen("tcp4", addr)
 		if err != nil {
