@@ -1,0 +1,10 @@
+node_modules
+.git
+bin
+data
+.env
+test-results
+playwright-report
+*.log
+**/.test-core
+**/coverage.out

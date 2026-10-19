@@ -1,0 +1,20 @@
+services:
+  uniproxy:
+    build: .
+    restart: unless-stopped
+    environment:
+      UNIPROXY_HOST: 0.0.0.0
+      UNIPROXY_ADMIN_TOKEN: ${UNIPROXY_ADMIN_TOKEN:?Set a random admin token of at least 24 characters}
+      UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS: "false"
+    ports:
+      - "127.0.0.1:9090:9090/tcp"
+      - "127.0.0.1:20000-20049:20000-20049/tcp"
+      # Native SOCKS UDP is loopback-only for security; use Linux host networking if needed.
+    volumes:
+      - uniproxy-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  uniproxy-data:

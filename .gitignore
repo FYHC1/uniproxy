@@ -1,0 +1,12 @@
+node_modules/
+dist/
+bin/
+data/
+.env
+playwright-report/
+test-results/
+*.log
+coverage.out
+.test-core/
+*.test
+.local/

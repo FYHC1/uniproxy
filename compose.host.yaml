@@ -1,0 +1,16 @@
+services:
+  uniproxy:
+    build: .
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      UNIPROXY_HOST: 127.0.0.1
+      UNIPROXY_ADMIN_TOKEN: ${UNIPROXY_ADMIN_TOKEN:?Set a random admin token of at least 24 characters}
+    volumes:
+      - uniproxy-data:/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+volumes:
+  uniproxy-data:

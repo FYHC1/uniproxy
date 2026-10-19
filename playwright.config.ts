@@ -1,0 +1,2 @@
+import { defineConfig } from '@playwright/test';
+export default defineConfig({ testDir: './tests/browser', timeout: 45000, workers: 1, use: { baseURL: 'http://127.0.0.1:19090', headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined), screenshot: 'only-on-failure' }, webServer: { command: 'go run ./cmd/testserver', url: 'http://127.0.0.1:19090/api/health', timeout: 120000, reuseExistingServer: false } });
