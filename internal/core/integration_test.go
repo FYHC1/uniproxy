@@ -60,6 +60,10 @@ func TestRealHTTPAndSOCKSDelaySpeedAndTCPPreservation(t *testing.T) {
 	origin := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/octet-stream")
 		if r.Method == http.MethodHead {
+			// An in-memory origin can finish below the pinned core's millisecond
+			// resolution, which its URL-test API treats as a failed zero delay.
+			// Add real fixture response time, never fabricate a measured delay.
+			time.Sleep(3 * time.Millisecond)
 			w.WriteHeader(204)
 			return
 		}

@@ -71,8 +71,10 @@ func Open(dir string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1)
-	fail := func(e error) (*Store, error) { db.Close(); return nil, e }
-	for _, q := range []string{"PRAGMA journal_mode=WAL", "PRAGMA busy_timeout=5000", "PRAGMA synchronous=FULL", "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL, payload BLOB NOT NULL)", "CREATE TABLE IF NOT EXISTS activities (id INTEGER PRIMARY KEY AUTOINCREMENT, level TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL)"} {
+	fail := func(e error) (*Store, error) { db.Close(); return nil, describeOpenError(e) }
+	// Install the bounded lock wait before journal setup/recovery. On a quick
+	// restart another connection may still be releasing its journal lock.
+	for _, q := range []string{"PRAGMA busy_timeout=5000", "PRAGMA journal_mode=WAL", "PRAGMA synchronous=FULL", "CREATE TABLE IF NOT EXISTS state (id INTEGER PRIMARY KEY CHECK(id=1), schema_version INTEGER NOT NULL, payload BLOB NOT NULL)", "CREATE TABLE IF NOT EXISTS activities (id INTEGER PRIMARY KEY AUTOINCREMENT, level TEXT NOT NULL, message TEXT NOT NULL, created_at TEXT NOT NULL)"} {
 		if _, err = db.Exec(q); err != nil {
 			return fail(err)
 		}

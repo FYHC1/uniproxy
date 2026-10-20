@@ -1,15 +1,15 @@
 // Package version is the single source of build identity.
 //
 // Release builds override these with -ldflags "-X ...Version=... -X ...Commit=...
-// -X ...Date=..."; a plain `go build` keeps the development defaults, so an
-// unreleased binary is never mistaken for a published one.
+// -X ...Date=..."; a plain `go build` keeps the source version but omits build
+// metadata. Unreleased artifacts should explicitly stamp a development version.
 package version
 
 import "strings"
 
 var (
 	// Version is the released semantic version.
-	Version = "0.2.1"
+	Version = "0.2.2"
 	// Commit is the short git commit the binary was built from.
 	Commit = "dev"
 	// Date is the build date in RFC3339 form.

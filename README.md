@@ -27,7 +27,7 @@
 
 ## 下载发布版
 
-当前正式版本：[UniProxy v0.2.1](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.1>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。私有仓库下载需要已获访问权限的GitHub账号。
+当前正式版本：[UniProxy v0.2.1](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.1>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
 
 ## 快速开始（源码）
 
@@ -67,6 +67,12 @@ Linux：
 
 下载由 **UniProxy 所在主机**直连官方发布服务，不使用浏览器或系统 HTTP 代理。如果服务器无法访问，面板会报告网络原因；可以手动放置匹配版本的 Mihomo 后点击“重新检测内核”。已有损坏/不兼容文件需先在主机上确认路径并手动处理，界面不会静默覆盖。安装目录须可写且支持硬链接（常见 NTFS、ext4 等），不支持时安全失败而不是降级覆盖。
 
+### Windows 启动失败与安全恢复
+
+若双击后窗口一闪而过，请先从 PowerShell 启动并保留错误文字。`database disk image is malformed (11)` 表示 SQLite 文件损坏，不是缺少 Mihomo；不要重装内核或删除密钥来绕过。停止全部实例后保留数据库、匹配密钥及可能存在的 WAL/SHM，再从完整备份离线恢复。运行中覆盖数据库会让旧 WAL 回写到新文件，导致损坏或数据丢失。
+
+0.2.2 源码包含：启动错误附带阶段与数据路径；独立无参数 Windows 控制台失败后等待 Enter；错误日志保存到用户缓存目录的 `UniProxy/logs/startup-*.log`，不可写时回退系统临时目录。普通 shell/脚本、`-version`、`-healthcheck` 不等待输入。Windows 子进程生命周期保护让自有 Mihomo 随主程序退出，不会扫描或终止其他实例。详情见[启动与恢复验收](<docs/windows-startup-verification.md>)。
+
 ### 开发
 
 ~~~sh
@@ -92,17 +98,17 @@ Go API 默认9090，Vite 默认5173，开发界面访问 http://127.0.0.1:5173�
 3. 已存在的旧版目录（进程工作目录下的 `data`，其次可执行文件同目录的 `data`）——升级不会因为换了默认路径而指向空库；
 4. 新建平台标准目录；若该目录不可写（例如普通用户没有 `/var/lib` 或 `ProgramData` 写权限），回退到用户目录 `%LOCALAPPDATA%\UniProxy`、`$XDG_DATA_HOME/uniproxy` 或 `~/.local/share/uniproxy`，并在日志中说明。
 
-若出现“检测到旧版…数据目录并继续使用”的提示，说明仍在用旧位置。迁移步骤：停止服务 → 把整个目录（`uniproxy.db`、`uniproxy.db-wal`、`uniproxy.db-shm`、`master.key`、`core/`）复制到新目录 → 用 `-data` 指向新目录启动一次确认数据在 → 再删除旧目录。**主密钥必须与数据库一起迁移**，换库不换钥会无法解密。
+若出现“检测到旧版…数据目录并继续使用”的提示，说明仍在用旧位置。迁移步骤：停止源与目标的全部 UniProxy 实例并确认退出 → 保留旧目录备份 → 把整个一致的数据目录（`uniproxy.db`、如存在则同一状态的 `uniproxy.db-wal` / `uniproxy.db-shm`、`master.key`、`core/`）复制到未使用的新目录 → 用 `-data` 指向新目录启动确认 → 确认恢复无误后再按需归档旧目录。**主密钥必须与数据库一起迁移。禁止在运行中覆盖数据库，禁止把新主库与旧 WAL/SHM 混用；仅复制在线主库不是可靠备份。**
 
 Docker 使用 `/data` 卷，这是容器内唯一挂载点，通过 `UNIPROXY_DATA_DIR=/data` 显式设置。
 
 ## 发布与版本
 
-版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间。当前源码默认版本为 0.2.1，未注入时不显示提交和时间；未发布构建应显式注入开发标识，不要仅凭版本号认定它是发布资产：
+版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间。当前源码默认版本为 0.2.2，未注入时不显示提交和时间；未发布构建应显式注入开发标识，不要仅凭版本号认定它是发布资产：
 
 ~~~sh
 go build -trimpath \
-  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.1 \
+  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.2 \
             -X github.com/uniproxy/uniproxy/internal/version.Commit=$(git rev-parse --short=12 HEAD) \
             -X github.com/uniproxy/uniproxy/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -o bin/uniproxy ./cmd/uniproxy
@@ -110,7 +116,7 @@ go build -trimpath \
 
 `uniproxy -version` 和 `/api/health` 都报告同一版本，可用来确认正在运行的进程对应哪个发布。
 
-发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.1` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个 UniProxy 二进制（内置在线安装功能，不再附带独立安装器），生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
+发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.2` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个 UniProxy 二进制（内置在线安装功能，不再附带独立安装器），生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
 
 ## 配置
 

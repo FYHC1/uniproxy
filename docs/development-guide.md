@@ -66,13 +66,13 @@ pnpm dev
 
 优先级：显式 `-data`/`UNIPROXY_DATA_DIR` → 已存在的标准目录 → 已存在的旧版 `data`（工作目录优先，其次可执行文件目录，日志会提示迁移）→ 新建标准目录 → 不可写时回退用户目录。旧目录被采用时**不会**在新位置建空库，避免升级后看起来数据丢失。
 
-迁移：停服 → 复制 `uniproxy.db`、`-wal`、`-shm`、`master.key`、`core/` → `-data` 指向新目录启动确认 → 删除旧目录。主密钥必须同行。
+迁移：停止源与目标的全部实例并确认退出 → 先保留完整备份 → 复制一致的 `uniproxy.db`、如存在则同一库的 `-wal` / `-shm`、`master.key`、`core/` 到未使用的新目录 → `-data` 指向新目录启动确认 → 再按需归档旧目录。主密钥必须同行。禁止在运行中覆盖主库、混用旧 WAL 或为了重启删除 WAL/SHM。2026-10-20 已确认一次在线覆盖导致关机后主库截断，见[故障验收](<windows-startup-verification.md>)。
 
 Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.1 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.2 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
 [发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
@@ -199,7 +199,7 @@ go test ./internal/app ./tests/integration -run TestPrivateClash -count=1 -v
 
 1. 确认准确exe路径、PID/子进程、管理端口、进程工作目录/绝对数据目录和内核路径，不使用过期PID。
 2. 准备匹配的备份。优先受控导出或停机后一致拷贝整个数据目录；SQLite WAL运行期间不能只复制主db文件。备份包括主密钥，且仅私有保存。
-3. 正常退出应用并确认它的内核退出。不要盲杀所有mihomo；异常退出可能留孤儿进程，先核对归属。
+3. 正常退出应用并确认它的内核退出。不要盲杀所有mihomo；旧版和非Windows异常退出可能留孤儿进程，先核对归属。M15修复候选的Windows入口已用进程生命周期Job清理自己的子孙，但这不保护在线覆盖数据库。
 4. 校验暂存文件哈希，保留旧exe到明确备份路径，再替换；任何覆盖/回滚前先确认目标。
 5. 用原数据目录启动；前端嵌入必须重启+刷新。检查bootstrap/runtime是否运行、版本一致、端口绑定正常；不要把仅health200当完整验收。
 6. 升级后更新[接续记录](<session-handoff.md>)的运行构建/哈希/时间。发布构建报告注入的版本+提交，未注入的本地构建显示开发版；仍以哈希核对具体文件。

@@ -11,6 +11,15 @@
 - pnpm test:ui：前端工具单元测试+内存构建fixture浏览器测试，不启动服务器。
 - UNIPROXY_TEST_CORE_PATH：指向已验证的 Mihomo 后执行真实内核测试；没设置时这些测试跳过而非伪造结果。
 
+## Windows 启动、关闭与同目录重启
+
+- [CLI/启动测试](<../cmd/uniproxy/main_test.go>)与[诊断测试](<../cmd/uniproxy/diagnostics_test.go>)覆盖参数脱敏、绑定端口失败不创建数据、错误路径、日志有界/回退/无覆盖和同目录取消后再启。
+- [损坏回归](<../internal/store/corruption_test.go>)只截断合成数据库，断言错误分类及原库/密钥不被清空；[短暂锁](<../internal/store/restart_test.go>)验证busy_timeout必须先于WAL初始化。
+- [Job测试](<../internal/processguard/subprocess_windows_test.go>)主测试进程不加入Job，只启动隔离helper；验证强杀/正常退出/嵌套Job清理子孙，原始inherit-all创建验证句柄不继承。
+- [构建后Windows测试](<../tests/integration/startup_windows_test.go>)需显式 APP_PATH/CORE_PATH；三轮强杀主程序而不先Stop内核，同一临时配置/端口再启，验证子进程退出与版本不丢；错误日志写隔离cache，不污染用户目录。
+- [真实控制台脚本](<../scripts/test-windows-console.py>)需Windows+Python标准库：用独立隐藏控制台和临时数据启动候选，以精确已创建PID附加核对控制台身份，然后发WM_CLOSE（不同于强杀/CTRL_BREAK）。两轮关闭/重启及无参数错误窗口保留；不向用户控制台发信号。命令：`python scripts/test-windows-console.py <uniproxy.exe> <mihomo.exe>`。只证明本机传统控制台路径，未覆盖所有Terminal/ConPTY宿主。
+- 用户数据库诊断/恢复不是常规测试。必须另行授权，先保留原证据，在副本检查完整性/解密，恢复时全部停机；不得复制运行中的主库或删除WAL来让测试通过。
+
 ## 在线内核安装验证
 
 - [下载器测试](<../internal/coreinstall/install_test.go>)以注入 transport/摘要验证四平台归档、来源/TLS重定向边界、校验先于解压、有界大小/取消清理、无覆盖文件发布竞态；默认不联网。
