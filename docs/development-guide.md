@@ -55,6 +55,28 @@ pnpm dev
 
 开发和测试不得直接复用用户数据库或在同一数据目录启动两个服务。使用绝对 -data/-core 最清楚；手工调试另选端口，勿抢占9090或测试19090。
 
+### 数据目录（平台标准位置）
+
+数据目录不再默认取相对工作目录的 `./data`，由[解析器](<../internal/appdata/appdata.go>)按平台决定：
+
+| 平台 | 默认 | 回退 |
+|---|---|---|
+| Windows | `%ProgramData%\UniProxy` | `%LOCALAPPDATA%\UniProxy` |
+| Linux | `/var/lib/uniproxy` | `$XDG_DATA_HOME/uniproxy` 或 `~/.local/share/uniproxy` |
+| macOS | `~/Library/Application Support/UniProxy` | 同左 |
+
+优先级：显式 `-data`/`UNIPROXY_DATA_DIR` → 已存在的标准目录 → 已存在的旧版 `data`（工作目录优先，其次可执行文件目录，日志会提示迁移）→ 新建标准目录 → 不可写时回退用户目录。旧目录被采用时**不会**在新位置建空库，避免升级后看起来数据丢失。
+
+迁移：停服 → 复制 `uniproxy.db`、`-wal`、`-shm`、`master.key`、`core/` → `-data` 指向新目录启动确认 → 删除旧目录。主密钥必须同行。
+
+Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
+
+### 版本与发布
+
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，本地未注入构建显示开发版。`-version` 与 `/api/health` 报告同一值。
+
+[发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个二进制与安装器，生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
+
 ## 3. 构建
 
 ### 没有活动同名程序时
@@ -181,7 +203,7 @@ go test ./internal/app ./tests/integration -run TestPrivateClash -count=1 -v
 3. 正常退出应用并确认它的内核退出。不要盲杀所有mihomo；异常退出可能留孤儿进程，先核对归属。
 4. 校验暂存文件哈希，保留旧exe到明确备份路径，再替换；任何覆盖/回滚前先确认目标。
 5. 用原数据目录启动；前端嵌入必须重启+刷新。检查bootstrap/runtime是否运行、版本一致、端口绑定正常；不要把仅health200当完整验收。
-6. 升级后更新[接续记录](<session-handoff.md>)的运行构建/哈希/时间。当前两份二进制都仍报告0.1.0，不能仅看版本字符串区分。
+6. 升级后更新[接续记录](<session-handoff.md>)的运行构建/哈希/时间。发布构建报告注入的版本+提交，未注入的本地构建显示开发版；仍以哈希核对具体文件。
 7. 涉及新数据字段时，**旧exe可能忽略并在写回时丢失字段**（尤其DialerID/Identity）。回滚必须恢复匹配旧版的备份，而不是直接让旧程序写新版数据。
 
 ## 7. 常见陷阱

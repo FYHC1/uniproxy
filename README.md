@@ -61,6 +61,43 @@ pnpm dev
 
 Go API 默认9090，Vite 默认5173，开发界面访问 http://127.0.0.1:5173。修改 Go 后需重启 Go 子进程；Vite 负责前端热更新。生产界面必须 pnpm build 后重启 UniProxy，生产二进制嵌入前端产物。
 
+## 数据目录
+
+配置数据库、主密钥与内核工作文件默认放在**平台标准位置**，不再依赖启动时的工作目录：
+
+| 平台 | 默认目录 |
+|---|---|
+| Windows | `%ProgramData%\UniProxy`（通常是 `C:\ProgramData\UniProxy`） |
+| Linux | `/var/lib/uniproxy` |
+| macOS | `~/Library/Application Support/UniProxy` |
+
+启动时会按顺序决定位置，并在日志中打印实际目录和选择原因：
+
+1. `-data` 参数或 `UNIPROXY_DATA_DIR`（显式指定优先，目录不存在会创建）；
+2. 已存在的平台标准目录；
+3. 已存在的旧版目录（进程工作目录下的 `data`，其次可执行文件同目录的 `data`）——升级不会因为换了默认路径而指向空库；
+4. 新建平台标准目录；若该目录不可写（例如普通用户没有 `/var/lib` 或 `ProgramData` 写权限），回退到用户目录 `%LOCALAPPDATA%\UniProxy`、`$XDG_DATA_HOME/uniproxy` 或 `~/.local/share/uniproxy`，并在日志中说明。
+
+若出现“检测到旧版…数据目录并继续使用”的提示，说明仍在用旧位置。迁移步骤：停止服务 → 把整个目录（`uniproxy.db`、`uniproxy.db-wal`、`uniproxy.db-shm`、`master.key`、`core/`）复制到新目录 → 用 `-data` 指向新目录启动一次确认数据在 → 再删除旧目录。**主密钥必须与数据库一起迁移**，换库不换钥会无法解密。
+
+Docker 使用 `/data` 卷，这是容器内唯一挂载点，通过 `UNIPROXY_DATA_DIR=/data` 显式设置。
+
+## 发布与版本
+
+版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间，未注入的本地构建显示为开发版：
+
+~~~sh
+go build -trimpath \
+  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.0 \
+            -X github.com/uniproxy/uniproxy/internal/version.Commit=$(git rev-parse --short=12 HEAD) \
+            -X github.com/uniproxy/uniproxy/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  -o bin/uniproxy ./cmd/uniproxy
+~~~
+
+`uniproxy -version` 和 `/api/health` 都报告同一版本，可用来确认正在运行的进程对应哪个发布。
+
+发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.0` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个二进制与安装器，生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
+
 ## 配置
 
 程序从进程环境读取设置，**不会自动载入 .env**；Docker Compose 则支持 .env 变量插值。
@@ -69,7 +106,7 @@ Go API 默认9090，Vite 默认5173，开发界面访问 http://127.0.0.1:5173�
 |---|---|
 | UNIPROXY_HOST | 127.0.0.1，管理服务 IP |
 | UNIPROXY_PORT | 9090，管理端口 |
-| UNIPROXY_DATA_DIR | ./data，数据目录 |
+| UNIPROXY_DATA_DIR | 平台标准数据目录（见下），可显式覆盖 |
 | UNIPROXY_CORE_PATH | 自动查找 data/core、bin 或可执行文件同目录的 Mihomo |
 | UNIPROXY_ADMIN_TOKEN | 本机可选；非回环监听必须至少24字符 |
 | UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS | false；显式 true 才允许受信任的内网订阅 |

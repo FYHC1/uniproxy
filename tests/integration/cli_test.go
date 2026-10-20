@@ -18,7 +18,7 @@ func TestBuiltCLIVersionAndPublicBindGuard(t *testing.T) {
 		args   []string
 		ok     bool
 		expect string
-	}{{"version", []string{"-version"}, true, "UniProxy 0.1.0"}, {"unexpected-positional", []string{"oops", "-version"}, false, "unexpected positional"}, {"public-without-token", []string{"-host", "0.0.0.0"}, false, "requires UNIPROXY_ADMIN_TOKEN"}} {
+	}{{"version", []string{"-version"}, true, "UniProxy "}, {"unexpected-positional", []string{"oops", "-version"}, false, "unexpected positional"}, {"public-without-token", []string{"-host", "0.0.0.0"}, false, "requires UNIPROXY_ADMIN_TOKEN"}} {
 		t.Run(tc.name, func(t *testing.T) {
 			cmd := exec.Command(path, tc.args...)
 			env := []string{}

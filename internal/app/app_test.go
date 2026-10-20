@@ -557,3 +557,21 @@ func TestBackupRoundTripMaintainsCredentialsAndGroups(t *testing.T) {
 		t.Fatal("backup round trip changed state")
 	}
 }
+
+// /api/health must let an operator match a running instance to a release build
+// instead of reporting one hard-coded string for every binary.
+func TestHealthReportsConfiguredVersion(t *testing.T) {
+	a, _ := fixture(t, true)
+	code, out := request(t, a, "GET", "/api/health", nil)
+	if code != 200 || out["ok"] != true {
+		t.Fatalf("health %d %#v", code, out)
+	}
+	if out["version"] != "dev" {
+		t.Fatalf("development build must report dev, got %#v", out["version"])
+	}
+	a.opts.Version = "9.9.9"
+	_, out = request(t, a, "GET", "/api/health", nil)
+	if out["version"] != "9.9.9" {
+		t.Fatalf("configured version not reported: %#v", out["version"])
+	}
+}

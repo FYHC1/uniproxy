@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"github.com/uniproxy/uniproxy/internal/version"
 )
 
 const MaxBody = 5 * 1024 * 1024
@@ -59,7 +61,7 @@ func Fetch(ctx context.Context, client *http.Client, raw string) (string, error)
 	if err != nil {
 		return "", failure(KindURL)
 	}
-	req.Header.Set("User-Agent", "UniProxy/0.1.0 Mihomo")
+	req.Header.Set("User-Agent", version.UserAgent()+" Mihomo")
 	req.Header.Set("Accept", "text/plain, application/yaml, application/json, */*")
 	if client == nil {
 		client = NewClient(false)

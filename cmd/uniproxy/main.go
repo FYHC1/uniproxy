@@ -6,8 +6,10 @@ import (
 	"flag"
 	"fmt"
 	"github.com/uniproxy/uniproxy/internal/app"
+	"github.com/uniproxy/uniproxy/internal/appdata"
 	"github.com/uniproxy/uniproxy/internal/core"
 	"github.com/uniproxy/uniproxy/internal/store"
+	"github.com/uniproxy/uniproxy/internal/version"
 	"github.com/uniproxy/uniproxy/internal/webui"
 	"log"
 	"net"
@@ -22,8 +24,6 @@ import (
 	"time"
 )
 
-const version = "0.1.0"
-
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
@@ -37,7 +37,8 @@ func run() error {
 		return errors.New("UNIPROXY_PORT must be a valid port")
 	}
 	port := flag.Int("port", portDefault, "admin listen port")
-	dataDir := flag.String("data", env("UNIPROXY_DATA_DIR", "./data"), "persistent data directory")
+	// Empty means "use the platform standard location"; see internal/appdata.
+	dataFlag := flag.String("data", env("UNIPROXY_DATA_DIR", ""), "persistent data directory (default: platform standard location)")
 	binary := flag.String("core", env("UNIPROXY_CORE_PATH", ""), "Mihomo executable path")
 	showVersion := flag.Bool("version", false, "show version")
 	healthcheck := flag.Bool("healthcheck", false, "check running local service health")
@@ -46,7 +47,7 @@ func run() error {
 		return errors.New("unexpected positional arguments; use -h for supported flags")
 	}
 	if *showVersion {
-		fmt.Println("UniProxy " + version)
+		fmt.Println("UniProxy " + version.String())
 		return nil
 	}
 	if *port < 1024 || *port > 65535 {
@@ -75,12 +76,17 @@ func run() error {
 	if !ip.IsLoopback() && token == "" {
 		return errors.New("non-loopback admin binding requires UNIPROXY_ADMIN_TOKEN (24+ characters)")
 	}
+	resolved, e := appdata.Resolve(*dataFlag, appdata.Default())
+	if e != nil {
+		return e
+	}
+	dataDir := resolved.Dir
 	if *binary == "" {
 		name := "mihomo"
 		if runtime.GOOS == "windows" {
 			name += ".exe"
 		}
-		*binary = filepath.Join(*dataDir, "core", name)
+		*binary = filepath.Join(dataDir, "core", name)
 		if _, e := os.Stat(*binary); e != nil {
 			if _, e := os.Stat(filepath.Join("bin", name)); e == nil {
 				*binary = filepath.Join("bin", name)
@@ -95,17 +101,13 @@ func run() error {
 			}
 		}
 	}
-	absData, e := filepath.Abs(*dataDir)
-	if e != nil {
-		return e
-	}
-	s, e := store.Open(absData)
+	s, e := store.Open(dataDir)
 	if e != nil {
 		return e
 	}
 	defer s.Close()
-	manager := core.New(core.Options{BinaryPath: *binary, DataDir: filepath.Join(absData, "core"), Log: func(level, message string) { s.Activity(level, message) }})
-	opts := app.Options{Token: token, Host: *host, AdminPort: *port, AllowPrivateSubscriptions: os.Getenv("UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS") == "true"}
+	manager := core.New(core.Options{BinaryPath: *binary, DataDir: filepath.Join(dataDir, "core"), Log: func(level, message string) { s.Activity(level, message) }})
+	opts := app.Options{Token: token, Host: *host, AdminPort: *port, AllowPrivateSubscriptions: os.Getenv("UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS") == "true", Version: version.Version}
 	for _, v := range strings.Split(os.Getenv("UNIPROXY_ALLOWED_ORIGINS"), ",") {
 		if v = strings.TrimSpace(v); v != "" {
 			opts.AllowedOrigins = append(opts.AllowedOrigins, v)
@@ -124,7 +126,11 @@ func run() error {
 	defer application.Close()
 	errorsCh := make(chan error, 1)
 	go func() { errorsCh <- server.Serve(listener) }()
-	log.Printf("UniProxy %s listening on http://%s", version, server.Addr)
+	log.Printf("UniProxy %s listening on http://%s", version.String(), server.Addr)
+	log.Printf("数据目录: %s (%s)", dataDir, resolved.Source)
+	if resolved.Note != "" {
+		log.Print(resolved.Note)
+	}
 	if token == "" {
 		log.Print("Admin authentication disabled for loopback-only access. Set UNIPROXY_ADMIN_TOKEN to enable.")
 	}

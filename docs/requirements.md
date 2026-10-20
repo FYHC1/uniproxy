@@ -39,6 +39,8 @@
 | R20 | 代理池页面更多信息、更紧凑，避免纵向过长 | 已实现并验证：用真实统计替代大横幅，卡片紧凑入口/状态摘要、节点限高分页/详情，单池合理利用横向空间；保留操作和真实数据语义 |
 | R21 | 点击分组直接管理节点 | 已实现并验证：组名/数量打开节点管理，搜索/全选/分页、添加现有节点、仅从组移除、启禁/延迟；区分包含与旧排除池引用，保留多来源安全提示 |
 
+| R22 | 数据备份路径需符合 Windows/Linux 开发标准；推送到 GitHub 并构建 Windows/Linux 发布 | 已实现：平台标准数据目录（ProgramData / /var/lib / Application Support）并沿用旧目录、版本单一来源与 `-ldflags` 注入、标签驱动四平台发布工作流；v0.2.0 待发布 |
+
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 
 ## 3. 必须保留的行为边界

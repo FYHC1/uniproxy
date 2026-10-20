@@ -107,7 +107,11 @@ func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 	route := func(pattern string, fn endpoint) { mux.HandleFunc(pattern, wrap(fn)) }
 	route("GET /api/health", func(w http.ResponseWriter, r *http.Request) (any, error) {
-		return map[string]any{"ok": true, "version": "0.1.0"}, nil
+		reported := a.opts.Version
+		if reported == "" {
+			reported = "dev"
+		}
+		return map[string]any{"ok": true, "version": reported}, nil
 	})
 	route("GET /api/bootstrap", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.bootstrap(), nil })
 	route("GET /api/runtime", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.Runtime(), nil })

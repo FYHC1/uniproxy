@@ -8,7 +8,7 @@ import (
 )
 
 func TestDeploymentManifestsParse(t *testing.T) {
-	for _, name := range []string{"compose.yaml", "compose.host.yaml", ".github/workflows/ci.yml", "pnpm-workspace.yaml"} {
+	for _, name := range []string{"compose.yaml", "compose.host.yaml", ".github/workflows/ci.yml", ".github/workflows/release.yml", "pnpm-workspace.yaml"} {
 		t.Run(name, func(t *testing.T) {
 			b, e := os.ReadFile(filepath.Join("..", "..", filepath.FromSlash(name)))
 			if e != nil {

@@ -23,6 +23,8 @@ COPY --from=build /out/uniproxy /app/uniproxy
 COPY --from=build /out/core-install /app/core-install
 RUN mkdir -p /app/bin /data && /app/core-install -output /app/bin/mihomo && chown -R uniproxy:uniproxy /data /app/bin
 USER uniproxy
+# /data is the container's mounted volume; the host default (/var/lib/uniproxy)
+# is replaced here on purpose because the volume must be a single mount point.
 ENV UNIPROXY_HOST=0.0.0.0 UNIPROXY_PORT=9090 UNIPROXY_DATA_DIR=/data UNIPROXY_CORE_PATH=/app/bin/mihomo
 EXPOSE 9090/tcp
 VOLUME ["/data"]

@@ -1,29 +1,29 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-10-20 01:10（Asia/Shanghai）。M11首次入库GitHub + 全面复查修复已完成并重新暂存；用户运行进程仍为2026-10-19 23:25启动的旧构建，未部署、未停止服务、未改动DB/主密钥/原始节点文件。**
+**最后核对：2026-10-20 09:00（Asia/Shanghai）。M12平台标准数据目录+版本注入+发布工作流已完成，源码 v0.2.0 待发布；用户运行进程为 08:15:36 启动的 M11 构建，数据仍在旧目录 bin/data，本轮未部署、未停止服务、未改动其 DB/主密钥。**
 
 ## 30秒摘要
 
 - 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32；不是Node/sing-box早期草案。
-- M0–M11完成。M11：仓库初始化并推送私有GitHub仓库，全面复查后修复7项缺陷。详情见[复查验收](<repository-review-verification.md>)、[M10验收](<subscription-groups-verification.md>)和[计划](<development-plan.md>)，不要重做旧任务。
-- **当前用户运行的是2026-10-19 23:25:57启动的旧构建（PID 5248，SHA256 22596106…），M10/M11新版均未部署。** 本轮未替用户升级，仅只读核对进程与文件。
-- M11修复：长节点名导致批量端口整批失败、预览/保存名称口径不一致、订阅元数据下载后才校验、监听页/节点页把待同步地址显示为监听中、活动记录按字节截断产生乱码、测试脚本写死浏览器路径、文档含个人绝对路径。
-- M11实际通过：**32 API浏览器、32工具、Go全量 -p1、vet、gofmt、严格TS、fixture UI、真实本机内核链路、构建后进程/CLI/manifest、Windows暂存+Linux两架构**。未请求私有订阅路径/正文或真实节点；race/Docker/Linux实跑/压测未做。
+- M0–M12完成。M12：数据目录改平台标准位置并沿用旧目录、版本注入、标签发布工作流（v0.2.0）。详情见[数据/发布验收](<data-release-verification.md>)、[复查验收](<repository-review-verification.md>)、[计划](<development-plan.md>)，不要重做旧任务。
+- **当前用户运行 PID 31588（2026-10-20 08:15:36 启动），哈希 510CAE7F…，即 M11 构建；数据在 [bin/data](<../bin/data/>)。M12 未部署。** 用户已自行导出备份到 Downloads。
+- M12变更：默认数据目录改为 `%ProgramData%\UniProxy` / `/var/lib/uniproxy` / Application Support；已有旧 `data` 会被沿用并在日志提示迁移；`-version`、启动日志与 `/api/health` 统一报告注入的版本；标签驱动四平台发布。
+- M12实际通过：Go全量、vet、gofmt、严格TS、32工具、32 API浏览器、fixture UI、真实本机内核链路、appdata/version/health 新测试、release ldflags 注入实测。未在 Linux/Docker 实跑；未创建正式 Release。
 - 下一步仅在用户批准后部署最新版/用户验收，或接受新的明确任务；不要擅自停服务、删除节点或换数据目录。
 
 先读：[需求](<requirements.md>) → [决策](<decisions.md>) → [开发指南](<development-guide.md>)。本文PID/哈希有时效性，未来操作前重新核对。
 
 ## 1. 当前工作区与用户实例
 
-| 项目 | 2026-10-20 01:10观察 |
+| 项目 | 2026-10-20 09:00观察 |
 |---|---|
 | 工作区 | 本仓库根目录（会话启动时由运行环境提供；文档不记录个人绝对路径） |
-| 版本控制 | 已初始化 git 并推送私有 GitHub 仓库；提交 `7829f25`（初始导入）、`1e956c9`（复查修复）、`f8b504e`（测试稳定性）、`b0459e0`（CI记录）；CI 两平台通过 |
-| 用户应用 | PID5248，启动2026-10-19 23:25:57，[bin/uniproxy.exe](<../bin/uniproxy.exe>)，无CLI参数 |
-| 子内核 | PID32296，父5248，启动23:26:02，[bin/mihomo.exe](<../bin/mihomo.exe>)，-f -从stdin读配置 |
-| 数据线索 | 子内核-d指向[bin/data/core](<../bin/data/core/>)，用户数据预计[bin/data](<../bin/data/>)；没有读取DB/密钥，升级前仍需核对启动环境/CWD |
+| 版本控制 | 私有 GitHub 仓库，CI 两平台通过；M12 提交后需推送 v0.2.0 标签才会产生 Release |
+| 用户应用 | PID31588，启动2026-10-20 08:15:36，[bin/uniproxy.exe](<../bin/uniproxy.exe>)，无CLI参数 |
+| 子内核 | PID27432，父31588，启动08:15:39，[bin/mihomo.exe](<../bin/mihomo.exe>)，-f -从stdin读配置 |
+| 数据线索 | 子内核 -d 指向 [bin/data/core](<../bin/data/core/>)，实际数据在 [bin/data](<../bin/data/>)（旧版布局）；未读取DB/密钥。用户已导出备份到 Downloads。 |
 | 其他目录 | 根[data](<../data/>)来自更早测试，不能与用户数据混用或自行清理 |
-| 管理端口 | 默认9090；本轮未请求用户运行API，未把默认值当监听事实 |
+| 管理端口 | 127.0.0.1:9090 正在监听（PID31588）；本轮仅只读查询 health/bootstrap 计数 |
 | 测试端口 | API浏览器仅临时19090，测试结束不保留服务；真实core测试均临时状态/本机受控上游 |
 
 默认-data=./data相对于进程CWD，不是exe目录。不能在旧实例运行时直接启动暂存程序；启动真实数据会自动apply/订阅刷新/检测，不能当只读检查。不得复用这里PID作为未来kill命令。
@@ -32,12 +32,12 @@
 
 | 产物 | 字节数 / mtime | SHA256 |
 |---|---|---|
-| [当前运行文件](<../bin/uniproxy.exe>) | 19779584 / 2026-10-19 23:16:57 | 22596106E243811EC3FCB81A5C39A982643D731D9782CBAC8EDC49F1F1DC81AB |
-| [Windows M11新版](<../bin/updates/uniproxy.exe>) | 19785216 / 2026-10-20 01:42:34 | 510CAE7FE157938A8F5060AE5B66363E73A73EFF9CE90F3F63CABF20CB147317 |
-| [Linux amd64 M11](<../bin/updates/linux-amd64/uniproxy>) | 19335940 / 01:42:37 | 0C901F935D2346B201931336EF2EE7EF9771436D0F9BAA91C791C45F78E658F7 |
-| [Linux arm64 M11](<../bin/updates/linux-arm64/uniproxy>) | 18211567 / 01:42:39 | 229771A0D1AB43CF2882BE6EAA9F502B9C28A8250352394E6FF9CA56C7826BFA |
+| [当前运行文件](<../bin/uniproxy.exe>) | 19785216 / 2026-10-19 17:42:34 | 510CAE7FE157938A8F5060AE5B66363E73A73EFF9CE90F3F63CABF20CB147317 |
+| [Windows v0.2.0 暂存](<../bin/updates/uniproxy.exe>) | 13579776 / 2026-10-20 09:04:03 | 655620BD53A894CF132CA82BFC68DB48ADAAAD8F5F3D4AD30360823D3AF78F49 |
+| [Linux amd64 v0.2.0 暂存](<../bin/updates/linux-amd64/uniproxy>) | 13250720 / 09:04:05 | 2321750BB3B359793AD4A70B855CC138B812FE2219C22B26732BA78B5E5184CD |
+| [Linux arm64 v0.2.0 暂存](<../bin/updates/linux-arm64/uniproxy>) | 12452000 / 09:04:08 | 96AF842A2D611BC0E7CB50C648FD1DD2A4FAD2F4DE85EB79D3D661E5C10F1257 |
 
-仍报告0.1.0，不可用health/version字符串辨认补丁；health200只是存活，不代表core/config ready。哈希不是签名或自动升级授权。
+v0.2.0 构建已注入版本/提交/时间，`-version` 与 `/api/health` 均报告 `0.2.0 · commit … · built …`；但 health200 只是存活，不代表 core/config ready，哈希仍不是签名或自动升级授权。
 
 历史20:31：应用PID27412、核心14788，当时运行文件19565056字节/SHA256 B2F45BFD28154D156A7F91F84678FFE983B3D07ADFC4279097743B3B2B405778，暂存为4A8FC2F8…；这些均不作为当前运行事实。
 

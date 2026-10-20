@@ -32,6 +32,9 @@ type Options struct {
 	AllowedOrigins            []string
 	AllowPrivateSubscriptions bool
 	AdminPort                 int
+	// Version is reported by /api/health so a running instance can be matched to
+	// the release it came from. Empty means "development build".
+	Version string
 }
 type App struct {
 	mu              sync.Mutex
