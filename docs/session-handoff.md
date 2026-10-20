@@ -6,7 +6,7 @@
 
 - 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32；不是Node/sing-box早期草案。
 - M0–M12完成。M12：数据目录改平台标准位置并沿用旧目录、版本注入、标签发布工作流；**v0.2.0 已发布并校验**。详情见[数据/发布验收](<data-release-verification.md>)、[复查验收](<repository-review-verification.md>)、[计划](<development-plan.md>)，不要重做旧任务。
-- **当前用户运行 PID 31588（2026-10-20 08:15:36 启动），哈希 510CAE7F…，即 M11 构建；数据在 [bin/data](<../bin/data/>)。v0.2.0 未部署到该实例。** 用户已导出备份到 Downloads。
+- **用户实例已停止**（09:25 复核无进程/无9090监听），数据完整保留在 [bin/data](<../bin/data/>)，WAL 已 checkpoint。此前运行 PID31588（M11 构建，哈希 510CAE7F…）。v0.2.0 未部署到该实例；本轮未启动或停止该服务。
 - M12变更：默认数据目录改为 `%ProgramData%\UniProxy` / `/var/lib/uniproxy` / Application Support；已有旧 `data` 会被沿用并在日志提示迁移；`-version`、启动日志与 `/api/health` 统一报告注入的版本；标签驱动四平台发布。
 - M12实际通过：Go全量、vet、gofmt、严格TS、32工具、32 API浏览器、fixture UI、真实本机内核链路、appdata/version/health 新测试、release ldflags 实测；**CI 两平台成功；Release 两 job 成功，发布资产 SHA256 全部复核，Windows 发布二进制实跑 health/UI 通过**。未在 Linux 主机/Docker 实跑。
 - 下一步仅在用户批准后部署最新版/用户验收，或接受新的明确任务；不要擅自停服务、删除节点或换数据目录。
@@ -19,11 +19,11 @@
 |---|---|
 | 工作区 | 本仓库根目录（会话启动时由运行环境提供；文档不记录个人绝对路径） |
 | 版本控制 | 私有 GitHub 仓库，CI 两平台通过；M12 提交后需推送 v0.2.0 标签才会产生 Release |
-| 用户应用 | PID31588，启动2026-10-20 08:15:36，[bin/uniproxy.exe](<../bin/uniproxy.exe>)，无CLI参数 |
-| 子内核 | PID27432，父31588，启动08:15:39，[bin/mihomo.exe](<../bin/mihomo.exe>)，-f -从stdin读配置 |
-| 数据线索 | 子内核 -d 指向 [bin/data/core](<../bin/data/core/>)，实际数据在 [bin/data](<../bin/data/>)（旧版布局）；未读取DB/密钥。用户已导出备份到 Downloads。 |
+| 用户应用 | **未运行**（09:25 复核：无 uniproxy/mihomo 进程，9090 无监听）。此前为 PID31588，08:15:36 启动；停止原因未知，非本轮操作 |
+| 子内核 | 随主进程退出。此前 PID27432 |
+| 数据线索 | 数据在 [bin/data](<../bin/data/>)：`uniproxy.db` 724,992 B（00:26:28），`master.key` 32 B；WAL 已随干净退出合并并移除。未读取内容。用户已导出备份到 Downloads。 |
 | 其他目录 | 根[data](<../data/>)来自更早测试，不能与用户数据混用或自行清理 |
-| 管理端口 | 127.0.0.1:9090 正在监听（PID31588）；本轮仅只读查询 health/bootstrap 计数 |
+| 管理端口 | 9090 无监听（服务已停止）；此前只读查询 health/bootstrap 计数 |
 | 测试端口 | API浏览器仅临时19090，测试结束不保留服务；真实core测试均临时状态/本机受控上游 |
 
 默认-data=./data相对于进程CWD，不是exe目录。不能在旧实例运行时直接启动暂存程序；启动真实数据会自动apply/订阅刷新/检测，不能当只读检查。不得复用这里PID作为未来kill命令。
@@ -134,6 +134,14 @@ Vite单chunk 509.25kB/gzip 150.33kB仍触发500kB非失败警告，未修改阈�
 - SQLite仅payload加密，WAL在线不可只拷主db；配置明文只内存/stdin，剔除CLASH_/MIHOMO_环境覆盖。
 - 源节点多来源归属不提升成全部人工固定；任务/刷新有revision/代数校验。
 - 普通pnpm build覆盖原bin exe，有活动服务时只暂存；前端嵌入Go，刷新旧程序不能生效。
+
+## 5.1 复核时观察到的实例状态（非本轮操作）
+
+2026-10-20 09:25 复核：`uniproxy`/子 `mihomo` 进程均不存在，9090 无监听，WAL 已合并进主库并被移除（`uniproxy.db` 724,992 B，mtime 00:26:28）。这符合正常退出后的状态，数据与主密钥完整。
+
+本轮**没有**停止、重启或替换该服务：全部工作只写入源码、文档、`bin/updates` 暂存目录和临时目录。若需要重新启动，请在 `bin` 目录下运行 `bin\uniproxy.exe`（当前文件仍是 M11 构建），或先用 v0.2.0 发布资产替换后再启动。
+
+**注意**：升级到 v0.2.0 后默认数据目录变为 `C:\ProgramData\UniProxy`，但 `bin\data` 会被自动识别为旧目录并继续使用；若要真正迁移，按 README「数据目录」步骤复制 `uniproxy.db` + `master.key` 后删除旧目录。
 
 ## 6. 明确下一步及接续
 
