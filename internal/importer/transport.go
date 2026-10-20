@@ -183,10 +183,13 @@ func readPlugin(r *fields, out map[string]any) {
 		tls := p.boolean("tls", false)
 		options["tls"] = tls
 		if p.has("skip-cert-verify") {
-			if !tls {
+			insecure := p.boolean("skip-cert-verify", false)
+			if !tls && insecure {
 				p.fail("plugin TLS options require TLS")
 			}
-			copyBool(p, options, "skip-cert-verify")
+			if tls {
+				options["skip-cert-verify"] = insecure
+			}
 		}
 		if p.has("name-cert-verify") {
 			value := p.text("name-cert-verify", true)

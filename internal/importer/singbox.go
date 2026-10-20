@@ -275,6 +275,13 @@ func singTLS(r *fields, out map[string]any, protocol string, required bool) {
 		tls.fail("TLS must be explicitly enabled for this sing-box protocol")
 	}
 	out["tls"] = enabled
+	if !enabled {
+		readDisabledSingTLS(tls)
+		if err := tls.finish(); err != nil {
+			r.fail(err.Error())
+		}
+		return
+	}
 	key := "sni"
 	if protocol == "vless" || protocol == "vmess" {
 		key = "servername"
@@ -322,15 +329,37 @@ func singTLS(r *fields, out map[string]any, protocol string, required bool) {
 			tls.fail("invalid or unsupported sing-box Reality options")
 		}
 	}
-	if !enabled {
-		for key := range tls.values {
-			if key != "enabled" {
-				tls.fail("disabled TLS contains options that would be ignored")
-			}
-		}
-	}
 	if err := tls.finish(); err != nil {
 		r.fail(err.Error())
+	}
+}
+
+// readDisabledSingTLS recognizes only explicit typed no-ops emitted by common
+// exporters. Unknown fields, file references, active uTLS/Reality and nonempty
+// verification settings remain errors; none are copied to a plaintext node.
+func readDisabledSingTLS(tls *fields) {
+	if tls.has("server_name") && tls.text("server_name", false) != "" {
+		tls.fail("disabled TLS contains options that would be ignored")
+	}
+	for _, key := range []string{"insecure", "disable_sni"} {
+		if tls.has(key) && tls.boolean(key, false) {
+			tls.fail("disabled TLS contains options that would be ignored")
+		}
+	}
+	for _, key := range []string{"utls", "reality"} {
+		if !tls.has(key) {
+			continue
+		}
+		options := newFields(tls.object(key))
+		if options.boolean("enabled", false) {
+			options.fail("disabled TLS contains active security options")
+		}
+		if key == "utls" && options.has("fingerprint") && options.text("fingerprint", false) != "" {
+			options.fail("disabled uTLS contains active options")
+		}
+		if err := options.finish(); err != nil {
+			tls.fail("disabled TLS contains invalid or active security options")
+		}
 	}
 }
 

@@ -34,6 +34,13 @@ go test ./tests/integration -run '^TestOnlineCoreDownloadThroughManagementAPI$' 
 $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 ~~~
 
+## 订阅格式兼容与授权样例离线验证
+
+- [TLS回归](<../internal/importer/tls_compat_test.go>)覆盖false/空SNI占位、显式安全冲突、URI/VMess/sing-box/插件、稳定指纹和中转；[客户端文本测试](<../internal/importer/client_formats_test.go>)覆盖有界静态段/引用拒绝/参数与引号；[URI元数据测试](<../internal/importer/subscription_uri_test.go>)覆盖STATUS与同值SNI别名。
+- [API回归](<../internal/app/subscription_compat_test.go>)采用注入HTTP transport和临时SQLite/fakeCore，验证7节点预览/保存/刷新、无秘密响应、强制错误刷新也不清理。
+- [集成验证](<../tests/integration/subscription_formats_test.go>)的合成方言用例需显式CORE_PATH进行Mihomo `-t`；不启动上游节点。私有样例仅在用户授权后通过 `UNIPROXY_TEST_SUBSCRIPTION_MANIFEST` 指向仓库外JSON清单（File绝对路径、Nodes/Errors预期数、可选ErrorContains），执行 `go test ./tests/integration -run "^TestPrivateSubscriptionFilesOffline$" -count=1 -v`。文件读取有界，测试不下载URL、不打印文件路径/内容/凭据，不启动节点；有CORE_PATH时仅对零错误样例做配置校验。常规测试该变量必须为空。[真实回环TLS观察](<../tests/integration/subscription_tls_test.go>)仅本机ClientHello，服务端故意中止握手，断言显式SNI未被WS Host替换且测速不能假成功。[候选程序验收](<../tests/integration/subscription_binary_test.go>)在临时data/cache、显式不存在core下直接验证暂存编译程序的6种格式/结构文档预览与保存及活动冲突拒绝。
+- [浏览器用例](<../tests/browser/subscription-formats.spec.ts>)只用临时缺失core服务器和合成文档地址：TLS占位导入、静态CONF预览/保存不采用全局策略、真实TLS冲突阻止导入。具体本轮结果见[验收](<subscription-format-verification.md>)。
+
 ## 必测功能
 
 1. 各协议链接/Clash/sing-box 配置导入，非法参数及不支持变体明确拒绝，错误不泄漏密钥。

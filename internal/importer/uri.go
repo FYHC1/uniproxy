@@ -22,18 +22,20 @@ func newQuery(raw string) *query {
 	if err != nil {
 		q.fail("malformed URI query encoding")
 	}
+	// Multiple malformed fields must yield the same safe first reason across
+	// runs; map iteration order cannot determine user-visible diagnostics.
+	duplicate, invalidEncoding := false, false
 	for key, v := range values {
-		if len(v) != 1 {
-			q.fail("duplicate URI query option")
-		}
-		if !utf8.ValidString(key) {
-			q.fail("invalid URI query encoding")
-		}
+		duplicate = duplicate || len(v) != 1
+		invalidEncoding = invalidEncoding || !utf8.ValidString(key) || strings.ContainsRune(key, 0)
 		for _, value := range v {
-			if !utf8.ValidString(value) || strings.ContainsRune(value, 0) {
-				q.fail("invalid URI query encoding")
-			}
+			invalidEncoding = invalidEncoding || !utf8.ValidString(value) || strings.ContainsRune(value, 0)
 		}
+	}
+	if invalidEncoding {
+		q.fail("invalid URI query encoding")
+	} else if duplicate {
+		q.fail("duplicate URI query option")
 	}
 	return q
 }
@@ -59,6 +61,24 @@ func (q *query) take(keys ...string) (string, bool) {
 	}
 	return value, present
 }
+
+// takeEquivalentSNI accepts exporter aliases only when their decoded values
+// agree byte-for-byte. Duplicate occurrences of one key are still rejected by
+// newQuery; every other option family retains the stricter alias policy.
+func (q *query) takeEquivalentSNI() (string, bool) {
+	value, present := "", false
+	for _, key := range []string{"sni", "peer", "serverName", "servername"} {
+		q.used[key] = true
+		if values, ok := q.values[key]; ok && len(values) > 0 {
+			if present && value != values[0] {
+				q.fail("conflicting URI option aliases")
+			}
+			value, present = values[0], true
+		}
+	}
+	return value, present
+}
+
 func (q *query) set(out map[string]any, key string, aliases ...string) {
 	if value, ok := q.take(aliases...); ok {
 		out[key] = value
@@ -310,7 +330,9 @@ func uriTLS(q *query, out map[string]any, protocol string, defaultTLS bool) {
 	if protocol == "vless" || protocol == "vmess" {
 		key = "servername"
 	}
-	q.set(out, key, "sni", "peer", "serverName", "servername")
+	if value, ok := q.takeEquivalentSNI(); ok {
+		out[key] = value
+	}
 	q.flag(out, "skip-cert-verify", "allowInsecure", "allowinsecure", "insecure", "skip-cert-verify")
 	q.set(out, "client-fingerprint", "fp", "client-fingerprint")
 	q.set(out, "fingerprint", "fingerprint", "pinSHA256", "pinSHA256Cert")

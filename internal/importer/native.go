@@ -358,11 +358,24 @@ func readTLS(r *fields, out map[string]any, protocol string, implicit bool) {
 	if protocol == "vless" || protocol == "vmess" {
 		serverKey = "servername"
 	}
-	tlsKeys := []string{serverKey, "skip-cert-verify", "name-cert-verify", "fingerprint", "alpn", "client-fingerprint", "reality-opts"}
-	for _, key := range tlsKeys {
-		if r.has(key) && !enabled {
+	if !enabled {
+		// Common exporters emit disabled verification and an empty SNI even for
+		// plaintext nodes. Consume only these typed, inert defaults; keep the
+		// same canonical map/fingerprint as a node without those placeholders.
+		// Any active security setting is still a conflict, never a reason to
+		// infer TLS or silently drop requested authentication.
+		if r.has(serverKey) && r.text(serverKey, false) != "" {
 			r.fail("TLS options require TLS to be enabled")
 		}
+		if r.has("skip-cert-verify") && r.boolean("skip-cert-verify", false) {
+			r.fail("TLS options require TLS to be enabled")
+		}
+		for _, key := range []string{"name-cert-verify", "fingerprint", "alpn", "client-fingerprint", "reality-opts"} {
+			if r.has(key) {
+				r.fail("TLS options require TLS to be enabled")
+			}
+		}
+		return
 	}
 	if r.has(serverKey) {
 		if protocol == "socks5" {

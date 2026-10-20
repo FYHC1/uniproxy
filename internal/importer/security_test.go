@@ -247,6 +247,9 @@ func TestParseConcurrentAndDeterministic(t *testing.T) {
 func FuzzParseNeverPanics(f *testing.F) {
 	seeds := []string{"", "proxies: []", `{"outbounds":[]}`, "http://example.com:80", "vless://" + testUUID + "@example.com:443", "ss://YWVzLTEyOC1nY206cGFzc3dvcmQ@example.com:443", "proxies: [*bad]", vmessLink(vmessBase()), "trojan://p%00@example.com:443"}
 	seeds = append(seeds,
+		"[Proxy]\nDIRECT = direct\nfixture = trojan, example.invalid, 443, password=synthetic-only,sni=front.example.invalid,skip-cert-verify=false\n[Rule]\nFINAL,DIRECT",
+		"[server_local]\nvmess=example.invalid:443,password="+testUUID+",method=auto,obfs=wss,obfs-host=front.example.invalid,tag=fixture",
+		"STATUS=synthetic status\ntrojan://p@example.invalid:443?sni=front.example.invalid&peer=front.example.invalid",
 		"proxies: [{name: exit, type: http, server: exit.example, port: 80, dialer-proxy: relay}, {name: relay, type: http, server: relay.example, port: 80}]",
 		"proxies: [{name: a, type: http, server: a.example, port: 80, dialer-proxy: b}, {name: b, type: http, server: b.example, port: 80, dialer-proxy: a}]",
 	)

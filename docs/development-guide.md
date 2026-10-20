@@ -72,7 +72,7 @@ Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.2 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.3 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
 [发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
@@ -143,7 +143,7 @@ pnpm test:ui
 
 - E2E用[隔离测试服务器](<../cmd/testserver/main.go>)19090及临时数据库；不会使用真实节点。Windows默认Edge。[配置](<../playwright.config.ts>)不复用已存在服务器。
 - UI fixture脚本内存构建、拦截测试域名，无产品假数据；它不能替代真实Go/内核验证。
-- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为34个E2E、36个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
+- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为37个E2E、36个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
 
 ### 私有文件离线验证
 

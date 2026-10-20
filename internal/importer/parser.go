@@ -79,14 +79,32 @@ func parseContent(content string, depth int, result *model.ParseResult) {
 		issue(result, 1, "import contains no nodes")
 		return
 	}
+	// Detect static client profiles before scanning for URI-looking text in
+	// their ignored rule/script sections. The adapter never fetches providers
+	// or imports global policy, and leaves other formats untouched.
+	if tryParseClientText(content, result) {
+		return
+	}
 	if isURILine(first) || looksLikeURIList(trimmed) {
 		scanner := bufio.NewScanner(strings.NewReader(content))
 		scanner.Buffer(make([]byte, 4096), MaxContentBytes+1)
 		line, attempts := 0, 0
+		statusSeen := false
 		for scanner.Scan() {
 			line++
 			text := strings.TrimSpace(scanner.Text())
 			if text == "" || strings.HasPrefix(text, "#") || strings.HasPrefix(text, "//") {
+				continue
+			}
+			// Some URI subscriptions prepend a STATUS= account-information line.
+			// It is presentation only, never a node or a request. Accept at most
+			// one bounded header before entries; unknown/late lines still fail.
+			if strings.HasPrefix(text, "STATUS=") && attempts == 0 && !statusSeen {
+				statusSeen = true
+				value := strings.TrimPrefix(text, "STATUS=")
+				if value == "" || len(value) > 1024 || containsControl(value) {
+					issue(result, line, "invalid subscription status header")
+				}
 				continue
 			}
 			attempts++
@@ -131,13 +149,21 @@ func firstDataLine(s string) string {
 
 func looksLikeURIList(content string) bool {
 	first := firstDataLine(content)
-	if strings.HasPrefix(first, "{") || strings.HasPrefix(first, "[") || strings.HasPrefix(first, "-") || strings.Contains(first, ": ") || strings.HasSuffix(first, ":") {
+	if !strings.HasPrefix(first, "STATUS=") && (strings.HasPrefix(first, "{") || strings.HasPrefix(first, "[") || strings.HasPrefix(first, "-") || strings.Contains(first, ": ") || strings.HasSuffix(first, ":")) {
 		return false
 	}
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	scanner.Buffer(make([]byte, 4096), MaxContentBytes+1)
 	for scanner.Scan() {
-		if isURILine(strings.TrimSpace(scanner.Text())) {
+		line := scanner.Text()
+		if isURILine(strings.TrimSpace(line)) {
+			// A STATUS-looking YAML key can introduce a block scalar. Its
+			// indented contents are data, not independently importable nodes.
+			// STATUS URI subscriptions require unindented entry lines so the
+			// metadata exception cannot steal a genuine YAML document.
+			if strings.HasPrefix(first, "STATUS=") && line != strings.TrimLeft(line, " \t") {
+				return false
+			}
 			return true
 		}
 	}

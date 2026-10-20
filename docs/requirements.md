@@ -43,6 +43,7 @@
 
 | R23 | Mihomo 安装不再依赖独立安装器：自动检测缺失并在 WebUI 提示，运行与设置页提供在线安装 | 已实现并验证：内置固定版本安全下载、后台进度/重试/重新检测、明确安装与应用分离；不覆盖已有或运行中的内核，已随v0.2.1发布；[验收](<core-install-verification.md>) |
 | R24 | 排查并修复 Windows 关闭终端后再次双击启动闪退 | 已确认在线覆盖SQLite主库造成malformed(11)并按授权离线恢复；修复错误可见性、损坏提示、初始锁等待、早期取消和Windows自有子进程退出保护，已作为v0.2.2发布；[验收](<windows-startup-verification.md>) |
+| R25 | 修复订阅下载成功后的节点解析兼容问题，参考 Clash Verge Rev / FlClash，并验证多客户端订阅 | 已实现/本地验证：原订阅7/7通过，false TLS占位与静态QX/Loon/Surge/Surfboard适配、URI元数据/SNI别名；保留来源完整性/安全字段，格式歧义按明确限制处理。2026-10-21已获准发布v0.2.3，不含部署；[功能验收](<subscription-format-verification.md>)、[发布验收](<release-0.2.3-verification.md>) |
 
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 

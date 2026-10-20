@@ -11,7 +11,7 @@
 ## 功能
 
 - 导入 VLESS / VMess / Trojan / Shadowsocks / Hysteria / Hysteria2 / TUIC / SSH / SOCKS5 / HTTP(S) 节点。
-- 粘贴节点链接、Base64 订阅、批量订阅 URL、本地 Clash YAML/JSON 和 sing-box JSON。自定义多个分组，预览识别结果；不支持的参数明确报错，不悄悄降级。
+- 粘贴节点链接、Base64 订阅、批量订阅 URL、本地 Clash YAML/JSON 和 sing-box JSON。0.2.3 源码支持 Quantumult X、Surge/Surfboard、Loon 静态节点文本；只提取节点，不采用全局规则/脚本或远程provider。自定义多个分组，预览识别结果；不支持的参数明确报错，不悄悄降级。
 - 节点多分组、搜索筛选（包含任一/全部、排除分组、仅未分组）、批量启禁/删除/加减分组、连通性检测、限流下载测速、批量独享端口。点击分组可直接分页管理组内节点、添加已有节点、移出本组和全局启禁/检测。
 - 订阅下载支持严格Fake-IP DNS兼容与分类诊断：只对全Fake-IP域名做公共加密DNS复核，保留公网地址/TLS/重定向安全校验，不放行内网。
 - 本地导入支持点击选择和拖入单个文件；相同5MiB限制，拒绝文件夹/多文件，拖入后需预览确认。
@@ -104,11 +104,11 @@ Docker 使用 `/data` 卷，这是容器内唯一挂载点，通过 `UNIPROXY_DA
 
 ## 发布与版本
 
-版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间。当前源码默认版本为 0.2.2，未注入时不显示提交和时间；未发布构建应显式注入开发标识，不要仅凭版本号认定它是发布资产：
+版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间。当前源码默认版本为 0.2.3，未注入时不显示提交和时间；未发布构建应显式注入开发标识，不要仅凭版本号认定它是发布资产：
 
 ~~~sh
 go build -trimpath \
-  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.2 \
+  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.3 \
             -X github.com/uniproxy/uniproxy/internal/version.Commit=$(git rev-parse --short=12 HEAD) \
             -X github.com/uniproxy/uniproxy/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -o bin/uniproxy ./cmd/uniproxy
@@ -116,7 +116,7 @@ go build -trimpath \
 
 `uniproxy -version` 和 `/api/health` 都报告同一版本，可用来确认正在运行的进程对应哪个发布。
 
-发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.2` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个 UniProxy 二进制（内置在线安装功能，不再附带独立安装器），生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
+发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.3` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个 UniProxy 二进制（内置在线安装功能，不再附带独立安装器），生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
 
 ## 配置
 

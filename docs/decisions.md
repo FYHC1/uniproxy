@@ -207,3 +207,13 @@ Docker 保持 `/data` 卷，因为容器内需要一个固定挂载点；这是�
 退出信号在慢启动前注册；应用Close取消与HTTP排空并行，而非排空后才取消。Windows入口在任何内核探测前调用[processguard.Enable](<../internal/processguard/processguard.go>)：无名且不可继承句柄的KILL_ON_JOB_CLOSE Job Object把当前主进程与后续子孙进程绑定，原始句柄保持至OS进程退出，不能在Manager.Stop或defer关闭。嵌套Job受宿主限制时明确失败，不绕过宿主策略/不静默无保护。非Windows行为不变。只负责自己的子进程，不按名称/PID寻找旧实例；普通关闭、强制结束/异常退出均不等于Windows常驻服务。
 
 不承诺程序能阻止主机管理员对运行中数据库强制覆盖。物理迁移/恢复必须源与目标都停止，用同一一致性状态的数据库/密钥/WAL/SHM，不手工拼接不同代文件；优先使用应用导出备份或停机完整副本。正常SQLite WAL崩溃恢复不需要删除sidecar。新增测试与实测范围见[本轮验收](<windows-startup-verification.md>)。
+
+## D23 — 订阅静态节点适配与有类型的无操作默认值
+
+**状态：2026-10-20按R25实现并隔离验证；2026-10-21获准发布v0.2.3，进度见[发布验收](<release-0.2.3-verification.md>)，不含部署。**
+
+本次原始错误来自4个明文VMess同时携带false证书绕过占位。现有按key存在拒绝的规则过严；只接受严格类型的false绕过标志和精确空SNI，与省略时归一到同一身份。活动TLS、Reality、证书pin、非空SNI和传输约束不降级；尤其不能忽略可能充当gRPC authority的非空servername。插件和sing-box仅作同等窄范围处理，未知字段即便为false/空也仍拒绝。
+
+客户端名称不等于格式。Quantumult X、Surge/Surfboard、Loon静态段通过独立有界适配层映射到native白名单，不采用其全局配置/规则/DNS/MITM/脚本。没有网络/文件执行副作用；远程节点provider/include/条件定义不能静默遗漏。全文件Proxy段的精确无参数内置策略声明仅忽略为非节点元数据，不能变为出口；只有这种声明仍不是成功空来源。URI的同值SNI别名及一个开头STATUS展示行允许有界兼容，冲突/重复key/未知项保持错误；缩进块标量和显式YAML键不转成独立节点。相同Surge/Surfboard语法的UDP默认相互冲突，产品不猜来源：静态文本未显式开启UDP则TCP-only并在UI/说明告知，不能宣称完整客户端默认等价。TLS+WS/SNI/Host和插件host默认有歧义时要求明确字段；安全身份不以警告替代正确转换。
+
+从GPL客户端只借鉴已核实行为，不复制实现；FlClash底层转换会跳过坏节点，UniProxy不采用这种刷新语义。每个订阅仍全有或全无，force也不能绕过解析错误；稳定身份/归属/中转与SSRF下载防线不变。实际样例和测试层级见[验收](<subscription-format-verification.md>)，解析/内核-t不等于远端连接。
