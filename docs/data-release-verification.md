@@ -100,6 +100,27 @@ UniProxy 0.2.0 · commit b0a04aa7cbc2 · built 2026-10-20T01:01:36Z
 
 当前运行中的 `bin/uniproxy.exe` 仍是 `510CAE7F…`（19,785,216 字节），**本轮未替换**。
 
+## 5.2 已发布 v0.2.0
+
+标签 `v0.2.0`（提交 `a9d3fc8`）已推送，Release 工作流两个 job 全部成功，产物已发布：
+
+| 资产 | 字节 |
+|---|---|
+| `uniproxy-windows-amd64.exe` | 12,748,800 |
+| `uniproxy-windows-arm64.exe` | 11,871,744 |
+| `uniproxy-linux-amd64` | 12,419,256 |
+| `uniproxy-linux-arm64` | 11,796,664 |
+| `core-install-*`（4 个平台） | 5.9–6.5 MB |
+| `SHA256SUMS.txt` | 736 |
+
+发布地址：`https://github.com/FYHC1/uniproxy/releases/tag/v0.2.0`
+
+验证（下载真实发布资产后执行，非本地构建）：
+
+- `SHA256SUMS.txt` 全部 8 项与本机重新计算的 SHA256 一致，0 处不符；
+- `uniproxy-windows-amd64.exe -version` 输出 `UniProxy 0.2.0 · commit a9d3fc886674 · built 2026-10-20T01:19:05Z`，与标签提交一致；
+- 用临时数据目录启动该发布二进制：`/api/health` 返回 `{"ok":true,"version":"0.2.0"}`，内嵌前端 HTTP 200，启动日志同时打印版本与数据目录。
+
 ## 6. 限制与后续
 
 - 未在 Linux/Docker 实跑；`/var/lib/uniproxy` 与 XDG 回退由单元测试覆盖，非真实主机验证。

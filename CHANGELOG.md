@@ -2,7 +2,7 @@
 
 日期按 Asia/Shanghai。当前源码包和CLI仍为0.1.0，没有已证实的Git tag/公开发布；“完成”不等同于已经替换用户运行程序。
 
-## 2026-10-20 — 平台标准数据目录、版本注入与发布流程（v0.2.0）
+## 2026-10-20 — 平台标准数据目录、版本注入与发布流程（v0.2.0 已发布）
 
 - 数据目录改为平台标准位置：Windows `%ProgramData%\UniProxy`、Linux `/var/lib/uniproxy`、macOS `~/Library/Application Support/UniProxy`；不再默认使用相对工作目录的 `./data`。
 - 已存在的旧版 `data`（工作目录或可执行文件同目录）会被自动沿用并在日志提示迁移，**升级不会指向空库**；标准目录不可写时回退用户目录。启动日志打印实际目录与选择原因。
@@ -11,6 +11,7 @@
 - 新增标签驱动的发布工作流：推送 `v*.*.*` 或手动触发，构建 linux/windows × amd64/arm64 四个二进制与安装器，生成 `SHA256SUMS.txt` 并创建 Release。
 - 版本号提升到 0.2.0（Go、package.json、文档同步）。
 - 新增 `internal/appdata` 解析器测试（含跨平台路径、旧目录沿用、不可写回退、零字节库不误判）与 `internal/version`、`/api/health` 版本测试。
+- 已推送标签 `v0.2.0` 并发布四平台产物与 `SHA256SUMS.txt`；下载后逐个校验哈希一致，Windows 发布二进制实跑 health/UI 通过。
 
 ## 2026-10-20 — 首次公开仓库与全面复查修复（9项缺陷，源码已更新，未部署）
 

@@ -1,14 +1,14 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-10-20 09:00（Asia/Shanghai）。M12平台标准数据目录+版本注入+发布工作流已完成，源码 v0.2.0 待发布；用户运行进程为 08:15:36 启动的 M11 构建，数据仍在旧目录 bin/data，本轮未部署、未停止服务、未改动其 DB/主密钥。**
+**最后核对：2026-10-20 09:22（Asia/Shanghai）。M12完成并已发布 v0.2.0（标签 a9d3fc8，四平台产物+SHA256SUMS 已校验）。用户运行进程仍是 08:15:36 启动的 M11 构建、数据在旧目录 bin/data；本轮未部署、未停止服务、未改动其 DB/主密钥。**
 
 ## 30秒摘要
 
 - 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32；不是Node/sing-box早期草案。
-- M0–M12完成。M12：数据目录改平台标准位置并沿用旧目录、版本注入、标签发布工作流（v0.2.0）。详情见[数据/发布验收](<data-release-verification.md>)、[复查验收](<repository-review-verification.md>)、[计划](<development-plan.md>)，不要重做旧任务。
-- **当前用户运行 PID 31588（2026-10-20 08:15:36 启动），哈希 510CAE7F…，即 M11 构建；数据在 [bin/data](<../bin/data/>)。M12 未部署。** 用户已自行导出备份到 Downloads。
+- M0–M12完成。M12：数据目录改平台标准位置并沿用旧目录、版本注入、标签发布工作流；**v0.2.0 已发布并校验**。详情见[数据/发布验收](<data-release-verification.md>)、[复查验收](<repository-review-verification.md>)、[计划](<development-plan.md>)，不要重做旧任务。
+- **当前用户运行 PID 31588（2026-10-20 08:15:36 启动），哈希 510CAE7F…，即 M11 构建；数据在 [bin/data](<../bin/data/>)。v0.2.0 未部署到该实例。** 用户已导出备份到 Downloads。
 - M12变更：默认数据目录改为 `%ProgramData%\UniProxy` / `/var/lib/uniproxy` / Application Support；已有旧 `data` 会被沿用并在日志提示迁移；`-version`、启动日志与 `/api/health` 统一报告注入的版本；标签驱动四平台发布。
-- M12实际通过：Go全量、vet、gofmt、严格TS、32工具、32 API浏览器、fixture UI、真实本机内核链路、appdata/version/health 新测试、release ldflags 注入实测。未在 Linux/Docker 实跑；未创建正式 Release。
+- M12实际通过：Go全量、vet、gofmt、严格TS、32工具、32 API浏览器、fixture UI、真实本机内核链路、appdata/version/health 新测试、release ldflags 实测；**CI 两平台成功；Release 两 job 成功，发布资产 SHA256 全部复核，Windows 发布二进制实跑 health/UI 通过**。未在 Linux 主机/Docker 实跑。
 - 下一步仅在用户批准后部署最新版/用户验收，或接受新的明确任务；不要擅自停服务、删除节点或换数据目录。
 
 先读：[需求](<requirements.md>) → [决策](<decisions.md>) → [开发指南](<development-guide.md>)。本文PID/哈希有时效性，未来操作前重新核对。
