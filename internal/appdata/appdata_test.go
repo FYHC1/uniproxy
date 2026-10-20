@@ -36,7 +36,9 @@ func (f *fakeDeps) deps(created *[]string) Deps {
 		WorkingDir:  func() (string, error) { return f.cwd, nil },
 		HasDatabase: has,
 		MkdirAll:    mkdir,
-		Abs:         func(p string) (string, error) { return filepath.Abs(p) },
+		// Identity: filepath.Abs would resolve a Windows fixture against the
+		// Linux CI working directory, which is not what precedence tests assert.
+		Abs: func(p string) (string, error) { return p, nil },
 	}
 }
 
