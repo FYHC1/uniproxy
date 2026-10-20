@@ -9,6 +9,7 @@ import { PoolsPage } from './PoolsPage';
 import { ListenersPage } from './ListenersPage';
 import { SubscriptionsPage } from './SubscriptionsPage';
 import { SettingsPage } from './SettingsPage';
+import { CoreInstallBanner, CoreInstallDialog } from './CoreInstall';
 
 type Page = 'nodes'|'groups'|'pools'|'listeners'|'subscriptions'|'settings';
 const navigation = [
@@ -21,7 +22,7 @@ const navigation = [
 ] as const;
 function currentPage():Page {const key = window.location.hash.replace('#/','');return navigation.some(item => item.id === key) ? key as Page : 'nodes';}
 export function App() {
-  const {data,loading,authRequired,connectionError,refreshing,refresh,updatedAt,notices,dismiss,forgetToken,hasToken,runtimeAction} = useApp();
+  const {data,loading,authRequired,connectionError,refreshing,refresh,updatedAt,notices,dismiss,forgetToken,hasToken,runtimeAction,openCoreInstaller,coreAction} = useApp();
   const [page,setPage] = useState<Page>(currentPage); const action = useAction();
   useEffect(() => {const change = () => {setPage(currentPage());window.requestAnimationFrame(() => document.getElementById('page-title')?.focus({preventScroll:true}));};window.addEventListener('hashchange',change);return () => window.removeEventListener('hashchange',change);},[]);
   useEffect(() => {document.title = (navigation.find(item => item.id === page)?.label || '管理控制台') + ' · UniProxy';},[page]);
@@ -32,12 +33,13 @@ export function App() {
     <div className="main-shell"><header className="topbar"><div className="breadcrumbs"><span>工作空间</span><span className="breadcrumb-slash">/</span><strong>{active.label}</strong></div><div className="topbar-actions">{activeJobs > 0 && <a href="#/settings" className="job-status"><CircleNotch size={15} className="spin" />{activeJobs} 项任务</a>}{data && <Badge dot tone={runtimeTone(data.runtime)}>{runtimeLabel(data.runtime)}</Badge>}<span className="topbar-divider" /><IconButton label={refreshing ? '正在同步数据' : '立即同步数据'} disabled={refreshing} onClick={() => void refresh()}><ArrowClockwise size={18} className={refreshing ? 'spin' : ''} /></IconButton><IconButton label={hasToken ? '清除令牌并锁定控制台' : '输入管理令牌'} onClick={forgetToken}><LockKey size={18} /></IconButton><span className="operator-avatar" aria-label="当前管理会话">U</span></div></header>
       <main id="main-content" className="main-content" tabIndex={-1}>
       {connectionError && <div className="global-alert global-alert--error" role="alert"><WarningCircle size={22} /><div><strong>{data ? '与管理服务的连接已中断' : '无法加载工作空间'}</strong><p>{connectionError}{data ? ' 当前显示最近一次成功同步的数据。' : ''}</p></div><Button small busy={refreshing} onClick={() => void refresh()}>重试连接</Button></div>}
-      {data && (!data.runtime.available || data.runtime.dirty || !!data.runtime.lastError) && <div className="global-alert global-alert--warning" role="status"><WarningCircle size={22} /><div><strong>{!data.runtime.available ? '内核尚不可用，配置仅保存到管理服务' : data.runtime.dirty ? '存在尚未应用的配置更改' : '内核报告了运行错误'}</strong><p>{data.runtime.lastError || (!data.runtime.available ? '节点和监听不会自动开始代理。请安装或配置 Mihomo，再应用当前配置。' : '期望配置与运行配置可能不同。解决内核错误后重新应用，勿将保存成功视为代理已生效。')}</p></div><Button small busy={action.running} disabled={data.runtime.applying} onClick={() => void action.execute(() => runtimeAction('apply'))}>重新应用</Button></div>}
+      {data && (!data.runtime.available || data.runtime.dirty || !!data.runtime.lastError) && <div className="global-alert global-alert--warning" role="status"><WarningCircle size={22} /><div><strong>{!data.runtime.available ? '内核尚不可用，配置仅保存到管理服务' : data.runtime.dirty ? '存在尚未应用的配置更改' : '内核报告了运行错误'}</strong><p>{data.runtime.lastError || (!data.runtime.available ? '节点和监听不会自动开始代理。请安装或配置 Mihomo，再应用当前配置。' : '期望配置与运行配置可能不同。解决内核错误后重新应用，勿将保存成功视为代理已生效。')}</p></div>{!data.runtime.available ? <Button small onClick={openCoreInstaller}>{data.coreInstallation.state === 'installing' ? '查看安装进度' : '管理内核安装'}</Button> : <Button small busy={action.running} disabled={data.runtime.applying || data.coreInstallation.state === 'installing' || !!coreAction} onClick={() => void action.execute(() => runtimeAction('apply'))}>重新应用</Button>}</div>}
+      <CoreInstallBanner />
       {data?.runtime.applying && <div className="applying-banner" role="status"><CircleNotch size={16} className="spin" />正在验证并应用配置，请以完成后的运行状态为准。</div>}
       <ErrorBox message={action.error} />
       {!data ? loading ? <LoadingWorkspace /> : <div className="connection-empty"><div className="connection-symbol"><Network size={42} weight="duotone" /></div><h1 id="page-title" tabIndex={-1}>等待连接 UniProxy</h1><p>连接成功后展示真实节点、订阅与内核状态。<br />请先启动管理服务，或确认网络与管理令牌。</p><Button variant="primary" busy={refreshing} onClick={() => void refresh()}><ArrowClockwise size={17} />重新连接</Button></div> : <PageBoundary key={page}>{page === 'nodes' ? <NodesPage /> : page === 'groups' ? <GroupsPage /> : page === 'pools' ? <PoolsPage /> : page === 'listeners' ? <ListenersPage /> : page === 'subscriptions' ? <SubscriptionsPage /> : <SettingsPage />}</PageBoundary>}
       <footer className="main-footer"><span><ShieldCheck size={14} />仅展示真实配置与检测结果</span><span>{updatedAt ? '最近同步 ' + updatedAt.toLocaleTimeString('zh-CN',{hour12:false}) : '尚未同步'} · UniProxy</span></footer>
-      </main></div></div><div className="toast-region" aria-label="操作通知" aria-live="polite" aria-atomic="false">{notices.map(notice => <div className={'toast toast--' + notice.tone} key={notice.id} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.tone === 'success' ? <CheckCircle size={21} /> : <WarningCircle size={21} />}<p>{notice.text}</p><IconButton label="关闭通知" onClick={() => dismiss(notice.id)}><X size={16} /></IconButton></div>)}</div></>;
+      </main></div></div><CoreInstallDialog /><div className="toast-region" aria-label="操作通知" aria-live="polite" aria-atomic="false">{notices.map(notice => <div className={'toast toast--' + notice.tone} key={notice.id} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.tone === 'success' ? <CheckCircle size={21} /> : <WarningCircle size={21} />}<p>{notice.text}</p><IconButton label="关闭通知" onClick={() => dismiss(notice.id)}><X size={16} /></IconButton></div>)}</div></>;
 }
 function AuthScreen() {
   const {authenticate,authError,refreshing,connectionError} = useApp(); const action = useAction(); const [token,setToken] = useState('');

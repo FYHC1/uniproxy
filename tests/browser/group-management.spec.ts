@@ -1,9 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
 import type { Bootstrap, Group } from '../../src/shared/types';
-import { byName, expect, poolCard, test } from './fixtures';
+import { byName, expect, poolCard, test, gotoWorkspace } from './fixtures';
 
 async function openManager(page: Page, group: Group): Promise<Locator> {
-  await page.goto('/#/groups');
+  await gotoWorkspace(page, '/#/groups');
   await page.getByRole('button', { name: '管理分组 ' + group.name + ' 的节点', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '分组节点 · ' + group.name, exact: true });
   await expect(dialog).toBeVisible();
@@ -159,7 +159,7 @@ test('remove confirmation can cancel, then removes only the current group withou
   expect(requests).toHaveLength(1);
   expect(requests[0]).toMatchObject({ method: 'POST', path: '/api/nodes/batch', body: { action: 'remove_groups' } });
   await dialog.getByRole('button', { name: '关闭', exact: true }).click();
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   await expect(poolCard(page, dynamic.name)).toContainText('1 个已选节点');
   await expect(poolCard(page, dynamic.name).getByRole('listitem', { name: '池内节点 ' + shared.name, exact: true })).toHaveCount(0);
   await expect(poolCard(page, otherPool.name).getByRole('listitem', { name: '池内节点 ' + shared.name, exact: true })).toBeVisible();

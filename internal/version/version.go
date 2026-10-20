@@ -9,7 +9,7 @@ import "strings"
 
 var (
 	// Version is the released semantic version.
-	Version = "0.2.0"
+	Version = "0.2.1"
 	// Commit is the short git commit the binary was built from.
 	Commit = "dev"
 	// Date is the build date in RFC3339 form.

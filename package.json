@@ -1,6 +1,6 @@
 {
   "name": "uniproxy",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,7 +13,6 @@
     "build:web": "tsc --noEmit && vite build",
     "test": "go test ./...",
     "typecheck": "tsc --noEmit",
-    "core:install": "go run ./cmd/core-install",
     "test:e2e": "playwright test",
     "test:ui": "node --test src/web/tests/utils.test.mjs && node src/web/tests/verify.mjs"
   },

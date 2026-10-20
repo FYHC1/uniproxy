@@ -1,151 +1,110 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-10-20 09:22（Asia/Shanghai）。M12完成并已发布 v0.2.0（标签 a9d3fc8，四平台产物+SHA256SUMS 已校验）。用户运行进程仍是 08:15:36 启动的 M11 构建、数据在旧目录 bin/data；本轮未部署、未停止服务、未改动其 DB/主密钥。**
+**最后核对：2026-10-20 11:09（Asia/Shanghai）。M13 内置 Mihomo 在线安装实现、验证与独立审查完成；暂存开发构建0.2.1-dev。用户PID29448运行已发布v0.2.0，9090正常。本轮没有部署、提交、推送、发布或改动用户数据。**
+
+## 当前发布轮：v0.2.1（2026-10-20 15:18，执行中）
+
+- 用户已明确授权提交、推送 GitHub 并发布 0.2.1，取代上轮“本轮不提交/发布”的范围限制；部署仍未获授权。
+- 本地与origin/main同为b638308，远端不存在v0.2.1标签或Release；私有仓库设置保持不变。
+- 版本已改0.2.1，[发布说明](<releases/v0.2.1.md>)已准备；本地Go全量/真实本机内核、vet、严格TS、36工具、生产UI及0.2.1候选CLI/嵌入服务通过。34项API浏览器回归全部通过（54.3秒）；独立发布前检查无阻塞问题。发布成功状态在真实完成后回写。
+- 15:17重新核对：无uniproxy/mihomo/testserver进程，9090/19090无监听。这是用户侧状态变化，非本轮停止。没有读取数据库/主密钥。
+- 后续顺序：完成本地验证 → 提交推送main → 等待Windows/Linux CI → 推送v0.2.1 → 检查Release四平台资产/校验和 → 回写。
+
+以下11:09状态与哈希保留为M13开发交付历史，不作为当前进程事实。
 
 ## 30秒摘要
 
-- 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32；不是Node/sing-box早期草案。
-- M0–M12完成。M12：数据目录改平台标准位置并沿用旧目录、版本注入、标签发布工作流；**v0.2.0 已发布并校验**。详情见[数据/发布验收](<data-release-verification.md>)、[复查验收](<repository-review-verification.md>)、[计划](<development-plan.md>)，不要重做旧任务。
-- **用户实例已停止**（09:25 复核无进程/无9090监听），数据完整保留在 [bin/data](<../bin/data/>)，WAL 已 checkpoint。此前运行 PID31588（M11 构建，哈希 510CAE7F…）。v0.2.0 未部署到该实例；本轮未启动或停止该服务。
-- M12变更：默认数据目录改为 `%ProgramData%\UniProxy` / `/var/lib/uniproxy` / Application Support；已有旧 `data` 会被沿用并在日志提示迁移；`-version`、启动日志与 `/api/health` 统一报告注入的版本；标签驱动四平台发布。
-- M12实际通过：Go全量、vet、gofmt、严格TS、32工具、32 API浏览器、fixture UI、真实本机内核链路、appdata/version/health 新测试、release ldflags 实测；**CI 两平台成功；Release 两 job 成功，发布资产 SHA256 全部复核，Windows 发布二进制实跑 health/UI 通过**。未在 Linux 主机/Docker 实跑。
-- 下一步仅在用户批准后部署最新版/用户验收，或接受新的明确任务；不要擅自停服务、删除节点或换数据目录。
+- 当前栈：Go + React/TypeScript + SQLite配置payload加密 + 外置Mihomo1.19.32。内核仍是外部进程，**只是安装逻辑已内置 UniProxy，不再需要独立安装器**。
+- M0–M12历史完成，v0.2.0已发布；M13/R23新增首次缺失内核提示，运行与设置分类在线安装/重检入口、后台进度/重试、严格安全下载和无覆盖发布。
+- 源码与Windows/Linux四平台开发构建已暂存；**用户当前服务仍是v0.2.0，本轮功能不会因浏览器刷新而出现在旧程序中**。部署和新发布另需用户授权。
+- 验证：最终Go全量（显式本地Mihomo+暂存程序）/vet/gofmt通过；严格TS、36/36工具、fixture UI、34/34隔离真实API浏览器通过；临时目录真实官方下载安装/摘要/版本/显式空配置启停通过。详见[M13验收](<core-install-verification.md>)。
+- 用户服务已于10:36:40从下载目录启动，与09:25“已停止”历史观察不同。PID29448、9090 health0.2.0；本轮未查询用户bootstrap或读取DB/主密钥，不猜测其当前数据目录。
 
-先读：[需求](<requirements.md>) → [决策](<decisions.md>) → [开发指南](<development-guide.md>)。本文PID/哈希有时效性，未来操作前重新核对。
+先读：[需求](<requirements.md>) → [计划](<development-plan.md>) → [决策](<decisions.md>) → [开发指南](<development-guide.md>)。PID/路径/哈希都是带日期事实，后续操作需重新核对。
 
-## 1. 当前工作区与用户实例
+## 1. 当前工作区、服务和数据
 
-| 项目 | 2026-10-20 09:00观察 |
+| 项目 | 2026-10-20 11:08观察 |
 |---|---|
-| 工作区 | 本仓库根目录（会话启动时由运行环境提供；文档不记录个人绝对路径） |
-| 版本控制 | 私有 GitHub 仓库，CI 两平台通过；M12 提交后需推送 v0.2.0 标签才会产生 Release |
-| 用户应用 | **未运行**（09:25 复核：无 uniproxy/mihomo 进程，9090 无监听）。此前为 PID31588，08:15:36 启动；停止原因未知，非本轮操作 |
-| 子内核 | 随主进程退出。此前 PID27432 |
-| 数据线索 | 数据在 [bin/data](<../bin/data/>)：`uniproxy.db` 724,992 B（00:26:28），`master.key` 32 B；WAL 已随干净退出合并并移除。未读取内容。用户已导出备份到 Downloads。 |
-| 其他目录 | 根[data](<../data/>)来自更早测试，不能与用户数据混用或自行清理 |
-| 管理端口 | 9090 无监听（服务已停止）；此前只读查询 health/bootstrap 计数 |
-| 测试端口 | API浏览器仅临时19090，测试结束不保留服务；真实core测试均临时状态/本机受控上游 |
+| 工作区 | 本仓库根目录，由会话运行环境提供；文档不记录个人绝对路径 |
+| 版本控制 | 已有私有Git仓库；HEAD=b638308，M13为未提交工作区变更。本轮不commit/push/tag/release |
+| 用户程序 | PID29448，名称uniproxy-windows-amd64.exe，10:36:40启动，位于用户下载目录；不要盲杀该进程 |
+| 服务版本 | 9090回环监听，公开health返回ok=true/version0.2.0；没有用正式API做写操作 |
+| 用户内核 | 观察时没有名为mihomo.exe的进程；不因此宣称已检查所有文件或数据库 |
+| 当前数据路径 | 未核实，不读取用户DB/主密钥，不依据进程exe目录或旧快照推断 |
+| 历史数据 | 09:25时旧数据在[bin/data](<../bin/data/>)、主密钥同行、WAL已合并；用户此前已导出备份。**本轮未重新读取其内容或搬迁** |
+| 测试 | Go全部临时数据；API浏览器19090仅测试期间运行，结束清理；官网安装测试临时目录，不复用用户实例 |
 
-默认-data=./data相对于进程CWD，不是exe目录。不能在旧实例运行时直接启动暂存程序；启动真实数据会自动apply/订阅刷新/检测，不能当只读检查。不得复用这里PID作为未来kill命令。
+禁止为确认路径/界面而使用生产数据启动暂存程序：启动即尝试apply并启动订阅/检测调度。不要运行会覆盖[旧本机程序](<../bin/uniproxy.exe>)的普通pnpm build。构建使用build:web+明确bin/updates目标。
 
-### 构建身份（SHA256）
+### 最终暂存构建身份
 
-| 产物 | 字节数 / mtime | SHA256 |
-|---|---|---|
-| [当前运行文件](<../bin/uniproxy.exe>) | 19785216 / 2026-10-19 17:42:34 | 510CAE7FE157938A8F5060AE5B66363E73A73EFF9CE90F3F63CABF20CB147317 |
-| [Windows v0.2.0 暂存](<../bin/updates/uniproxy.exe>) | 13579776 / 2026-10-20 09:12:31 | 0E014D1B9DCF712B4E6A4FC0EB162CAD5514AD5A55318E26E1894CFC399FB9E6 |
-| [Linux amd64 v0.2.0 暂存](<../bin/updates/linux-amd64/uniproxy>) | 13250720 / 09:12:33 | 7B9D90337803EC2775E1656A6553A4802E7846F10CB6038C8CCDE3992BCE2740 |
-| [Linux arm64 v0.2.0 暂存](<../bin/updates/linux-arm64/uniproxy>) | 12452000 / 09:12:35 | E5C1B982CB9116B2B53167DA664677702EAD0E97B8E99C1A09F54BC0CDCEC377 |
+0.2.1-dev · commit b638308+work · built 2026-10-20T03:07:29Z。标识表示未发布工作区构建，不存在对应发布tag。
 
-v0.2.0 构建已注入版本/提交/时间，`-version` 与 `/api/health` 均报告 `0.2.0 · commit … · built …`；但 health200 只是存活，不代表 core/config ready，哈希仍不是签名或自动升级授权。
+| 产物 | 字节数 | SHA256 |
+|---|---:|---|
+| [Windows amd64](<../bin/updates/uniproxy.exe>) | 13882880 | 3FEFEC0DAA895EAF6779418887644E0BDC71EFB6F4DE3E17ED47604C290638FA |
+| [Windows arm64](<../bin/updates/windows-arm64/uniproxy.exe>) | 12816896 | 42AB550604C37588BB9470B6411CD9582DFF8423CF892703A04B01BC3659738F |
+| [Linux amd64](<../bin/updates/linux-amd64/uniproxy>) | 13549728 | 6B0CD85861CA0057B3C6598374A29AC1423CD84329FAC283FF2479388A187AEB |
+| [Linux arm64](<../bin/updates/linux-arm64/uniproxy>) | 12714144 | 78667D0382883C9099EDC686C1D71771F473399F67DE53AC457BBA6D5910A9BA |
 
-历史20:31：应用PID27412、核心14788，当时运行文件19565056字节/SHA256 B2F45BFD28154D156A7F91F84678FFE983B3D07ADFC4279097743B3B2B405778，暂存为4A8FC2F8…；这些均不作为当前运行事实。
+健康200只代表存活，不等于内核/监听已就绪；哈希不等于签名或部署授权。当前源码默认Version仍0.2.0且Commit=dev，未注入构建省略提交/时间；本轮刻意注入开发身份，不冒充v0.2.0发布资产。
 
-## 2. 当前关键实现语义（M9保留，M10补充，M11修订）
+## 2. M13当前安装实现语义
 
-### 代理池选择
+### 检测与安装位置
 
-[对话框](<../src/web/PoolDialog.tsx>)用[纯选择函数](<../src/web/poolSelection.ts>)：
+[统一发现](<../internal/core/installation.go>)：显式-core/UNIPROXY_CORE_PATH权威；未覆盖时依次data/core、工作目录bin、程序同目录、PATH。已有目录/断链/不兼容文件不当作缺失，也不静默跳到另一个文件。在线默认目标为解析后的data/core；显式缺失文件路径则写该路径，仅PATH命令名不作为可写目标。支持windows/linux × amd64/arm64。
 
-- 未选组候选为所有节点；已选组候选是any并集/all交集，再按池UDP兼容过滤。
-- 组成员默认勾选，取消变excludeNodeIds；重新勾选清除排除，组命中不额外静态pin。动态订阅新增仍自动纳入。
-- 全选包含搜索结果所有分页，保留搜索之外选择；禁用旧group-excluded项不能通过全选绕过。
-- 显式改变组/模式/UDP清理范围外手动引用并提示，取消对话框不保存；仅打开/改名称不改旧成员。
-- 旧excludeGroupIds继续生效并展示兼容说明，没有排除组选择器；新池为空，可明确清除旧规则后保存。节点列表排除组功能不变。
-- 最新bootstrap确认节点已删除时，保存清理nodeIds/excludeNodeIds中真正失效引用；不能因范围/搜索隐藏而清掉有效引用。
+[内部下载包](<../internal/coreinstall/install.go>)没有public URL/version/force参数。固定1.19.32与四平台摘要同源；官方元数据/URL/每跳GitHubHTTPS、公共DNS数字拨号/严格Fake-IP安全复核、TLS、内置+官方摘要先验、128MiB归档/256MiB二进制、归档路径/链接/CRC等保护。不开系统HTTP代理，不执行脚本、不改网络设置。文件关闭同步后os.Link同目录原子无覆盖发布；不支持硬链接失败，不降级Rename覆盖。详情[D21](<decisions.md>)。
 
-### 池与监听事务 / 移除
+### 管理API与并发
 
-[API](<../internal/app/pools.go>)增加：
+[安装API](<../internal/app/core_install.go>)：
 
 ~~~text
-POST /api/pools/with-listener
-{pool:<Pool editable fields>,listener:{name?,protocol?,host?,port?,udp?,enabled?,users?}}
-=> {data:{pool,listener(public)},runtime}
-
-DELETE /api/pools/{id}/members/{nodeId}
-=> {data:Pool,runtime}
+GET /api/core/installation -> CoreInstallation
+POST /api/core/install {} -> 202 CoreInstallation
+POST /api/core/inspect {} -> {coreInstallation,runtime}
 ~~~
 
-组合创建一次mutate/校验/revision/保存/应用，不是两个前端请求。服务器分配身份与绑定，拒绝注入；默认监听名=池名，回环mixed TCP。port0/省略自动分配；手填允许设置范围外1024–65535。统一[端口分配器](<../internal/app/ports.go>)跳过管理和已有配置（含禁用）并探测TCP/所需UDP。没有永久预留；应用失败可能保存两者但dirty，不能补偿删除。
+Bootstrap新增coreInstallation，前端共享类型/契约同步。state=idle/installing/succeeded/failed；stage=metadata/downloading/verifying/extracting/installing/inspecting/complete；字节仅归档实际下载。installed=本地路径存在，available=固定版本探测通过，running=真实进程状态，三者不能混淆。
 
-成员DELETE在当前服务器快照删除手动引用并加节点排除，旧group exclusions不变；不改总节点、分组来源、中转、其他池/监听。空池REJECT。旧池POST/PUT/DELETE行为与schema1保留。
+任务在内存，不进备份/schema、不增revision；已有/运行/重复拒绝409。请求断开不取消安装，Close取消并等待。安装预约排斥Apply/Validate，下载不持管理锁；最终探测时保存跳过内核校验仍经模型校验并保持pending。安装后的首次版本进程最多60秒，普通20秒；超时保留文件，可重检而非重下。手工修复后重检会退掉旧下载失败状态，不假报原任务成功。
 
-### 卡片与检测
+安装开始后当前进程awaitingCoreApply暂停自动apply，包括随后的手动配置和订阅刷新；安装成功只是available，不启动代理。显式runtime Apply清除暂停；重启管理服务保留原有启动应用语义。手动Stop逻辑不被安装误清除。
 
-[卡片](<../src/web/PoolCard.tsx>)展示全部关联监听、复制/编辑/追加入口，成员最近实际延迟和禁用/中转状态，单/整池检测、确认移除。dirty/applying只显示配置地址，不冒充已生效。检测使用全局Settings.TestURL而非池自动健康URL；不模拟指标。
+### UI
 
-服务重启导致任务记录丢失时有失效说明并解除忙碌；成员降至分页阈值以下但仍有搜索词时保留可清除搜索框。外部节点删除不会让编辑草稿陷入不可保存。
+[共享安装组件](<../src/web/CoreInstall.tsx>)+[状态提供器](<../src/web/state.tsx>)：鉴权后缺失自动弹一次（sessionStorage+内存按目标路径），允许稍后处理、关闭和页面切换。运行概况与检测/端口设置均保留入口；顶端全局安装/错误可再次打开详情。安装/重新检测共享请求锁，5秒真实bootstrap轮询，正常轮询不执行版本进程；请求/会话epoch阻止旧成功/401/过时bootstrap覆盖新状态。已可用内核优先于旧失败记录。仅下载有真实百分比，校验/解压等阶段不伪造完成度。
 
-### M10：订阅Fake-IP传输修复
+### 分发
 
-系统DNS对用户截图主机返回198.18.0.230，原安全策略拒绝且隐藏原因。新[客户端](<../internal/safehttp/client.go>)/[DoH](<../internal/safehttp/doh.go>)仅全Fake-IP域名触发固定公共加密DNS的A/AAAA复核，验证全部公网IP后固定拨号、校验原域名TLS；literalFakeIP/普通私网/混合答案不放行。未使用系统HTTP代理、未改网络设置。
+删除旧CLI源码；构建脚本、package脚本、后续Release、Docker均不依赖独立安装器。Docker首次WebUI安装到/data/core持久卷；历史v0.2.0发布包和本机旧安装器文件不追溯删除。许可证义务保持。
 
-[安全错误](<../internal/safehttp/errors.go>)保留类别/HTTP码不保留原url.Error等秘密。HTML、下载、配置解析分别说明；订阅源不完整不导入/不删除，空200仍原确认规则。显式allowPrivate模式保留旧行为，不推荐用来解决Fake-IP。
+## 3. 历史关键语义（保持不变）
 
-本轮有界域名证据：系统DNS、固定公共DoH、原域名TLS1.3、[新客户端根HEAD](<../tests/integration/subscription_host_test.go>)返回200+校验TLS。**没访问私有订阅路径、没读正文，不能称用户完整订阅导入/远端节点已验证。** 主机诊断环境变量默认空。
+- M9池选择/事务：组任一/全部限定候选，默认动态纳入、取消写节点排除、全选跨分页；旧excludeGroupIds仍保留。pool+listener一个mutate/revision，失效与空池REJECT；移除池成员不删总节点。[验收](<pool-workflow-verification.md>)。
+- M10：全Fake-IP域名才公共DoH复核，混合/私网/literalFakeIP不放行；订阅诊断脱敏，失败/不完整不删除。紧凑池6条分页、实际统计；组名/数量打开20条节点管理，关系移除与全局启禁分离。[验收](<subscription-groups-verification.md>)。
+- M11：显示名1–160字符，导入上游标签≤1024按字符边界截断；派生名预留后缀，活动UTF-8安全截断；多页监听共享运行状态判定，dirty/revision不一致不得称监听中。[复查验收](<repository-review-verification.md>)。
+- M12：平台数据标准路径+旧目录沿用、不自动迁移，版本ldflags与标签驱动发布；v0.2.0历史发布四平台+安装器/校验和已核实。[历史验收](<data-release-verification.md>)。
+- 早期Clash文件授权离线验证325唯一节点/178中转等是历史事实，本轮没有再次读原文件或联网实测其凭据。禁用/缺失中转不得删dialer字段回退直连。
 
-### M11：显示名称与运行状态一致性
+## 4. 本轮验证、问题与限制
 
-显示名称（分组/节点/池/监听/订阅）统一1–160字符且禁控制字符，但该上限只约束“保存的显示名”：[导入器](<../internal/importer/native.go>)对超过160字符的上游标签按字符边界截断加“…”，超过1024字符或含控制字符仍判无效输入，空白标签回退协议+地址。因此预览展示的就是保存结果，不再出现“预览通过、确认导入失败”。
+完整证据和具体失败调查在[M13验收](<core-install-verification.md>)。
 
-服务端派生名称必须为后缀预留空间：[批量独立监听](<../internal/app/http.go>)用[derivedName](<../internal/app/validate.go>)生成“<节点名> · 独享”，接近上限时截断而不是让整批400。名称类校验错误点名字段（节点/监听/分组/订阅名称、监听地址、监听端口、订阅URL、间隔），不再把名称问题伪装成端口问题。订阅名称/分组名/刷新间隔在下载前校验，且只在订阅模式生效。
+- 40下载安全测试函数+97子用例通过，2个OS symlink子用例因Windows权限skip；归档symlink和原子硬链接竞态通过。最终模块coverage92.0%。
+- 10个安装manager、7个app API测试通过；全量Go显式本地core+暂存APP（真实代理链、配置校验、CLI/进程/UI）通过，vet/gofmt通过。
+- 严格TS、36工具0skip、全fixture UI与34真实API浏览器通过。截图仅隔离fixture证据，不是用户代理连通证明。
+- 真实官方下载安装/API/版本/显式空配置启动停止通过；第一次下载成功但版本检查20秒超时，改60秒冷启动+重检恢复后通过，不禁用安全软件或强制覆盖。
+- 没做：Linux/Docker/Windowsarm64实跑、race（无C工具链）、公网节点/私有订阅/容量压测。Vite520.50kB/gzip153.58kB非失败分包警告保留。
 
-监听运行状态由[listenerState](<../src/web/poolView.ts>)统一判定，池卡片、监听页、节点页共用；`appliedRevision`与`revision`不一致或dirty/applying时不得显示“监听中”。活动记录按字符边界截断，禁止产生非法UTF-8。
+## 5. 下一步和收尾
 
-### M10：紧凑池与分组管理
+1. 本轮开发实现/最终验证完成，独立只读review未发现未解决的阻塞/P1/P2缺陷；26份文档345个本地链接全有效、代码围栏闭合。无需重做本轮功能。
+2. 要让用户9090看到新安装界面，必须获准停机并核实**当前**程序/数据路径/备份后部署暂存新版，刷新页面；不能直接刷新旧发布版当作部署。本轮未获此授权、未执行。
+3. 如用户要求推送/发布，再审查diff、提交并推送/打新标签；不要改写历史v0.2.0资产或假称已发布。
+4. coreinstall、UI和独立review子任务均已交付，任务板完成，子任务后台作业均收集。所有Lead构建/浏览器/Go验证job已结束并收集；用户服务始终保留。独立review列出的非阻塞测试扩展见验收限制，不把它们写成已测。
 
-[池页](<../src/web/PoolsPage.tsx>)用真实统计+策略/状态过滤；[卡片](<../src/web/PoolCard.tsx>)单池宽屏双栏、6节点分页/限高、2入口后明确展开、节点details、真实成功失败未知/中位延迟，revision mismatch显示状态待同步而不是旧地址在线。
-
-[分组页](<../src/web/GroupsPage.tsx>)组名/数量打开[节点管理](<../src/web/GroupNodesDialog.tsx>)：20条分页、组范围筛选/全选、批量添加、仅移出本组、全局启禁确认、实际延迟任务。使用旧batch API，不删除总节点/覆盖所有组。订阅刷新或修改可重新分组，人工加组不改Manual保留标志。组页分列包含与旧排除引用，删除组/移出旧排除组可能扩大池范围需提示。最新数据清理失效选中ID，缺失组只可关闭。
-
-## 3. 之前完成的背景（历史事实）
-
-首版包含多协议导入、分组/订阅、四策略池、独享/共享监听、回环UDP、实际检测/限量下载、自动应用回滚、认证、加密配置、备份恢复，六个Web页面；没有独立流量分析模块。
-
-前轮Clash中转/拖入/节点过滤已完成，不能误开旧待办：
-
-- 前轮授权离线验证的私有Clash文件（路径不写入仓库）共328定义、178中转、325唯一节点；3别名等价。**这是历史授权离线测试事实，本轮未读取或重测该文件，也没使用真实凭据联网。**
-- 旧失败是拒绝dialer-proxy和128详情 cap提前停止扫描，不是GFW判断；解析继续扫描并统计totalErrors。
-- 稳定DialerID/DialerIdentity保留上下游身份；缺失/禁用中转阻断，不得删dialer字段直连。原生Config不得直接透传不可信dialer-proxy。
-- 导出保留安全占位避免builtin/缺失引用捕获；公共response副本才清除私有身份字段；来源归属/备份恢复不误删共享节点。
-
-[首版历史验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)保留当时5/9、7/21测试数字，不是本轮重复测量。
-
-## 4. 本轮验证与限制
-
-完整命令、缺陷清单与边界：[M11复查验收](<repository-review-verification.md>)；[M10验收](<subscription-groups-verification.md>)、[M9验收](<pool-workflow-verification.md>)作为历史保留。
-
-- 严格TS（含noUnused）、生产Vite（build:web，未覆盖运行exe）、Windows暂存构建、Linux amd64/arm64交叉编译通过。
-- node工具32/32；内存构建fixture浏览器通过（含375/390/768/1024，零未捕获错误）。
-- 真实API浏览器32/32，55.8秒；[fixture隔离器](<../tests/browser/fixtures.ts>)限制19090/missing core、唯一名称、文档地址、仅清理测试归属对象。
-- Go全量 -p1 -count1 通过，go vet与gofmt通过；真实内核链路用显式UNIPROXY_TEST_CORE_PATH（本地bin/mihomo.exe），构建后进程/CLI/manifest用UNIPROXY_TEST_APP_PATH指向暂存exe；私有文件与裸主机变量为空。
-- 真实本机链路验证 HTTP/mixed转发、URLTest、限速测速、禁用即拒、池原子创建/空池拒绝/同端口重新纳入、13协议配置校验。
-- 复查发现并修复7项：长名称批量端口整批失败、预览/保存名称口径不一致、订阅元数据下载后才校验、监听页/节点页待同步误标监听中、活动记录字节截断乱码、测试脚本写死浏览器路径、文档个人绝对路径。均有回归或行为复测。
-- 未做：私有订阅正文、真实公网节点握手/吞吐、Linux/Docker实跑、race、容量压测。
-
-Vite单chunk 509.25kB/gzip 150.33kB仍触发500kB非失败警告，未修改阈值掩盖；分包是后续优化。当前运行文件与暂存构建哈希不同，说明部署未发生。
-
-## 5. 不可破坏的安全/兼容边界
-
-- 正式数据/密钥不作为测试夹具，不读取或输出私有配置。所有新功能测试只临时数据。
-- 配置保存≠应用；手动Stop暂停auto apply，失败保留dirty/lastError；校验失败不提交。
-- 失败即拒绝，不直连回退；固定Mihomo1.19.32；回环UDP且禁UDP in-user，不把TCP认证当UDP认证。
-- SQLite仅payload加密，WAL在线不可只拷主db；配置明文只内存/stdin，剔除CLASH_/MIHOMO_环境覆盖。
-- 源节点多来源归属不提升成全部人工固定；任务/刷新有revision/代数校验。
-- 普通pnpm build覆盖原bin exe，有活动服务时只暂存；前端嵌入Go，刷新旧程序不能生效。
-
-## 5.1 复核时观察到的实例状态（非本轮操作）
-
-2026-10-20 09:25 复核：`uniproxy`/子 `mihomo` 进程均不存在，9090 无监听，WAL 已合并进主库并被移除（`uniproxy.db` 724,992 B，mtime 00:26:28）。这符合正常退出后的状态，数据与主密钥完整。
-
-本轮**没有**停止、重启或替换该服务：全部工作只写入源码、文档、`bin/updates` 暂存目录和临时目录。若需要重新启动，请在 `bin` 目录下运行 `bin\uniproxy.exe`（当前文件仍是 M11 构建），或先用 v0.2.0 发布资产替换后再启动。
-
-**注意**：升级到 v0.2.0 后默认数据目录变为 `C:\ProgramData\UniProxy`，但 `bin\data` 会被自动识别为旧目录并继续使用；若要真正迁移，按 README「数据目录」步骤复制 `uniproxy.db` + `master.key` 后删除旧目录。
-
-## 6. 明确下一步及接续
-
-1. 本次复查与修复完成；最新源码已构建到暂存目录，未执行部署。用户若希望马上使用，先确认允许停机、准确CWD/数据目录和一致备份，再正常退出旧服务、替换原位置、原数据启动、刷新Web。
-2. 若继续开发，按[计划](<development-plan.md>)或新用户要求限定范围，不重做已完成功能；先读[根入口](<../AGENTS.md>)及本快照。
-3. 本轮无并行写任务、无后台任务；用户服务不是残留，不清理它。仓库已推送私有GitHub，修复改动仍需提交推送。
-4. 收尾继续更新计划/本快照/变更/决策与实际测试状态，核对产物与运行差异；不宣称部署或未经实测的平台成功。
+下次读[AGENTS入口](<../AGENTS.md>)与本快照即可继续；不要把历史验证当成本轮重测，不凭旧PID杀进程，不读取数据库/密钥作为开发夹具。

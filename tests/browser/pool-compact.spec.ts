@@ -1,9 +1,9 @@
-import { byName, expect, poolCard, test } from './fixtures';
+import { byName, expect, poolCard, test, gotoWorkspace } from './fixtures';
 
 test('single pool fills the workspace width and large membership stays paginated and compact',async({page,fixtures})=>{
  const nodes=await fixtures.importNodes(Array.from({length:150},(_,i)=>fixtures.proxy('compact-'+String(i).padStart(3,'0'))));
  const created=await fixtures.poolWithListener('compact-pool',{nodeIds:nodes.map(n=>n.id),strategy:'round-robin'});
- await page.setViewportSize({width:1650,height:1000});await page.goto('/#/pools');
+ await page.setViewportSize({width:1650,height:1000});await gotoWorkspace(page, '/#/pools');
  await page.getByRole('searchbox',{name:'搜索代理池',exact:true}).fill(created.pool.name);
  const card=poolCard(page,created.pool.name);
  await expect(card).toContainText('150 个已选节点');
@@ -32,7 +32,7 @@ test('many pool listeners collapse explicitly and remain accessible without grow
  const created=await fixtures.poolWithListener('endpoint-pool',{nodeIds:[node.id]});
  const second=await fixtures.listener('endpoint-second',created.pool.id);
  const third=await fixtures.listener('endpoint-third',created.pool.id,{host:'::1'});
- await page.goto('/#/pools');const card=poolCard(page,created.pool.name);
+ await gotoWorkspace(page, '/#/pools');const card=poolCard(page,created.pool.name);
  await expect(card.getByText(third.name,{exact:true})).toHaveCount(0);
  await card.getByRole('button',{name:'查看全部 3 个监听',exact:true}).click();
  await expect(card.getByText(third.name,{exact:true})).toBeVisible();await expect(card.getByText(second.name,{exact:true})).toBeVisible();

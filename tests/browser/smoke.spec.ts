@@ -1,11 +1,12 @@
 import type { Mutation, ProxyListener } from '../../src/shared/types';
-import { byName, expect, newPoolDialog, nodeChoices, poolCard, submitNewPool, test } from './fixtures';
+import { byName, expect, newPoolDialog, nodeChoices, poolCard, submitNewPool, test, gotoWorkspace } from './fixtures';
 
 test('missing-core console is honest and every page is accessible', async ({ page }) => {
-  await page.goto('/');
+  await gotoWorkspace(page, '/');
   await expect(page.getByRole('link', { name: 'UniProxy 节点管理', exact: true })).toBeVisible();
   await expect(page.getByText('内核尚不可用，配置仅保存到管理服务', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: '重新应用', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '管理内核安装', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '重新应用', exact: true })).toHaveCount(0);
   for (const name of ['节点管理', '分组管理', '代理池', '监听端口', '订阅管理', '运行与设置']) {
     await page.getByRole('link', { name, exact: true }).click();
     await expect(page.getByRole('heading', { name, level: 1, exact: true })).toBeVisible();
@@ -16,7 +17,7 @@ test('offline import and UI reflect persisted nodes without exposing credentials
   const password = fixtures.name('generated-upstream-password');
   const groupName = fixtures.name('browser-group');
   const [node] = await fixtures.importNodes([fixtures.proxy('Browser-Smoke', { type: 'http', username: 'browser-test', password })], { groupNames: [groupName] });
-  await page.goto('/#/nodes');
+  await gotoWorkspace(page, '/#/nodes');
   await page.getByRole('searchbox', { name: '搜索节点名称、协议、地址或分组' }).fill(node.name);
   const row = page.getByRole('row').filter({ has: page.getByRole('button', { name: node.name, exact: true }) });
   await expect(row).toBeVisible();
@@ -28,7 +29,7 @@ test('offline import and UI reflect persisted nodes without exposing credentials
 });
 
 test('create a unique group through the responsive console', async ({ page, fixtures }, testInfo) => {
-  await page.goto('/#/groups');
+  await gotoWorkspace(page, '/#/groups');
   await page.locator('.page-heading').getByRole('button', { name: '新建分组', exact: true }).click();
   const dialog = page.getByRole('dialog');
   const name = fixtures.name('UI-Group');
@@ -44,7 +45,7 @@ test('create a unique group through the responsive console', async ({ page, fixt
 
 test('import dialog previews and imports documentation-address nodes offline', async ({ page, fixtures }, testInfo) => {
   const proxy = fixtures.proxy('UI-SOCKS');
-  await page.goto('/#/nodes');
+  await gotoWorkspace(page, '/#/nodes');
   await page.locator('.page-heading').getByRole('button', { name: '导入节点', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByLabel('节点内容', { exact: false }).fill(JSON.stringify({ proxies: [proxy] }));
@@ -103,7 +104,7 @@ test('create a native strategy pool and its authenticated mixed listener atomica
 test('separate listener creation and blank-password editing preserve authentication', async ({ page, fixtures }) => {
   const [node] = await fixtures.importNodes([fixtures.proxy('auth-node')]);
   const pool = await fixtures.pool('auth-pool', { nodeIds: [node.id] });
-  await page.goto('/#/listeners');
+  await gotoWorkspace(page, '/#/listeners');
   await page.locator('.page-heading').getByRole('button', { name: '新建监听', exact: true }).click();
   let dialog = page.getByRole('dialog', { name: '新建监听端口', exact: true });
   const name = fixtures.name('auth-listener');

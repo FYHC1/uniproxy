@@ -1,11 +1,11 @@
-import { byName, expect, test } from './fixtures';
+import { byName, expect, test, gotoWorkspace } from './fixtures';
 
 test('dragged local Clash file previews and imports relay dependencies', async ({ page, fixtures }) => {
   const relay = fixtures.proxy('Drop-Relay');
   const leaf = fixtures.proxy('Drop-Leaf', { 'dialer-proxy': relay.name });
   // JSON is valid YAML and stays entirely in the offline local-file importer.
   const content = JSON.stringify({ proxies: [leaf, relay] });
-  await page.goto('/#/nodes');
+  await gotoWorkspace(page, '/#/nodes');
   await page.locator('.page-heading').getByRole('button', { name: '导入节点', exact: true }).click();
   const dialog = page.getByRole('dialog');
   await dialog.getByRole('button', { name: '本地文件', exact: true }).click();
@@ -44,7 +44,7 @@ test('exclude groups retains ungrouped nodes and explicit ungrouped filter reset
   await fixtures.importNodes([included], { groupNames: [a] });
   await fixtures.importNodes([excluded], { groupNames: [b] });
   await fixtures.importNodes([ungrouped]);
-  await page.goto('/#/nodes');
+  await gotoWorkspace(page, '/#/nodes');
   await page.getByRole('searchbox', { name: '搜索节点名称、协议、地址或分组', exact: true }).fill(fixtures.prefix);
   await page.locator('.node-group-filter summary').click();
   const filter = page.locator('.node-group-filter');

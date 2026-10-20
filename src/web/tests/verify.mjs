@@ -9,6 +9,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { verifyRelayImportUi, verifyNodeGroupUi } from './relay-regressions.mjs';
 import { verifyPoolCards } from './pool-regressions.mjs';
+import { verifyCoreInstallUi } from './core-install-regressions.mjs';
 
 const output = await build({ configFile:false, root:'src/web', plugins:[react()], publicDir:false, build:{write:false,emptyOutDir:false}, logLevel:'warn' });
 const files = new Map((Array.isArray(output) ? output[0] : output).output.map(asset => ['/' + asset.fileName,asset.type === 'chunk' ? asset.code : asset.source]));
@@ -19,6 +20,7 @@ let state = {
   nodes:[], groups:[], pools:[], listeners:[], subscriptions:[], revision:0,
   settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999},
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'',startedAt:'',dirty:false,listeners:[]},
+  coreInstallation:{state:'idle',stage:'',version:'1.19.32',os:'windows',arch:'amd64',path:'/fixture/core/mihomo.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:''},
   activities:[], jobs:[]
 };
 let auth = true;
@@ -108,8 +110,13 @@ mkdirSync('src/web/tests/artifacts',{recursive:true});
 try {
   await page.goto('http://uniproxy.test/');
   await textVisible('验证管理访问');
+  assert.equal(await page.getByRole('dialog',{name:'安装 Mihomo 内核',exact:true}).count(),0,'no installation prompt before authentication');
   await page.getByLabel('管理令牌',{exact:true}).fill(token);
   await page.getByRole('button',{name:'验证并进入',exact:true}).click();
+  const corePrompt=page.getByRole('dialog',{name:'安装 Mihomo 内核',exact:true});
+  await corePrompt.waitFor();
+  await corePrompt.getByRole('button',{name:'稍后处理',exact:true}).click();
+  assert.equal(calls.filter(call=>call.path==='/api/core/install').length,0,'dismissing prompt never starts installation');
   await page.getByRole('heading',{name:'节点管理',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('uniproxy.admin-token')),token);
   assert.equal(await page.evaluate(()=>localStorage.length),0);
@@ -281,6 +288,8 @@ try {
   await page.getByRole('button',{name:'验证并进入',exact:true}).click();
   await page.getByRole('navigation').waitFor();
   console.log('PASS all strategy controls, new-password protection, non-loopback UDP guard, HTTP UDP-off, local-file/subscription previews, job cancel, confirmed force refresh, restore cancellation, offline stale state, expired token lock');
+  await verifyCoreInstallUi({browser,files});
+  assert.equal(calls.filter(call=>call.path==='/api/core/install').length,0,'legacy fixture flows never request installation');
   assert.equal(errors.length,0,'No browser runtime errors: ' + errors.join('; '));
   console.log('PASS responsive 375/768/1024 layouts, Escape dialog, settings save and backup confirmation');
   console.log('PASS zero uncaught browser errors; screenshots src/web/tests/artifacts/ (test fixtures, not live proxy evidence)');

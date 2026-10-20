@@ -1,8 +1,8 @@
-import { expect, test } from './fixtures';
+import { expect, test, gotoWorkspace } from './fixtures';
 
 test('subscription preview explains direct download and distinguishes transport failure without saving',async({page,fixtures})=>{
  const before=await fixtures.bootstrap();
- await page.goto('/#/nodes');await page.locator('.page-heading').getByRole('button',{name:'导入节点',exact:true}).click();
+ await gotoWorkspace(page, '/#/nodes');await page.locator('.page-heading').getByRole('button',{name:'导入节点',exact:true}).click();
  const dialog=page.getByRole('dialog');await dialog.getByRole('button',{name:'订阅链接',exact:true}).click();
  await expect(dialog.getByText(/预览会由管理服务直连下载/)).toBeVisible();
  await expect(dialog.getByText(/不会发送订阅路径或令牌/)).toBeVisible();
@@ -21,7 +21,7 @@ test('subscription preview explains direct download and distinguishes transport 
 });
 
 test('literal Fake-IP URL is still blocked instead of treating safety fallback as permission',async({page,fixtures})=>{
- await page.goto('/#/subscriptions');await page.getByRole('button',{name:'添加订阅',exact:true}).first().click();
+ await gotoWorkspace(page, '/#/subscriptions');await page.getByRole('button',{name:'添加订阅',exact:true}).first().click();
  const dialog=page.getByRole('dialog');const before=await fixtures.bootstrap();
  await dialog.getByLabel('订阅 URL',{exact:true}).fill('https://198.18.0.1/example-token?key=test-only');
  await dialog.getByRole('button',{name:'预览解析',exact:true}).click();

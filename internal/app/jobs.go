@@ -32,6 +32,9 @@ func (a *App) startJob(ids []string, kind string) (model.Job, error) {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	empty := model.Job{}
+	if a.closed || a.background.Err() != nil {
+		return empty, &apiError{503, "管理服务正在关闭", "shutting_down"}
+	}
 	if kind != "latency" && kind != "speed" {
 		return empty, bad("检测类型无效")
 	}

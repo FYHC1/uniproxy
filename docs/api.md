@@ -10,6 +10,27 @@
 4. 检查修改响应中的 runtime，只有 running=true 且 dirty=false 才代表期望配置已应用。
 5. POST /api/tests 获取异步任务ID，GET /api/jobs/{id}查询结果。
 
+## 内核安装与检测
+
+首次 `GET /api/bootstrap` 会带 `coreInstallation`，也可单独 `GET /api/core/installation` 查询。查询只检查本地路径和任务状态，不会下载或启动内核。`installed` 只表示检测到文件，`runtime.available` 才表示固定版本检测通过。
+
+~~~sh
+# 在已鉴权的管理服务上，发起一次后台安装（必须是空 JSON 对象）
+curl -X POST http://127.0.0.1:9090/api/core/install \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $UNIPROXY_ADMIN_TOKEN" -d '{}'
+
+# 轮询真实下载/校验/安装阶段
+curl -H "Authorization: Bearer $UNIPROXY_ADMIN_TOKEN" http://127.0.0.1:9090/api/core/installation
+~~~
+
+- 开始返回 `202` 和状态，不代表已完成：`state` 为 `idle/installing/succeeded/failed`；`stage` 为 `metadata/downloading/verifying/extracting/installing/inspecting/complete`（无任务时空）。
+- `version/os/arch/path` 为服务端固定版本、当前平台与文件路径；`bytesDownloaded/totalBytes` 为安装包真实字节数，只有下载阶段有可计算百分比。`error/reason/canInstall` 给出失败或不可安装原因。
+- 单实例只能有一个安装任务；安装中、内核运行/应用中、目标已有文件或平台不支持时返回 `409`。不接受 `version/url/path/force` 等参数，无法从 API 安装任意软件或覆盖已有内核。
+- 安装不修改配置 revision，不启动代理。成功后显式 `POST /api/runtime/apply` 并核对 runtime；关闭浏览器不取消任务，关闭管理服务会取消并等待清理。失败且目标未写入时可重新 POST。
+- 手动放入文件、或下载完成但版本检测暂时失败：`POST /api/core/inspect {}` 返回 `{coreInstallation,runtime}`，不下载、不应用；已有文件不会为了重试被覆盖。
+- 所有接口使用同样的 Token、Host、Origin 和跨站防护；只向已获权的管理客户端展示主机路径。状态/自动应用暂停在进程内，管理服务重启仍按原有启动语义尝试应用配置。
+
 ## 节点导入
 
 ~~~json

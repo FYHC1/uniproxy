@@ -5,7 +5,7 @@ This package implements the core interface in [the implementation contract](../.
 ## Guarantees
 
 - Exactly Mihomo **v1.19.32** is accepted. Other versions are not assumed to support `hash-key: in-user` and fail with `ErrUnsupportedVersion`. Missing binaries return `ErrUnavailable`.
-- Binary discovery checks `Options.BinaryPath`, or `Options.DataDir/mihomo[.exe]` then PATH when no explicit path is configured. Default data directory: `data/core`.
+- Binary discovery checks authoritative `Options.BinaryPath`; without an override it checks `Options.DataDir/mihomo[.exe]`, working-directory `bin/mihomo[.exe]`, the UniProxy executable directory, then PATH. Invalid/incompatible first candidates do not silently fall through. The application passes its platform-resolved data directory plus `core`; standalone manager default remains `data/core`.
 - Stable IDs become `n-ID`, `p-ID`, and `l-ID`. Node and pool membership is ordered by ID. Renaming entities does not change their compiled configuration.
 - Native `url-test` and `load-balance` groups implement round-robin, consistent-hashing, and sticky-sessions. Every group explicitly uses `empty-fallback: REJECT`. Empty pools contain only `REJECT`. Stale/disabled targets bind to `REJECT`. Global and private-probe rules end with `MATCH,REJECT`.
 - Each public listener binds directly to its target through native `proxy`. The private mixed probe uses node-specific authenticated usernames and HMAC-derived passwords with isolated `IN-USER` sub-rules; public listener usernames cannot select probe routes.
@@ -32,18 +32,21 @@ Speed tests perform real downloads through the node-authenticated internal proxy
 
 ## Install and test
 
-From the repository root:
+Start UniProxy without installing a separate command. The authenticated WebUI prompts when the core is missing, and both operations/settings tabs expose installation and rediscovery. The Go management API starts an asynchronous task through this Manager; [coreinstall](<../coreinstall/install.go>) contains the verified downloader.
+
+- `InstallationStatus()` returns transient task state and local discovery without network I/O or subprocesses.
+- `PrepareInstall(ctx)` atomically reserves a missing destination; running/applying/busy/existing/unwritable-as-PATH-name targets are rejected.
+- `RunInstall(ctx)` downloads in the background without holding the lifecycle mutex, then verifies the installed version. Apply/Validate are excluded by the reservation.
+- App shutdown cancels and waits. A request disconnect or closing the modal does not cancel an accepted task.
+- Install success never starts proxying or changes configuration revision. App pauses automatic apply until explicit runtime Apply; restarting the app retains existing startup-apply behavior.
+- An interrupted post-install version probe keeps the verified file. Explicit Inspect can recover the install status without redownloading/replacing; ordinary probes are capped at20s, first post-install probes at60s, within the5min installation budget.
+
+The downloader accepts only Windows/Linux amd64-compatible and arm64 pinned v1.19.32 assets. It checks HTTPS origins on every redirect, public DNS/numeric-pinned dialing/TLS, exact official release tag and URL, advertised size, GitHub SHA256 and built-in SHA256 before extraction. Archive paths, symlinks, ambiguous executables, CRC failures and oversized expansion are rejected. The extracted staging file and archive are closed before cleanup/publication (Windows-safe); same-directory `os.Link` provides atomic **no-replace** publication even when two processes race. Filesystems without hard links fail safely. No public version/URL/force overrides or downloaded scripts exist.
 
 ```sh
-go run ./cmd/core-install
-# Optional cross-platform download:
-go run ./cmd/core-install -os linux -arch arm64 -output ./mihomo-linux-arm64
-# Existing binaries require explicit -force; stop the core first.
-go test ./internal/core ./cmd/core-install
-go vet ./internal/core ./cmd/core-install
+go test ./internal/core ./internal/coreinstall
+go vet ./internal/core ./internal/coreinstall
 ```
-
-The installer accepts Windows/Linux amd64-compatible and arm64 release assets, validates HTTPS origins, release tag, advertised size, GitHub SHA256 asset digest, and built-in v1.19.32 SHA256 pins before extraction. ZIP paths/symlinks/multiple executables are rejected. Downloads and extracted bytes are bounded. Installation is staged and renamed; unverified code is never executed. Explicit stable `-version` overrides still require an official SHA256 digest; the manager continues to require the pinned version.
 
 Real integration is opt-in and uses only local HTTP/SOCKS/TCP/UDP fixtures, no public proxy accounts:
 

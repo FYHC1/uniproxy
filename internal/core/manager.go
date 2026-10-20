@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/uniproxy/uniproxy/internal/coreinstall"
 	"github.com/uniproxy/uniproxy/internal/model"
 	"gopkg.in/yaml.v3"
 )
@@ -62,6 +63,9 @@ type Manager struct {
 	logs          *boundedLog
 	command       func(context.Context, string, ...string) *exec.Cmd
 	startCommand  func(string, ...string) *exec.Cmd
+	installation  model.CoreInstallation
+	installWorker bool
+	install       func(context.Context, coreinstall.Options, func(coreinstall.Progress)) (string, error)
 }
 
 func New(options Options) *Manager {
@@ -72,7 +76,7 @@ func New(options Options) *Manager {
 	if err == nil {
 		options.DataDir = dir
 	}
-	return &Manager{options: options, status: model.RuntimeStatus{Dirty: true, Listeners: []model.ListenerRuntime{}}, logs: &boundedLog{limit: 32 << 10}, command: exec.CommandContext, startCommand: exec.Command, client: &http.Client{Transport: &http.Transport{Proxy: nil, MaxIdleConnsPerHost: 8, ResponseHeaderTimeout: 35 * time.Second, MaxResponseHeaderBytes: 64 << 10}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	return &Manager{options: options, status: model.RuntimeStatus{Dirty: true, Listeners: []model.ListenerRuntime{}}, logs: &boundedLog{limit: 32 << 10}, install: coreinstall.Install, command: exec.CommandContext, startCommand: exec.Command, client: &http.Client{Transport: &http.Transport{Proxy: nil, MaxIdleConnsPerHost: 8, ResponseHeaderTimeout: 35 * time.Second, MaxResponseHeaderBytes: 64 << 10}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 
 func (m *Manager) Status() model.RuntimeStatus {
@@ -83,20 +87,50 @@ func (m *Manager) Status() model.RuntimeStatus {
 	return s
 }
 func (m *Manager) Inspect(ctx context.Context) model.RuntimeStatus {
+	if m.installing() {
+		return m.Status()
+	}
 	m.op.Lock()
 	defer m.op.Unlock()
+	if m.installing() {
+		return m.Status()
+	}
 	if err := m.inspectBinary(ctx); err != nil {
 		m.mu.Lock()
 		m.status.LastError = err.Error()
 		m.status.Dirty = true
+		m.mu.Unlock()
+	} else {
+		m.mu.Lock()
+		// A previously timed-out post-install probe can be retried without
+		// replacing the verified binary or leaving a stale installation failure.
+		if m.installation.State == "failed" {
+			if m.installation.Stage == "inspecting" {
+				m.installation.State, m.installation.Stage = "succeeded", "complete"
+				m.installation.Error = ""
+				m.installation.FinishedAt = model.Now()
+			} else {
+				// A host administrator may have installed it manually after a
+				// failed download. Clear obsolete task errors, but do not claim
+				// our download succeeded or keep stale transferred byte counts.
+				m.installation = model.CoreInstallation{State: "idle"}
+			}
+			m.status.LastError = ""
+		}
 		m.mu.Unlock()
 	}
 	return m.Status()
 }
 
 func (m *Manager) Validate(ctx context.Context, state model.State) error {
+	if m.installing() {
+		return ErrInstalling
+	}
 	m.op.Lock()
 	defer m.op.Unlock()
+	if m.installing() {
+		return ErrInstalling
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -119,8 +153,14 @@ func (m *Manager) Validate(ctx context.Context, state model.State) error {
 // can reset on reload; changed binds/auth briefly recreate accept sockets. Only
 // failed rollback recovery may require a process restart (and reset connections).
 func (m *Manager) Apply(ctx context.Context, state model.State) (err error) {
+	if m.installing() {
+		return ErrInstalling
+	}
 	m.op.Lock()
 	defer m.op.Unlock()
+	if m.installing() {
+		return ErrInstalling
+	}
 	m.mu.Lock()
 	m.status.Applying = true
 	m.status.Dirty = true
@@ -231,26 +271,16 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 func (m *Manager) inspectBinary(ctx context.Context) error {
-	name := m.options.BinaryPath
-	if name == "" {
-		filename := "mihomo"
-		if runtime.GOOS == "windows" {
-			filename += ".exe"
-		}
-		local := filepath.Join(m.options.DataDir, filename)
-		if info, err := os.Stat(local); err == nil && info.Mode().IsRegular() {
-			name = local
-		} else {
-			name = filename
-		}
-	}
-	resolved, err := exec.LookPath(name)
+	return m.inspectBinaryWithTimeout(ctx, 20*time.Second)
+}
+
+func (m *Manager) inspectBinaryWithTimeout(ctx context.Context, timeout time.Duration) error {
+	resolved, exists, err := m.discoverBinary()
 	if err != nil {
 		m.setBinaryStatus(false, "")
-		return ErrUnavailable
+		return err
 	}
-	resolved, err = filepath.Abs(resolved)
-	if err != nil {
+	if !exists {
 		m.setBinaryStatus(false, "")
 		return ErrUnavailable
 	}
@@ -268,7 +298,7 @@ func (m *Manager) inspectBinary(ctx context.Context) error {
 	// binary can be slow when an antivirus scanner inspects it or the disk is busy.
 	// A five second cap produced spurious "core unavailable" results on such hosts,
 	// so allow a realistic cold-start budget while staying bounded.
-	inspectCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	inspectCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	output := &boundedLog{limit: 16 << 10}
 	cmd := m.command(inspectCtx, resolved, "-v")

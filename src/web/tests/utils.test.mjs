@@ -1,4 +1,5 @@
 import test from 'node:test';
+import './core-install.test.mjs';
 import assert from 'node:assert/strict';
 import {address,checkHttpUrl,formatDate,isIP,isLoopback,poolMembers,runtimeLabel} from '../utils.ts';
 import {emptyNodeGroupFilter,matchesNodeFilter,matchesNodeGroups,nodeRelay} from '../nodeFilters.ts';

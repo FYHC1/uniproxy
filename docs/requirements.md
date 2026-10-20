@@ -1,6 +1,6 @@
 # UniProxy 需求基线
 
-更新：2026-10-19（Asia/Shanghai）。这是已经讨论的产品需求与当前实现边界，不是未经批准的新功能清单。
+更新：2026-10-20（Asia/Shanghai）。这是已经讨论的产品需求与当前实现边界，不是未经批准的新功能清单。
 
 入口：[文档索引](<README.md>) · [开发计划](<development-plan.md>) · [接续快照](<session-handoff.md>)。
 
@@ -39,7 +39,9 @@
 | R20 | 代理池页面更多信息、更紧凑，避免纵向过长 | 已实现并验证：用真实统计替代大横幅，卡片紧凑入口/状态摘要、节点限高分页/详情，单池合理利用横向空间；保留操作和真实数据语义 |
 | R21 | 点击分组直接管理节点 | 已实现并验证：组名/数量打开节点管理，搜索/全选/分页、添加现有节点、仅从组移除、启禁/延迟；区分包含与旧排除池引用，保留多来源安全提示 |
 
-| R22 | 数据备份路径需符合 Windows/Linux 开发标准；推送到 GitHub 并构建 Windows/Linux 发布 | 已实现：平台标准数据目录（ProgramData / /var/lib / Application Support）并沿用旧目录、版本单一来源与 `-ldflags` 注入、标签驱动四平台发布工作流；v0.2.0 待发布 |
+| R22 | 数据备份路径需符合 Windows/Linux 开发标准；推送到 GitHub 并构建 Windows/Linux 发布 | 已实现：平台标准数据目录（ProgramData / /var/lib / Application Support）并沿用旧目录、版本单一来源与 `-ldflags` 注入、标签驱动四平台发布工作流；v0.2.0 已发布并校验 |
+
+| R23 | Mihomo 安装不再依赖独立安装器：自动检测缺失并在 WebUI 提示，运行与设置页提供在线安装 | 已实现并验证：内置固定版本安全下载、后台进度/重试/重新检测、明确安装与应用分离；不覆盖已有或运行中的内核，暂存构建未部署；[验收](<core-install-verification.md>) |
 
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 

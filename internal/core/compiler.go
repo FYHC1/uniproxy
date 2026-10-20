@@ -17,13 +17,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/uniproxy/uniproxy/internal/coreinstall"
 	"github.com/uniproxy/uniproxy/internal/model"
 	"gopkg.in/yaml.v3"
 )
 
 // PinnedVersion is the version whose native hash-key, listeners and reload APIs
 // have been verified. In particular older cores can silently ignore hash-key.
-const PinnedVersion = "1.19.32"
+const PinnedVersion = coreinstall.PinnedVersion
 
 const probeName = "uniproxy-probe"
 const defaultTestURL = "https://www.gstatic.com/generate_204"

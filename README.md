@@ -34,10 +34,9 @@
 ~~~sh
 pnpm install --frozen-lockfile
 pnpm build
-pnpm core:install
 ~~~
 
-安装器固定下载 Mihomo v1.19.32，核对官方资产 SHA256 和内置固定摘要后才解压，默认写入 data/core/mihomo（Windows 为 mihomo.exe）。不会执行远程脚本。已有文件不会覆盖；停止内核后可显式使用 -force。
+不需要另行下载或运行独立安装器。先启动 UniProxy，再从 WebUI 安装所需的 Mihomo 内核；没有内核也可以打开管理面板、保存配置。
 
 Windows：
 
@@ -51,7 +50,18 @@ Linux：
 ./bin/uniproxy
 ~~~
 
-打开 **http://127.0.0.1:9090**。首次没有节点，导入后新建代理池时一并配置共享监听，或直接为节点创建独享入口。服务不会更改系统/浏览器代理，不修改防火墙。
+打开 **http://127.0.0.1:9090**。首次没有节点；如果未检测到 Mihomo，管理面板会弹出“安装 Mihomo 内核”提示。点击在线安装，等待完成并通过版本检测，再点击“重新应用配置”启动代理。导入后新建代理池时可一并配置共享监听，或为节点创建独享入口。服务不会更改系统/浏览器代理或防火墙。
+
+### Mihomo 内核在线安装
+
+- **自动检测**：显式 `-core` / `UNIPROXY_CORE_PATH` 优先；未指定时依次检查数据目录的 `core/mihomo[.exe]`、工作目录的 `bin/mihomo[.exe]`、UniProxy 可执行文件同目录、系统 PATH。可用内核必须是 v1.19.32，已有内核无需重新安装。
+- **随时进入**：“运行与设置” → “运行概况”或“检测与端口”都保留在线安装、安装状态和“重新检测内核”入口；关闭首次提示不会妨碍继续管理配置。
+- **真实进度**：下载、SHA256 校验、解压、安装和版本检测在服务端后台执行；面板每 5 秒同步。关闭窗口或切换页面不取消任务；失败显示原因，未写入目标时可以重试。
+- **目标位置**：默认使用当前数据目录下的 `core` 子目录，随数据卷持久化。显式指定缺失的内核文件路径时安装到该路径；仅指定 PATH 命令名则需要先改为完整文件路径或取消覆盖。
+- **安全与版本**：仅 Windows/Linux × amd64/arm64 在线安装固定 v1.19.32；从官方发布下载，经 HTTPS、重定向域名、公网 DNS/TLS 和内置 SHA256 双重摘要校验后才解压。不会执行安装脚本、自动升级或覆盖已有文件，不会替换运行中的内核。
+- **安装不等于代理运行**：安装完成后不自动应用配置，期间及之后的配置变更仅保存；必须显式“重新应用配置”。此暂停与安装任务记录在当前进程内，重启管理服务仍按原有启动语义尝试应用已保存配置。
+
+下载由 **UniProxy 所在主机**直连官方发布服务，不使用浏览器或系统 HTTP 代理。如果服务器无法访问，面板会报告网络原因；可以手动放置匹配版本的 Mihomo 后点击“重新检测内核”。已有损坏/不兼容文件需先在主机上确认路径并手动处理，界面不会静默覆盖。安装目录须可写且支持硬链接（常见 NTFS、ext4 等），不支持时安全失败而不是降级覆盖。
 
 ### 开发
 
@@ -84,11 +94,11 @@ Docker 使用 `/data` 卷，这是容器内唯一挂载点，通过 `UNIPROXY_DA
 
 ## 发布与版本
 
-版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间，未注入的本地构建显示为开发版：
+版本号只有一处来源：[internal/version](<internal/version/version.go>)。发布构建用 `-ldflags` 注入版本、提交与构建时间。当前源码默认版本为 0.2.1，未注入时不显示提交和时间；未发布构建应显式注入开发标识，不要仅凭版本号认定它是发布资产：
 
 ~~~sh
 go build -trimpath \
-  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.0 \
+  -ldflags "-X github.com/uniproxy/uniproxy/internal/version.Version=0.2.1 \
             -X github.com/uniproxy/uniproxy/internal/version.Commit=$(git rev-parse --short=12 HEAD) \
             -X github.com/uniproxy/uniproxy/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
   -o bin/uniproxy ./cmd/uniproxy
@@ -96,7 +106,7 @@ go build -trimpath \
 
 `uniproxy -version` 和 `/api/health` 都报告同一版本，可用来确认正在运行的进程对应哪个发布。
 
-发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.0` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个二进制与安装器，生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
+发布由 [release workflow](<.github/workflows/release.yml>) 自动完成：推送 `v0.2.1` 形式的标签，或在 Actions 里手动触发并填写版本号。工作流会构建 linux/windows 的 amd64+arm64 四个 UniProxy 二进制（内置在线安装功能，不再附带独立安装器），生成 `SHA256SUMS.txt`，创建 Release 并附加产物。标签必须是真实推送的版本，未发布的构建不应冒充已发布版本。
 
 ## 配置
 
@@ -136,7 +146,7 @@ docker compose up -d --build
 
 **UDP部署限制**：bridge模式只提供对宿主暴露的认证TCP入口。原生SOCKS UDP仅回环，Linux可使用 docker compose -f compose.host.yaml up -d --build（host网络）并在控制台绑定127.0.0.1；Windows需要本机UDP时建议原生运行。两份compose方案二选一，不能同时使用同一数据卷。不能把认证TCP误当成同端口UDP也已认证。
 
-镜像用非root用户、无额外 capabilities，数据卷持久化 /data。无需 privileged、TUN或NET_ADMIN。
+镜像用非root用户、无额外 capabilities，数据卷持久化 /data。首次启动在 WebUI 在线安装内核到 /data/core，重建镜像不丢失已安装内核；镜像构建本身不下载或预置 Mihomo。现有旧卷可能仍需首次安装。无需 privileged、TUN或NET_ADMIN。
 
 ## 使用 API
 
@@ -165,6 +175,9 @@ curl -X POST http://127.0.0.1:9090/api/import \
 | POST/PUT/DELETE /api/listeners、POST /api/listeners/batch | 入口与批量端口 |
 | POST /api/subscriptions/:id/refresh | 订阅刷新；force:true确认异常删减 |
 | POST /api/tests | latency/speed异步任务 |
+| GET /api/core/installation | 内核检测与后台安装状态 |
+| POST /api/core/install（空 JSON 对象） | 后台安装固定内核，返回 202；不自动启动代理 |
+| POST /api/core/inspect（空 JSON 对象） | 重新检测手动放置的内核，不应用配置 |
 | POST /api/runtime/apply、/api/runtime/stop | 应用/停止 |
 | GET /api/export/nodes、/api/export/backup | 含敏感信息的显式导出 |
 | POST /api/import/backup | 恢复备份 |
@@ -205,7 +218,7 @@ $env:UNIPROXY_TEST_CORE_PATH = (Resolve-Path bin/mihomo.exe).Path
 go test -v ./internal/core ./tests/integration
 ~~~
 
-若安装在默认 data/core，替换上面的路径。Linux用 export UNIPROXY_TEST_CORE_PATH=/absolute/path/to/mihomo。未设置环境变量时，真实内核测试会明确跳过。
+若安装在平台数据目录的 core 子目录，替换上面的路径。Linux用 export UNIPROXY_TEST_CORE_PATH=/absolute/path/to/mihomo。未设置环境变量时，真实内核测试会明确跳过。
 
 浏览器测试在隔离临时数据目录启动19090服务；Windows默认使用已安装的Edge，其他平台可运行 pnpm exec playwright install chromium。不要同时运行另一份19090测试服务。
 

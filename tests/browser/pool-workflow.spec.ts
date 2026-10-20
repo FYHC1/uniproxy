@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { byName, editPoolDialog, expect, newPoolDialog, nodeChoices, poolCard, savePoolDialog, submitNewPool, test } from './fixtures';
+import { byName, editPoolDialog, expect, newPoolDialog, nodeChoices, poolCard, savePoolDialog, submitNewPool, test, gotoWorkspace } from './fixtures';
 
 async function expectNoHorizontalOverflow(page: Page, container: Locator): Promise<void> {
   const dimensions = await page.evaluate(() => ({ body: document.body.scrollWidth, root: document.documentElement.scrollWidth, view: window.innerWidth }));
@@ -83,7 +83,7 @@ test('card removal is pool-local, confirms before DELETE, and allows re-inclusio
   const source = await fixtures.poolWithListener('remove-source', { groupIds: [group.id], nodeIds: [node.id] });
   const other = await fixtures.poolWithListener('remove-other', { groupIds: [group.id] });
   const dedicated = await fixtures.listener('remove-dedicated', node.id, { kind: 'node' });
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   const before = await fixtures.bootstrap();
   const removed: string[] = [];
   page.on('request', request => { if (request.method() === 'DELETE') removed.push(new URL(request.url()).pathname); });
@@ -131,7 +131,7 @@ test('pool-only API stays compatible and cards allocate or add listeners on the 
   const before = await fixtures.bootstrap();
   const pool = await fixtures.pool('pool-only', { nodeIds: [node.id] });
   expect((await fixtures.bootstrap()).listeners).toEqual(before.listeners);
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   const card = poolCard(page, pool.name);
   await expect(card.getByRole('region', { name: '关联监听', exact: true })).toContainText('尚未分配监听');
   for (const [index, action] of ['分配监听', '添加监听'].entries()) {
@@ -165,7 +165,7 @@ for (const viewport of [{ width: 1440, height: 1000 }, { width: 390, height: 844
     const poolName = created.pool.name;
     const testRequests: string[] = [];
     page.on('request', request => { if (new URL(request.url()).pathname === '/api/tests') testRequests.push(request.method()); });
-    await page.goto('/#/pools');
+    await gotoWorkspace(page, '/#/pools');
     await page.getByRole('searchbox', { name: '搜索代理池', exact: true }).fill(poolName);
     const card = poolCard(page, poolName);
     await expect(card).toBeVisible();

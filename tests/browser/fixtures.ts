@@ -144,7 +144,23 @@ export class BrowserFixtures {
   }
 }
 
-export const test = base.extend<{ fixtures: BrowserFixtures; pageErrors: void }>({
+// Other feature tests dismiss the real startup prompt rather than changing
+// bootstrap availability or removing assertions about a genuinely missing core.
+export async function dismissCoreInstallPrompt(page: Page): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: '安装 Mihomo 内核', exact: true });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: '稍后处理', exact: true }).click();
+  await expect(dialog).not.toBeVisible();
+}
+
+export async function gotoWorkspace(page: Page, target: string): Promise<void> {
+  const alreadyPrompted = await page.evaluate(() => Object.keys(sessionStorage).some(key => key.startsWith('uniproxy.core-install.prompt:'))).catch(() => false);
+  await page.goto(target);
+  if (!alreadyPrompted) await dismissCoreInstallPrompt(page);
+  else await expect(page.getByRole('navigation')).toBeVisible();
+}
+
+export const test = base.extend<{ fixtures: BrowserFixtures; pageErrors: void; offlineCoreGuard: void }>({
   fixtures: [async ({ request, baseURL }, use) => {
     expect(baseURL, 'Browser writes are restricted to cmd/testserver on port 19090').toBe('http://127.0.0.1:19090');
     const fixtures = new BrowserFixtures(request);
@@ -156,6 +172,15 @@ export const test = base.extend<{ fixtures: BrowserFixtures; pageErrors: void }>
     } finally {
       await fixtures.dispose();
     }
+  }, { auto: true }],
+  offlineCoreGuard: [async ({ context }, use) => {
+    const unexpected: string[] = [];
+    await context.route('**/api/core/install', async route => {
+      unexpected.push(route.request().method());
+      await route.abort('blockedbyclient');
+    });
+    await use();
+    expect(unexpected, 'Real API browser tests must never request a network core installation').toEqual([]);
   }, { auto: true }],
   pageErrors: [async ({ page }, use) => {
     const errors: string[] = [];
@@ -178,7 +203,7 @@ export function groupChoices(dialog: Locator): Locator {
 }
 
 export async function newPoolDialog(page: Page): Promise<Locator> {
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   // The empty state also has a create button; always use the page action.
   await page.locator('.page-heading').getByRole('button', { name: '新建代理池', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '新建代理池', exact: true });

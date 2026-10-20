@@ -37,21 +37,24 @@ type Options struct {
 	Version string
 }
 type App struct {
-	mu              sync.Mutex
-	store           *store.Store
-	core            Core
-	opts            Options
-	client          *http.Client
-	jobMu           sync.Mutex
-	jobs            map[string]*model.Job
-	cancels         map[string]context.CancelFunc
-	background      context.Context
-	cancel          context.CancelFunc
-	wg              sync.WaitGroup
-	refreshing      map[string]bool
-	lastHealth      time.Time
-	applyError      string
-	manuallyStopped bool
+	mu                sync.Mutex
+	store             *store.Store
+	core              Core
+	opts              Options
+	client            *http.Client
+	jobMu             sync.Mutex
+	jobs              map[string]*model.Job
+	cancels           map[string]context.CancelFunc
+	background        context.Context
+	cancel            context.CancelFunc
+	wg                sync.WaitGroup
+	refreshing        map[string]bool
+	lastHealth        time.Time
+	applyError        string
+	manuallyStopped   bool
+	installPending    bool
+	awaitingCoreApply bool
+	closed            bool
 }
 type apiError struct {
 	Status        int
@@ -74,14 +77,21 @@ func New(s *store.Store, c Core, opts Options) *App {
 }
 func (a *App) Start() {
 	a.mu.Lock()
+	if a.closed || a.background.Err() != nil {
+		a.mu.Unlock()
+		return
+	}
 	a.core.Inspect(a.background)
 	a.applyLocked(a.store.Snapshot())
-	a.mu.Unlock()
 	a.wg.Add(1)
+	a.mu.Unlock()
 	go a.scheduler()
 }
 func (a *App) Close() {
 	a.cancel()
+	a.mu.Lock()
+	a.closed = true
+	a.mu.Unlock()
 	a.jobMu.Lock()
 	for _, c := range a.cancels {
 		c()
@@ -105,6 +115,14 @@ func (a *App) runtime() model.RuntimeStatus {
 }
 func (a *App) Runtime() model.RuntimeStatus { a.mu.Lock(); defer a.mu.Unlock(); return a.runtime() }
 func (a *App) applyLocked(s model.State) {
+	if a.installPending {
+		a.applyError = "Mihomo 正在安装；更改仅保存，安装完成后请手动应用配置"
+		return
+	}
+	if a.awaitingCoreApply {
+		a.applyError = "安装操作后尚未应用配置；更改仅保存，请点击重新应用配置"
+		return
+	}
 	if a.manuallyStopped {
 		a.applyError = "内核已手动停止；更改仅保存，点击重新应用后恢复代理"
 		return
@@ -133,8 +151,13 @@ func (a *App) mutate(ctx context.Context, label string, fn func(*model.State) (a
 	s.Revision++
 	validationCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	if e = a.core.Validate(validationCtx, s); e != nil && a.core.Status().Available {
-		return nil, bad("代理内核配置校验失败：" + e.Error())
+	// The installer may be probing a newly published executable. Do not wait
+	// for its lifecycle lock while holding the management mutex: pending saves
+	// are allowed just as when the binary is missing, and never auto-apply.
+	if !a.installPending {
+		if e = a.core.Validate(validationCtx, s); e != nil && a.core.Status().Available {
+			return nil, bad("代理内核配置校验失败：" + e.Error())
+		}
 	}
 	if e = a.store.Save(s); e != nil {
 		return nil, fmt.Errorf("保存配置失败: %w", e)
@@ -163,10 +186,11 @@ func (a *App) bootstrap() any {
 	}
 	return struct {
 		model.State
-		Runtime    model.RuntimeStatus `json:"runtime"`
-		Activities []model.Activity    `json:"activities"`
-		Jobs       []model.Job         `json:"jobs"`
-	}{s, a.runtime(), a.store.Activities(), a.jobList()}
+		Runtime          model.RuntimeStatus    `json:"runtime"`
+		Activities       []model.Activity       `json:"activities"`
+		Jobs             []model.Job            `json:"jobs"`
+		CoreInstallation model.CoreInstallation `json:"coreInstallation"`
+	}{s, a.runtime(), a.store.Activities(), a.jobList(), a.coreInstallation()}
 }
 func publicListener(l model.Listener) model.Listener {
 	l.Users = append([]model.Credential{}, l.Users...)

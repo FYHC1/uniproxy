@@ -13,7 +13,7 @@
 | 模块 | 主要源码 | 责任 |
 |---|---|---|
 | 服务入口 | [main.go](<../cmd/uniproxy/main.go>) | 参数/环境、IP/Token、数据路径、Web/API、启动与退出 |
-| 内核安装器 | [安装器](<../cmd/core-install/main.go>) | 固定版本、来源/摘要/归档安全、原子安装 |
+| 内置内核安装 | [下载器](<../internal/coreinstall/install.go>)、[安装生命周期](<../internal/core/installation.go>)、[安装 API](<../internal/app/core_install.go>) | 固定版本、来源/摘要/归档安全、原子无覆盖安装与后台状态 |
 | 数据模型 | [types.go](<../internal/model/types.go>)、[relay.go](<../internal/model/relay.go>) | 规范类型、动态池成员、稳定依赖图/阻断检查 |
 | 解析 | [parser.go](<../internal/importer/parser.go>)、[dialer.go](<../internal/importer/dialer.go>) | 有界离线输入、协议标准化、同文件依赖/递归指纹 |
 | 状态协调 | [app.go](<../internal/app/app.go>)、[http.go](<../internal/app/http.go>) | 序列化变更、公开投影、鉴权、接口与备份 |
@@ -34,10 +34,9 @@
 
 ~~~sh
 pnpm install --frozen-lockfile
-pnpm core:install
 ~~~
 
-内核安装到默认数据子目录；已有同名文件不会覆盖。不要在当前内核运行时强行覆盖内核文件。参数详见[内核指南](<../internal/core/README.md>)。
+启动管理服务后在 WebUI 缺失提示或“运行与设置”中在线安装，无独立安装器。内核默认安装到当前平台数据目录的 core 子目录；自动检测包含显式路径、数据目录、旧 bin、程序同目录与 PATH。已有文件及运行中的内核不会覆盖。下载由服务主机直连官方发布服务，进度与错误可轮询；安装成功后需显式应用，详见[内核指南](<../internal/core/README.md>)。
 
 仅在默认9090/5173空闲且数据目录是开发用时：
 
@@ -51,7 +50,7 @@ pnpm dev
 
 ### 数据目录规则
 
-**默认 ./data 相对于进程工作目录，不相对于exe路径。** 从根目录执行和从bin目录执行会得到不同数据库。源代码见[服务入口](<../cmd/uniproxy/main.go>)。显式参数/环境优先；原生服务不自动载入 [.env.example](<../.env.example>)。
+**默认数据目录按平台选择，显式相对 -data 路径仍相对于进程工作目录。** 旧版 data 目录自动沿用规则见下文。源代码见[服务入口](<../cmd/uniproxy/main.go>)。显式参数/环境优先；原生服务不自动载入 [.env.example](<../.env.example>)。
 
 开发和测试不得直接复用用户数据库或在同一数据目录启动两个服务。使用绝对 -data/-core 最清楚；手工调试另选端口，勿抢占9090或测试19090。
 
@@ -73,9 +72,9 @@ Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，本地未注入构建显示开发版。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.1 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
-[发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个二进制与安装器，生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
+[发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
 ## 3. 构建
 
@@ -144,7 +143,7 @@ pnpm test:ui
 
 - E2E用[隔离测试服务器](<../cmd/testserver/main.go>)19090及临时数据库；不会使用真实节点。Windows默认Edge。[配置](<../playwright.config.ts>)不复用已存在服务器。
 - UI fixture脚本内存构建、拦截测试域名，无产品假数据；它不能替代真实Go/内核验证。
-- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为32个E2E、31个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
+- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为34个E2E、36个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
 
 ### 私有文件离线验证
 
@@ -212,7 +211,7 @@ go test ./internal/app ./tests/integration -run TestPrivateClash -count=1 -v
 - 原生延迟API把四舍五入0ms视为失败；回环fixture应实际延迟几毫秒，不伪造延迟结果。
 - 测试的空闲端口要同时可绑定TCP/UDP；只探测TCP不足，旧fixture已修复。
 - Windows曾有临时test.exe执行拒绝或内核首次检查超时；查真实证据、确保任务不重复，不能禁用安全软件或假报通过。
-- 当前目录观察不到.git；不要凭路径中Github推断有仓库/提交。初始化版本控制另经用户确认。
+- 当前项目已有 Git 仓库；仍应检查 git status 再修改。不自动提交、推送或发布，新请求需明确授权。
 - 在有活动用户实例时，文档变更不需要启动服务或全量构建。只跑与改动相关的校验。
 
 ## 8. 每次收尾回写

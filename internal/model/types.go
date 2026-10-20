@@ -133,6 +133,28 @@ type RuntimeStatus struct {
 	Dirty           bool              `json:"dirty"`
 	Listeners       []ListenerRuntime `json:"listeners"`
 }
+
+// CoreInstallation describes a transient installation task, not persisted configuration.
+// Installed means a binary path exists; RuntimeStatus.Available additionally requires
+// a successful probe of the pinned version. Installing never starts proxy traffic.
+type CoreInstallation struct {
+	State           string `json:"state"`
+	Stage           string `json:"stage"`
+	Version         string `json:"version"`
+	OS              string `json:"os"`
+	Arch            string `json:"arch"`
+	Path            string `json:"path"`
+	Installed       bool   `json:"installed"`
+	Supported       bool   `json:"supported"`
+	CanInstall      bool   `json:"canInstall"`
+	Reason          string `json:"reason"`
+	BytesDownloaded int64  `json:"bytesDownloaded"`
+	TotalBytes      int64  `json:"totalBytes"`
+	Error           string `json:"error"`
+	StartedAt       string `json:"startedAt"`
+	FinishedAt      string `json:"finishedAt"`
+}
+
 type ListenerRuntime struct {
 	ID        string `json:"id"`
 	Listening bool   `json:"listening"`

@@ -114,18 +114,46 @@ func (a *App) Handler() http.Handler {
 		return map[string]any{"ok": true, "version": reported}, nil
 	})
 	route("GET /api/bootstrap", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.bootstrap(), nil })
+	route("GET /api/core/installation", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.installationStatus(), nil })
+	route("POST /api/core/install", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		if err := emptyCoreRequest(w, r); err != nil {
+			return nil, err
+		}
+		status, err := a.startCoreInstall(r.Context())
+		if err != nil {
+			return nil, err
+		}
+		respond(w, http.StatusAccepted, status)
+		return nil, nil
+	})
+	route("POST /api/core/inspect", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		if err := emptyCoreRequest(w, r); err != nil {
+			return nil, err
+		}
+		return a.inspectCore(r.Context())
+	})
 	route("GET /api/runtime", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.Runtime(), nil })
 	route("POST /api/runtime/apply", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
+		if a.closed || a.background.Err() != nil {
+			return nil, &apiError{503, "管理服务正在关闭", "shutting_down"}
+		}
+		if a.installPending {
+			return nil, &apiError{409, "内核正在安装，请等待完成后再应用配置", "core_install_busy"}
+		}
 		a.core.Inspect(r.Context())
 		a.manuallyStopped = false
+		a.awaitingCoreApply = false
 		a.applyLocked(a.store.Snapshot())
 		return a.runtime(), nil
 	})
 	route("POST /api/runtime/stop", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
+		if a.installPending {
+			return nil, &apiError{409, "内核正在安装，没有运行中的代理需要停止，请等待安装完成", "core_install_busy"}
+		}
 		if e := a.core.Stop(r.Context()); e != nil {
 			return nil, bad(e.Error())
 		}

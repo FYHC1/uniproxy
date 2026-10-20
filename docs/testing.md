@@ -11,6 +11,20 @@
 - pnpm test:ui：前端工具单元测试+内存构建fixture浏览器测试，不启动服务器。
 - UNIPROXY_TEST_CORE_PATH：指向已验证的 Mihomo 后执行真实内核测试；没设置时这些测试跳过而非伪造结果。
 
+## 在线内核安装验证
+
+- [下载器测试](<../internal/coreinstall/install_test.go>)以注入 transport/摘要验证四平台归档、来源/TLS重定向边界、校验先于解压、有界大小/取消清理、无覆盖文件发布竞态；默认不联网。
+- [内核安装生命周期测试](<../internal/core/installation_test.go>)与[管理 API 测试](<../internal/app/core_install_test.go>)覆盖自动发现、重复/运行保护、真实字节状态、安装不自动应用、关闭取消等待、鉴权/严格空对象与重新检测。
+- 浏览器隔离服务对安装 POST 固定返回 409，客户端也默认拦截；真正在线安装只能在单独、明确的 opt-in 集成测试中执行。
+- [真实下载 API 测试](<../tests/integration/core_install_test.go>)仅在 `UNIPROXY_TEST_CORE_DOWNLOAD=1` 时访问官方发布并安装到临时目录，经真实版本检测后显式应用空配置、停止清理。不读取订阅/用户配置，不使用公网代理节点；常规测试该变量保持为空。
+
+~~~powershell
+$env:UNIPROXY_TEST_CORE_DOWNLOAD = "1"
+go test ./tests/integration -run '^TestOnlineCoreDownloadThroughManagementAPI$' -count=1 -v
+# 当前 shell 后续普通测试前清除此 opt-in
+$env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
+~~~
+
 ## 必测功能
 
 1. 各协议链接/Clash/sing-box 配置导入，非法参数及不支持变体明确拒绝，错误不泄漏密钥。
@@ -64,5 +78,11 @@
 - 通过：Go全量 -p1 -count1、go vet、gofmt、严格TS（含noUnused）、32项工具测试、32项API浏览器、fixture UI、真实本机内核链路、构建后进程/CLI/manifest测试、Windows暂存+Linux两架构。
 - 修复7项缺陷并补回归：长名称导致批量独立端口整批失败、预览与保存名称口径不一致、订阅元数据下载后才校验、监听页/节点页待同步误标“监听中”、活动记录按字节截断产生非法UTF-8、fixture脚本写死浏览器路径、文档含个人绝对路径。
 - 未执行 race（无C工具链）、Linux/Docker实跑、容量压测；未访问真实订阅或真实节点。细节见[复查验收](<repository-review-verification.md>)。
+
+## 内置安装轮（2026-10-20 11:09）
+
+- 最终Go全量显式Mihomo/暂存程序、vet/gofmt、严格TS、36工具、fixture UI、34真实API浏览器通过。
+- 下载器40函数/97子用例，92.0%覆盖，2个OS symlink子用例因宿主权限skip；本轮真实临时官网下载、摘要/版本检测、显式空配置启停通过。
+- 四平台仅交叉构建暂存，未部署/提交/发布。Linux/Docker/Windowsarm64实跑、race、私有订阅/公网节点/容量压测未做。[完整验收与失败调查](<core-install-verification.md>)。
 
 具体测试源、命令和限制可复查，不以虚拟节点/虚构延迟填充生产界面。

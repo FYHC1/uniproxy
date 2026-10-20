@@ -1,4 +1,4 @@
-import { byName, editPoolDialog, expect, groupChoices, newPoolDialog, nodeChoices, poolCard, savePoolDialog, submitNewPool, test } from './fixtures';
+import { byName, editPoolDialog, expect, groupChoices, newPoolDialog, nodeChoices, poolCard, savePoolDialog, submitNewPool, test, gotoWorkspace } from './fixtures';
 
 test('group-scoped bulk selection covers more than 100 results and preserves search-hidden choices', async ({ page, fixtures }) => {
   const group = await fixtures.group('large-scope');
@@ -142,7 +142,7 @@ test('only explicit group, mode or UDP scope changes prune old manual inclusions
   const [outside] = await fixtures.importNodes([fixtures.proxy('prune-outside')]);
   const allIds = [shared.id, tcpOnly.id, onlyB.id, outside.id];
   const pool = await fixtures.pool('pruning-pool', { groupIds: [a.id], nodeIds: allIds });
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   let dialog = await editPoolDialog(page, pool.name);
   await expect(dialog.getByText(/有 2 个旧手动节点在当前范围外/)).toBeVisible();
   await dialog.getByRole('combobox', { name: '调度策略', exact: true }).selectOption('round-robin');
@@ -177,7 +177,7 @@ test('legacy excluded groups survive ordinary editing and clear only after an ex
   const [blocked] = await fixtures.importNodes([fixtures.proxy('legacy-blocked')], { groupIds: [include.id, excluded.id] });
   const [outside] = await fixtures.importNodes([fixtures.proxy('legacy-manual-outside')]);
   const pool = await fixtures.pool('legacy-pool', { groupIds: [include.id], excludeGroupIds: [excluded.id], nodeIds: [outside.id] });
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   let dialog = await editPoolDialog(page, pool.name);
   await expect(dialog.getByRole('group', { name: /^排除分组/ })).toHaveCount(0);
   await expect(dialog.getByText('旧分组排除规则仍生效', { exact: true })).toBeVisible();
@@ -205,7 +205,7 @@ test('an open editor drops deleted node references without losing existing hidde
   const [deleted, retained] = await fixtures.importNodes([fixtures.proxy('stale-deleted'), fixtures.proxy('stale-retained')], { groupIds: [include.id] });
   const [hiddenManual, hiddenExcluded] = await fixtures.importNodes([fixtures.proxy('stale-manual'), fixtures.proxy('stale-excluded')]);
   const pool = await fixtures.pool('stale-pool', { groupIds: [include.id], nodeIds: [hiddenManual.id], excludeNodeIds: [hiddenExcluded.id], excludeGroupIds: [excluded.id] });
-  await page.goto('/#/pools');
+  await gotoWorkspace(page, '/#/pools');
   const dialog = await editPoolDialog(page, pool.name);
   await nodeChoices(dialog).getByRole('checkbox', { name: deleted.name, exact: true }).uncheck();
   const response = await request.post('/api/nodes/batch', { data: { ids: [deleted.id], action: 'delete' } });

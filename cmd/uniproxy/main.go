@@ -17,7 +17,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -81,26 +80,6 @@ func run() error {
 		return e
 	}
 	dataDir := resolved.Dir
-	if *binary == "" {
-		name := "mihomo"
-		if runtime.GOOS == "windows" {
-			name += ".exe"
-		}
-		*binary = filepath.Join(dataDir, "core", name)
-		if _, e := os.Stat(*binary); e != nil {
-			if _, e := os.Stat(filepath.Join("bin", name)); e == nil {
-				*binary = filepath.Join("bin", name)
-			}
-		}
-		if _, e := os.Stat(*binary); e != nil {
-			if exe, e := os.Executable(); e == nil {
-				candidate := filepath.Join(filepath.Dir(exe), name)
-				if _, e := os.Stat(candidate); e == nil {
-					*binary = candidate
-				}
-			}
-		}
-	}
 	s, e := store.Open(dataDir)
 	if e != nil {
 		return e

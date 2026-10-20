@@ -1,0 +1,37 @@
+.core-install-panel { padding: 23px; margin-bottom: 21px; }
+.core-install-panel > .section-heading { margin-bottom: 18px; }
+.core-install-panel .note, .core-install-dialog .note { font-size: 13px; }
+.core-install-metadata { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 18px 0; }
+.core-install-metadata > div { min-width: 0; }
+.core-install-metadata dt { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.core-install-metadata dd { margin: 0; font-size: 13px; color: var(--ink); overflow-wrap: anywhere; }
+.core-install-metadata .core-install-path { grid-column: 1 / -1; }
+.core-install-dialog .core-install-metadata { margin: 0; }
+.core-install-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.core-install-actions .button { min-height: 44px; }
+.core-install-panel > .core-install-actions { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 18px; }
+.core-install-working { display: flex; align-items: center; gap: 8px; color: var(--teal-dark); font-size: 13px; min-height: 44px; }
+.core-install-progress { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-subtle); }
+.core-install-progress > p { display: flex; align-items: center; gap: 8px; color: var(--teal-dark); font-size: 14px; }
+.core-install-progress progress { width: 100%; height: 8px; }
+.core-install-transfer { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.core-install-progress .field-hint { font-size: 12px; }
+.core-install-assurance { display: flex; align-items: flex-start; gap: 9px; font-size: 12px; color: var(--muted); line-height: 1.8; }
+.core-install-assurance > svg { color: var(--teal); margin-top: 2px; }
+.core-install-feedback { display: flex; align-items: flex-start; gap: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 7px; font-size: 13px; overflow-wrap: anywhere; }
+.core-install-feedback > svg { margin-top: 3px; }
+.core-install-feedback p + p, .core-install-feedback strong + p { margin-top: 5px; }
+.core-install-feedback--error { color: var(--danger); border-color: currentColor; background: var(--danger-soft); }
+.core-install-banner { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; row-gap: 5px; margin-bottom: 20px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 7px; background: var(--surface); }
+.core-install-banner-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; color: var(--teal-dark); font-size: 13px; }
+.core-install-banner > p { grid-column: 1; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.core-install-banner > .button { grid-column: 2; grid-row: 1 / 3; align-self: center; min-height: 44px; }
+@media (max-width: 560px) {
+  .core-install-panel { padding: 17px; }
+  .core-install-panel > .section-heading { align-items: flex-start; gap: 12px; }
+  .core-install-banner { grid-template-columns: minmax(0, 1fr); }
+  .core-install-banner > .button { grid-column: 1; grid-row: auto; justify-self: start; margin-top: 7px; }
+  .core-install-actions { justify-content: flex-start; }
+  .core-install-actions .button { flex: 1 1 auto; }
+  .core-install-working { flex-basis: 100%; }
+}

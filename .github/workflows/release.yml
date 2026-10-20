@@ -78,7 +78,6 @@ jobs:
           mkdir -p dist
           ldflags="-s -w -X github.com/uniproxy/uniproxy/internal/version.Version=${VERSION} -X github.com/uniproxy/uniproxy/internal/version.Commit=${COMMIT} -X github.com/uniproxy/uniproxy/internal/version.Date=${BUILD_DATE}"
           go build -trimpath -ldflags "$ldflags" -o "dist/uniproxy-${GOOS}-${GOARCH}${suffix}" ./cmd/uniproxy
-          go build -trimpath -ldflags "$ldflags" -o "dist/core-install-${GOOS}-${GOARCH}${suffix}" ./cmd/core-install
       - uses: actions/upload-artifact@v4
         with:
           name: uniproxy-${{ matrix.goos }}-${{ matrix.goarch }}
