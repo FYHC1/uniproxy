@@ -92,11 +92,11 @@ UniProxy 0.2.0 · commit b0a04aa7cbc2 · built 2026-10-20T01:01:36Z
 
 | 产物 | 字节 | 时间 | SHA256 |
 |---|---|---|---|
-| `bin/updates/uniproxy.exe` | 13579776 | 2026-10-20 09:04:03 | `655620BD53A894CF132CA82BFC68DB48ADAAAD8F5F3D4AD30360823D3AF78F49` |
-| `bin/updates/linux-amd64/uniproxy` | 13250720 | 09:04:05 | `2321750BB3B359793AD4A70B855CC138B812FE2219C22B26732BA78B5E5184CD` |
-| `bin/updates/linux-arm64/uniproxy` | 12452000 | 09:04:08 | `96AF842A2D611BC0E7CB50C648FD1DD2A4FAD2F4DE85EB79D3D661E5C10F1257` |
+| `bin/updates/uniproxy.exe` | 13579776 | 2026-10-20 09:12:31 | `0E014D1B9DCF712B4E6A4FC0EB162CAD5514AD5A55318E26E1894CFC399FB9E6` |
+| `bin/updates/linux-amd64/uniproxy` | 13250720 | 09:12:33 | `7B9D90337803EC2775E1656A6553A4802E7846F10CB6038C8CCDE3992BCE2740` |
+| `bin/updates/linux-arm64/uniproxy` | 12452000 | 09:12:35 | `E5C1B982CB9116B2B53167DA664677702EAD0E97B8E99C1A09F54BC0CDCEC377` |
 
-均带 `-ldflags` 注入，`-version` 输出 `UniProxy 0.2.0 · commit b0a04aa7cbc2 · built 2026-10-20T01:04:01Z`。体积明显小于此前构建，因为新增 `-s -w` 去符号。
+均带 `-ldflags` 注入，`-version` 输出 `UniProxy 0.2.0 · commit c45e8f3fe13d · built 2026-10-20T01:12:29Z`。体积明显小于此前构建，因为新增 `-s -w` 去符号。
 
 当前运行中的 `bin/uniproxy.exe` 仍是 `510CAE7F…`（19,785,216 字节），**本轮未替换**。
 

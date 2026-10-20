@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version, e.g. 0.2.0 (creates tag v<version> if missing)'
+        description: 'Release version, e.g. 0.2.0 or v0.2.0'
         required: true
 
 permissions:
@@ -54,6 +54,12 @@ jobs:
           else
             VERSION="${GITHUB_REF_NAME#v}"
           fi
+          # Accept 0.2.0 or v0.2.0; the binary always reports the bare semver.
+          VERSION="${VERSION#v}"
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+[.][0-9]+[.][0-9]+$' ; then
+            echo 'version must look like 0.2.0 or v0.2.0' >&2
+            exit 1
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "commit=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
           echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
@@ -67,13 +73,12 @@ jobs:
           BUILD_DATE: ${{ steps.meta.outputs.date }}
         run: |
           set -euo pipefail
-          suffix=""
-          if [ "$GOOS" = "windows" ]; then suffix=".exe"; fi
-          out="dist"
-          mkdir -p "$out"
+          suffix=''
+          if [ "$GOOS" = 'windows' ]; then suffix='.exe'; fi
+          mkdir -p dist
           ldflags="-s -w -X github.com/uniproxy/uniproxy/internal/version.Version=${VERSION} -X github.com/uniproxy/uniproxy/internal/version.Commit=${COMMIT} -X github.com/uniproxy/uniproxy/internal/version.Date=${BUILD_DATE}"
-          go build -trimpath -ldflags "$ldflags" -o "$out/uniproxy-${GOOS}-${GOARCH}${suffix}" ./cmd/uniproxy
-          go build -trimpath -ldflags "$ldflags" -o "$out/core-install-${GOOS}-${GOARCH}${suffix}" ./cmd/core-install
+          go build -trimpath -ldflags "$ldflags" -o "dist/uniproxy-${GOOS}-${GOARCH}${suffix}" ./cmd/uniproxy
+          go build -trimpath -ldflags "$ldflags" -o "dist/core-install-${GOOS}-${GOARCH}${suffix}" ./cmd/core-install
       - uses: actions/upload-artifact@v4
         with:
           name: uniproxy-${{ matrix.goos }}-${{ matrix.goarch }}
@@ -94,11 +99,23 @@ jobs:
           cd dist
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ github.event_name == 'workflow_dispatch' && format('v{0}', inputs.version) || github.ref_name }}
-          name: UniProxy ${{ github.event_name == 'workflow_dispatch' && inputs.version || github.ref_name }}
-          generate_release_notes: true
-          fail_on_unmatched_files: true
-          files: |
-            dist/*
+      # Uses the runner's preinstalled gh CLI instead of a third-party release
+      # action, so publishing adds no extra supply-chain dependency.
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = 'workflow_dispatch' ]; then
+            RAW="${{ inputs.version }}"
+            TAG="v${RAW#v}"
+            TITLE="UniProxy ${TAG#v}"
+            # A manual run has no pushed tag yet, so create it on this commit.
+            gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "$TITLE" --generate-notes
+          else
+            TAG="${{ github.ref_name }}"
+            TITLE="UniProxy ${TAG#v}"
+            # A tag push must point at a real existing tag, never a typo.
+            gh release create "$TAG" dist/* --verify-tag --title "$TITLE" --generate-notes
+          fi

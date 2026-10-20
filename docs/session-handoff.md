@@ -33,9 +33,9 @@
 | 产物 | 字节数 / mtime | SHA256 |
 |---|---|---|
 | [当前运行文件](<../bin/uniproxy.exe>) | 19785216 / 2026-10-19 17:42:34 | 510CAE7FE157938A8F5060AE5B66363E73A73EFF9CE90F3F63CABF20CB147317 |
-| [Windows v0.2.0 暂存](<../bin/updates/uniproxy.exe>) | 13579776 / 2026-10-20 09:04:03 | 655620BD53A894CF132CA82BFC68DB48ADAAAD8F5F3D4AD30360823D3AF78F49 |
-| [Linux amd64 v0.2.0 暂存](<../bin/updates/linux-amd64/uniproxy>) | 13250720 / 09:04:05 | 2321750BB3B359793AD4A70B855CC138B812FE2219C22B26732BA78B5E5184CD |
-| [Linux arm64 v0.2.0 暂存](<../bin/updates/linux-arm64/uniproxy>) | 12452000 / 09:04:08 | 96AF842A2D611BC0E7CB50C648FD1DD2A4FAD2F4DE85EB79D3D661E5C10F1257 |
+| [Windows v0.2.0 暂存](<../bin/updates/uniproxy.exe>) | 13579776 / 2026-10-20 09:12:31 | 0E014D1B9DCF712B4E6A4FC0EB162CAD5514AD5A55318E26E1894CFC399FB9E6 |
+| [Linux amd64 v0.2.0 暂存](<../bin/updates/linux-amd64/uniproxy>) | 13250720 / 09:12:33 | 7B9D90337803EC2775E1656A6553A4802E7846F10CB6038C8CCDE3992BCE2740 |
+| [Linux arm64 v0.2.0 暂存](<../bin/updates/linux-arm64/uniproxy>) | 12452000 / 09:12:35 | E5C1B982CB9116B2B53167DA664677702EAD0E97B8E99C1A09F54BC0CDCEC377 |
 
 v0.2.0 构建已注入版本/提交/时间，`-version` 与 `/api/health` 均报告 `0.2.0 · commit … · built …`；但 health200 只是存活，不代表 core/config ready，哈希仍不是签名或自动升级授权。
 
