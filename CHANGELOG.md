@@ -1,8 +1,10 @@
 # UniProxy 变更记录
 
-日期按 Asia/Shanghai。v0.2.1 发布准备中；历史 v0.2.0 已发布。发布与替换用户运行程序是不同操作，本轮不部署。
+日期按 Asia/Shanghai。v0.2.1 已发布并校验（2026-10-20 15:25:50）；历史 v0.2.0 保持不变。发布与替换用户运行程序是不同操作，本轮未部署。
 
 ## 0.2.1 — 2026-10-20 · WebUI 内置 Mihomo 在线安装
+
+- 已推送[功能提交](<https://github.com/FYHC1/uniproxy/commit/d8f394eb644159d3725b1c42a07d87bc1d7aacf1>)与v0.2.1标签，[正式Release](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.1>)含四平台程序与SHA256SUMS；main/标签两平台CI及Release全成功，下载摘要和Windows实际程序验证通过。[发布验收](<docs/release-0.2.1-verification.md>)。
 
 - 不再依赖独立安装器：安装逻辑改为 UniProxy 内部模块，构建脚本/后续 Release/Docker 不再生成或调用额外安装程序。
 - 启动统一检测显式路径、数据目录/core、旧 bin、程序同目录和 PATH；缺失时仅在已进入管理会话后弹出可关闭的安装提示。运行概况与设置页常驻安装/重新检测入口。

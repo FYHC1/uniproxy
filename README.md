@@ -25,6 +25,10 @@
 
 > 第一版的安全边界：Mihomo v1.19.32 原生 SOCKS UDP 不执行用户名/密码认证，也不携带 InUser。因此只允许回环 UDP 监听；同机其他进程仍可发送UDP。不支持“对外 UDP + 用户名认证”或“UDP 按用户名哈希”。TCP 对外监听有认证支持。公网管理必须配置 Token 并使用 HTTPS。
 
+## 下载发布版
+
+当前正式版本：[UniProxy v0.2.1](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.1>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。私有仓库下载需要已获访问权限的GitHub账号。
+
 ## 快速开始（源码）
 
 需要 Go 1.24+、Node.js 22.18+（建议24）、pnpm 11.28.5。运行时仅需编译后的 UniProxy 和 Mihomo，不需要 Node/Python。
