@@ -27,7 +27,7 @@
 
 ## 下载发布版
 
-当前正式版本：[UniProxy v0.2.2](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.2>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
+当前正式版本：[UniProxy v0.2.3](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.3>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
 
 ## 快速开始（源码）
 

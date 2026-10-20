@@ -1,14 +1,14 @@
 # UniProxy 变更记录
 
-日期按 Asia/Shanghai。2026-10-21 用户授权将订阅解析修复作为 v0.2.3 发布；发布验收进行中，现有 v0.2.0/v0.2.1/v0.2.2 标签与资产不改写。发布与替换用户运行程序是不同操作，本轮未部署。
+日期按 Asia/Shanghai。v0.2.3 已于2026-10-21 01:42:43正式发布；v0.2.0/v0.2.1/v0.2.2历史标签与资产保持不变。发布与替换用户运行程序是不同操作，本轮未部署。
 
-## 0.2.3 — 2026-10-21 · 订阅解析兼容修复（发布准备）
+## 0.2.3 — 2026-10-21 · 订阅解析兼容修复
 
 - 修复可选TLS关闭时false证书绕过标志/空SNI被误判为活动TLS参数；保持原TLS开关、证书校验和稳定节点身份。插件与sing-box关闭TLS默认字段采用同样窄范围策略。
 - 新增Quantumult X、Surge/Surfboard、Loon的静态节点文本适配；支持有界双引号参数、原始行号和Base64包装，仅提取节点，不采用全局策略/DNS/MITM/脚本或远程节点provider。无法精确转换的字段明确报错。
 - URI支持同值SNI别名与单个开头STATUS元数据；不同值、重复key和非法SNI仍拒绝。错误/不完整订阅不导入或清理原节点，强制刷新也不绕过解析错误。
 - 静态客户端文本未显式声明UDP时按TCP-only导入，各导入模式均显示提示；TLS/WS认证名、HTTP Host或插件Host无法无歧义映射时要求明确源字段，不猜测安全身份或完整复制各客户端默认值。
-- 增加合成TLS/方言/来源完整性/预览隐私回归、显式授权文件的离线验证和导入浏览器覆盖。开发期实际结果见[验收](<docs/subscription-format-verification.md>)；本轮按用户授权发布v0.2.3，过程见[发布验收](<docs/release-0.2.3-verification.md>)与[中文说明](<docs/releases/v0.2.3.md>)。不部署，已有v0.2.2资产不变。
+- 增加合成TLS/方言/来源完整性/预览隐私回归、显式授权文件的离线验证和导入浏览器覆盖。开发期实际结果见[验收](<docs/subscription-format-verification.md>)；已按用户授权发布[v0.2.3](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.3>)，main/标签两平台CI和四平台Release成功；过程见[发布验收](<docs/release-0.2.3-verification.md>)与[中文说明](<docs/releases/v0.2.3.md>)。不部署，已有v0.2.2资产不变。
 
 ## 0.2.2 — 2026-10-20 · Windows 启动诊断与退出保护
 

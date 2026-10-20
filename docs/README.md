@@ -37,7 +37,7 @@
 | [Windows启动与恢复验收](<windows-startup-verification.md>) | R24 malformed根因、授权离线恢复、错误可见性与Job保护、真实控制台/重启验收 | M15开发历史，后续修复已随v0.2.2发布，不等于部署 |
 | [v0.2.2发布验收](<release-0.2.2-verification.md>) | 启动诊断/Windows进程保护正式发布、源码/CI/资产与程序核验 | M16已发布并验证，部署另行授权 |
 | [订阅格式兼容验收](<subscription-format-verification.md>) | R25 TLS默认字段兼容、QX/Surge/Surfboard/Loon静态节点、授权样例与回归 | M17开发验收；源码/暂存不等于已发布或部署 |
-| [v0.2.3发布验收](<release-0.2.3-verification.md>) | 订阅解析兼容正式发布、源码/CI/四平台资产与Windows程序核验 | M18发布进度；不部署或访问用户数据 |
+| [v0.2.3发布验收](<release-0.2.3-verification.md>) | 订阅解析兼容正式发布、源码/CI/四平台资产与Windows程序核验 | M18已发布；资产/程序验收及未部署边界见记录 |
 | [归档协作备注](<coordination.md>) | 早期并行划分和结束状态 | 归档，不用于判断剩余工作 |
 | [CHANGELOG](<../CHANGELOG.md>) | 用户可见变化和交付节点 | 每个变更完成时追加；不等于已发布 |
 
