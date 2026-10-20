@@ -27,7 +27,7 @@
 
 ## 下载发布版
 
-当前正式版本：[UniProxy v0.2.1](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.1>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
+当前正式版本：[UniProxy v0.2.2](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.2>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
 
 ## 快速开始（源码）
 
@@ -71,7 +71,7 @@ Linux：
 
 若双击后窗口一闪而过，请先从 PowerShell 启动并保留错误文字。`database disk image is malformed (11)` 表示 SQLite 文件损坏，不是缺少 Mihomo；不要重装内核或删除密钥来绕过。停止全部实例后保留数据库、匹配密钥及可能存在的 WAL/SHM，再从完整备份离线恢复。运行中覆盖数据库会让旧 WAL 回写到新文件，导致损坏或数据丢失。
 
-0.2.2 源码包含：启动错误附带阶段与数据路径；独立无参数 Windows 控制台失败后等待 Enter；错误日志保存到用户缓存目录的 `UniProxy/logs/startup-*.log`，不可写时回退系统临时目录。普通 shell/脚本、`-version`、`-healthcheck` 不等待输入。Windows 子进程生命周期保护让自有 Mihomo 随主程序退出，不会扫描或终止其他实例。详情见[启动与恢复验收](<docs/windows-startup-verification.md>)。
+0.2.2 已发布：启动错误附带阶段与数据路径；独立无参数 Windows 控制台失败后等待 Enter；错误日志保存到用户缓存目录的 `UniProxy/logs/startup-*.log`，不可写时回退系统临时目录。普通 shell/脚本、`-version`、`-healthcheck` 不等待输入。Windows 子进程生命周期保护让自有 Mihomo 随主程序退出，不会扫描或终止其他实例。详情见[启动与恢复验收](<docs/windows-startup-verification.md>)。
 
 ### 开发
 
