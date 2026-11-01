@@ -16,10 +16,10 @@
 
 | 文档 | 用途 | 性质/维护时机 |
 |---|---|---|
-| [需求基线](<requirements.md>) | 场景、R01–R26、接受的行为/限制、不做什么 | 用户确认/范围改变时更新 |
-| [开发计划](<development-plan.md>) | M0–M20、P0/P1/P2待办、完成定义 | 每次任务阶段更新；候选不等于获准 |
+| [需求基线](<requirements.md>) | 场景、R01–R28、接受的行为/限制、不做什么 | 用户确认/范围改变时更新 |
+| [开发计划](<development-plan.md>) | M0–M23、P0/P1/P2待办、完成定义 | 每次任务阶段更新；候选不等于获准 |
 | [开发指南](<development-guide.md>) | 源码模块、环境、数据规则、构建/测试、停机升级 | 工程操作或模块接口改变时更新 |
-| [技术决策](<decisions.md>) | D01–D24、原因与后果、替代旧方案 | 新决策追加或标注被取代，保留历史 |
+| [技术决策](<decisions.md>) | D01–D26、原因与后果、替代旧方案 | 新决策追加或标注被取代，保留历史 |
 | [接续快照](<session-handoff.md>) | 一页恢复上下文，时间敏感运行状态和下一步 | 每轮收尾必更新，PID/哈希必须注明日期 |
 | [架构](<architecture.md>) | 控制/转发面、核心对象、生命周期、安全边界 | 实现架构变动时更新 |
 | [接口契约](<implementation-contract.md>) | Go/TS模型、API形状、内核适配、校验范围 | 字段/接口变动时同步源码测试 |
@@ -39,6 +39,8 @@
 | [订阅格式兼容验收](<subscription-format-verification.md>) | R25 TLS默认字段兼容、QX/Surge/Surfboard/Loon静态节点、授权样例与回归 | M17开发验收；源码/暂存不等于已发布或部署 |
 | [v0.2.3发布验收](<release-0.2.3-verification.md>) | 订阅解析兼容正式发布、源码/CI/四平台资产与Windows程序核验 | M18已发布；资产/程序验收及未部署边界见记录 |
 | [v0.2.4发布与部署验收](<release-0.2.4-verification.md>) | M19正式发布、四平台资产与Windows程序核验，以及本机部署替换、一致备份和运行复核 | M20已发布并部署；部署事实、备份与验证边界见记录 |
+| [v0.2.5发布验收](<release-0.2.5-verification.md>) | M22/M23（Linux 稳定性、全局出站网卡）正式发布、四平台资产与Windows程序核验 | 发布后编写；不含部署 |
+| [WSL实机运行与Linux修复验收](<wsl-runtime-verification.md>) | Linux amd64 WSL2 真实启动、固定内核、回环HTTP/SOCKS、持久化重启、认证与异常终止观察，以及探针重试/Pdeathsig 本地修复复验 | M21实机证据与M22本地修复；不替代裸机/ARM64/Docker/容量与真实远端节点 |
 | [归档协作备注](<coordination.md>) | 早期并行划分和结束状态 | 归档，不用于判断剩余工作 |
 | [CHANGELOG](<../CHANGELOG.md>) | 用户可见变化和交付节点 | 每个变更完成时追加；不等于已发布 |
 

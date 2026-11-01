@@ -225,3 +225,25 @@ Docker 保持 `/data` 卷，因为容器内需要一个固定挂载点；这是�
 用户先要求“添加/移除”暂存提交，随后明确撤回该交互，改为在包含节点区提供测试、排序和状态筛选。最终保留即时勾选：每次变更仍调用 changePoolSelection，按组匹配、UDP兼容与旧排除规则统一推导 nodeIds/excludeNodeIds，不引入第二套成员语义。状态筛选（全部/已启用/已禁用/检测健康/检测异常/尚未检测）和排序（名称/延迟/速度/最近更新）只影响当前显示，不清除筛选或搜索隐藏的已选节点；“全选当前结果”覆盖当前筛选，未显示的选择保留。这样既能全选，也能在筛选后精确调整，无需额外的暂存状态。
 
 “测延迟”复用真实 POST /api/tests（kind=latency），只提交已勾选、已启用且无中转错误的节点；按钮要求内核 available/running、配置非 dirty/applying 且应用revision一致，否则禁用并说明原因。它只提交任务并刷新真实状态，不在前端伪造延迟或健康；后端仍执行节点数量、中转依赖和任务互斥校验。包含分组列表固定在字段内显示四行（167px）并内部滚动，分组搜索与全选保持原样。边界：仅前端交互、样式与测试，无API、数据库、内核或安全策略变更；解析器与订阅导入未动。浏览器回归覆盖状态筛选/排序仅显示、隐藏成员保留、真实检测请求体、禁用原因、四行滚动，以及原有组匹配/旧排除/删除引用行为。
+
+## D25 — Linux 内核探针有界重试与 best-effort 父子生命周期
+
+**状态：2026-11-01 按 R27 在本地实现并在 WSL2/Fedora 44 amd64 复验；正式 v0.2.4 资产不含该修复，随 v0.2.5 发布（不含部署）。见[WSL 实机运行与修复验收](<wsl-runtime-verification.md>)。**
+
+M21 的 WSL 实跑暴露出两个 Linux 行为差异：冷启动首次 apply 时，内核已启动但私有认证探针在 750ms 单次检查内尚未就绪，导致配置被判定未生效并停止内核；主程序被 `SIGKILL` 时，Windows Job Object 不存在，Mihomo 子进程会继续监听。前者是时序窗口，不通过降低认证/探针标准解决；后者只对自有子进程做 best-effort 生命周期绑定，不按名称/PID 清理其他实例。
+
+探针保留原 HTTP/SOCKS/UDP 认证检查，改为外层 3 秒 deadline、每次 1 秒尝试、间隔 100ms；到 deadline 仍失败时返回原错误并停止内核，避免半应用。对 `/proxies` 原生出站暴露检查也采用 3 秒有界重试，避免控制器已响应但提交配置尚未可见的冷启动竞态。Linux `PrepareCommand` 仅在 `SysProcAttr == nil` 时设置 `Pdeathsig = syscall.SIGTERM`，由内核在父线程退出时发送信号；它不是 Windows Job 等价，父进程被 `SIGKILL`、线程迁移或内核不支持时仍可能来不及清理。Windows 继续使用原有 Job Object，其他平台 no-op；版本探测、配置校验和正式启动都复用同一准备函数。
+
+测试覆盖 `/proxies` 先返回空映射后暴露原生出站的 `verifyProxies` 重试、1,200ms 延迟绑定的 SOCKS listener（旧 750ms 单次检查必失败）与父 deadline，以及 Linux helper 的 `Pdeathsig=SIGTERM` 和父进程 `SIGKILL` 后子进程消失。Windows/WSL 全量 Go、vet、gofmt 及本地 Linux 候选实跑通过；不能据此宣称裸机、arm64、Docker、systemd 或所有异常退出路径都已覆盖。
+
+## D26 — 全局出站网卡由管理员设置写入内核顶层 interface-name
+
+**状态：2026-11-01 按 R28 在本机实现并验证；随 v0.2.5 发布（不含部署）。见[计划](<development-plan.md>) M23。**
+
+需求是让 UniProxy 只从指定物理网卡（如 `以太网`）或 WLAN 出站，绕开 Clash Verge TUN 经 `Meta` 适配器接管默认路由造成的节点测试全失败。这个能力只作为**全局**设置存在，不进入节点/订阅字段。
+
+为什么不放开节点级 `interface-name`：`internal/core/compiler.go` 的 `safeNativeValue` 继续把 `interface-name` 与 `dialer-proxy`、`routing-mark`、`*-path` 一起拒绝，订阅节点无法自行选择源网卡或写文件路径。管理员设置走独立字段 `Settings.OutboundInterface`（空=自动/系统默认路由），编译时仅当 TrimSpace 后非空才写入 Mihomo 顶层 `interface-name`，位置在 `internal/core/compiler.go` 的 document 构造之后、`yaml.Marshal` 之前。
+
+为什么必须由 Go 侧校验：实测 `bin/mihomo.exe -t` 对 `interface-name: definitely-not-an-interface` 返回 0 并输出 `test is successful`；实际启动也成功，只在拨号时失败，且日志是误导性的 `dns resolve failed: couldn't find ip`。因此 `internal/app/validate.go` 在保存前用 `net.InterfaceByName` 要求网卡存在、`FlagUp`、非 `FlagLoopback`，并对首尾空白直接报错。`GET /api/interfaces` 只返回 `name/up/loopback/addresses`（CIDR，已过滤 fe80::/10 与 169.254/16），不暴露路由、网关、MAC 或 DNS 状态。
+
+边界：该设置只约束 UniProxy 自有内核的出站源网卡，不创建虚拟网卡、不是 TUN、不修改系统路由表或 DNS、不影响其他程序；系统级 TUN/VPN 仍可能按路由规则接管。绑定失效网卡时不会回退直连——Mihomo 直接拨号失败（实测 curl 35/000），不会绕过限制。selected 网卡名区分大小写并直接对应操作系统适配器名（Windows 为 `Get-NetAdapter` 的 Name 列，如 `以太网`）。

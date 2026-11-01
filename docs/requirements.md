@@ -45,6 +45,8 @@
 | R24 | 排查并修复 Windows 关闭终端后再次双击启动闪退 | 已确认在线覆盖SQLite主库造成malformed(11)并按授权离线恢复；修复错误可见性、损坏提示、初始锁等待、早期取消和Windows自有子进程退出保护，已作为v0.2.2发布；[验收](<windows-startup-verification.md>) |
 | R25 | 修复订阅下载成功后的节点解析兼容问题，参考 Clash Verge Rev / FlClash，并验证多客户端订阅 | 已实现/本地验证：原订阅7/7通过，false TLS占位与静态QX/Loon/Surge/Surfboard适配、URI元数据/SNI别名；保留来源完整性/安全字段，格式歧义按明确限制处理。2026-10-21已作为v0.2.3正式发布，不含部署；[功能验收](<subscription-format-verification.md>)、[发布验收](<release-0.2.3-verification.md>) |
 | R26 | 编辑代理池弹窗更紧凑；包含分组固定 4 行并可滚动；包含节点提供测试、排序与状态筛选 | 已实现/浏览器验证；2026-11-01发布v0.2.4并部署替换本机服务：即时勾选不变，状态筛选与名称/延迟/速度/更新时间排序仅影响显示，隐藏成员保留；测延迟复用真实任务且要求内核已应用；分组列表167px内滚、弹窗间距收紧；组匹配/UDP/排除规则不变；[计划](<development-plan.md>)、[决策](<decisions.md>) |
+| R27 | 修复 Linux 实机运行发现的内核探针超时与强杀遗留 | 本地实现/WSL2 amd64 复验：私有认证探针与原生出站暴露检查改为 3 秒有界重试（1 秒尝试/100ms 间隔），Linux 子进程增加 best-effort `Pdeathsig=SIGTERM`；首次 apply 直接成功、`kill -9` 后内核退出且端口释放、同目录重启恢复。正式 v0.2.4 资产不含该修复，随 v0.2.5 发布（不含部署）；[验收](<wsl-runtime-verification.md>) |
+| R28 | 提供全局出站网卡选择：可在设置中选用物理以太网、WLAN 等本机网卡出站，默认自动 | 本地实现/实测：Settings 新增 `outboundInterface`，非空时编译写入 Mihomo 顶层 `interface-name`；保存前 Go 侧校验存在/已启用/非回环（Mihomo `-t` 不校验）；新增只读 `GET /api/interfaces` 与设置页「03 全局出站网络」；绑定以太网/WLAN 时实测出站源地址分别变化，失效网卡直接失败不回退直连；节点级 interface-name 仍拒绝。随 v0.2.5 发布（不含部署）；[决策](<decisions.md>) D26、[计划](<development-plan.md>) M23 |
 
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 

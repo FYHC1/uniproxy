@@ -1,8 +1,8 @@
 # UniProxy 开发计划与任务状态
 
-最后更新：2026-11-01 16:32（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
+最后更新：2026-11-02 02:05（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M20完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest；源码/标签推送、main与标签CI、四平台资产/摘要及正式Windows程序验收通过。2026-11-01 12:23已将运行服务从v0.2.3替换为v0.2.4，原数据目录保留并在停机后完成一致备份；历史v0.2.3标签/资产不变。**
+**当前结论：M0–M23完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，合并为 v0.2.5 发布（不含部署）；运行中的 Windows 服务仍为 v0.2.4，未改动；历史 v0.2.3 标签/资产不变。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -110,6 +110,38 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 部署：12:20前核对旧服务PID10920/内核28120、9090与32节点等基线；调用runtime/stop停内核后以受控控制台中断优雅退出，确认WAL/SHM清理完成；停机备份C:\ProgramData\UniProxy-backups\20261101-122319-pre-v0.2.4（5文件62,960,192字节）逐文件SHA256一致。
 - 12:23:29启动官方v0.2.4：PID16568/新内核28844，9090归16568，health0.2.4，32节点/3分组/3池/6监听，内核1.19.32且dirty=false；16:32复核仍运行。详情见[发布与部署验收](<release-0.2.4-verification.md>)。
 
+## M21 — WSL 实机运行验收（2026-11-01，已完成）
+
+- 用户要求“使用wsl来做实际运行测试”；目标是补 Linux 实机运行缺口，不触碰 Windows 运行服务、用户数据或外部节点。
+- 环境：Fedora Linux 44 (WSL2)，内核 6.18.54.1-microsoft-standard-WSL2，x86_64，16 CPU/7.4GiB；官方 Linux amd64 v0.2.4 程序（SHA256 c56a73ae…）+ 固定 Mihomo 1.19.32 官方 linux-amd64-compatible（归档 SHA256 ba3ce607…，解压后 7a0d59da…）。
+- 实跑结果：健康/UI+CSP、固定内核起停、自建回环 HTTP 与 SOCKS5 真实转发、runtime stop 与端口释放、SIGTERM 后 WAL/SHM 清理、同数据目录重启自动应用、healthcheck、端口冲突/公网绑定保护、管理员 Token 401/200 均通过。测试源和节点均为本机回环合成数据。
+- 初次验收发现：WSL 冷启动首次 apply 可能因 750ms 私有认证 probe 超时失败，重试恢复；`kill -9` 主程序会遗留 Mihomo 内核（当时 processguard 仅 Windows），手动 SIGINT 可清理，重启可从 WAL 恢复数据与流量。该两项已由 M22 在本地修复并复验，正式 v0.2.4 资产不含该修复。
+- 边界：仅 WSL2/Fedora/amd64；Linux arm64、裸机/其他发行版、Docker、systemd、UDP、并发/容量/吞吐和真实远端节点未测。详见[WSL 实机验收](<wsl-runtime-verification.md>)。
+
+## M22 — Linux 实机问题修复（2026-11-01 完成，随 v0.2.5 发布）
+
+- 用户要求“修复Linux测试中遇到的问题”；范围为 M21 发现的两项：750ms 私有认证 probe 偶发超时、Linux `kill -9` 后 Mihomo 子进程遗留。
+- 实现：[processguard](<../internal/processguard/processguard.go>)新增 `PrepareCommand`，Linux 在 `SysProcAttr == nil` 时设置 `Pdeathsig = syscall.SIGTERM`（best-effort，非 Windows Job 等价）；[manager.go](<../internal/core/manager.go>)在版本探测、配置校验、启动三处调用。[controller.go](<../internal/core/controller.go>)把单次 750ms 探针检查改为 3 秒有界重试（1 秒尝试/100ms 间隔），并对 `/proxies` 原生出站暴露检查增加同样的有界重试；超期仍失败并停止内核。
+- 测试：新增 [controller_verify_test.go](<../internal/core/controller_verify_test.go>) 的 `verifyProxies` 空映射后重试、1200ms 延迟绑定/父 deadline 用例和 [processguard_linux_test.go](<../internal/processguard/processguard_linux_test.go>) 的 SIGTERM/父进程强杀用例；Windows/WSL 定向与全量 Go、vet、gofmt、diff 检查通过。
+- 实跑：最终本地构建 `.local/linux-fix/uniproxy-linux-amd64`（13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`）在 WSL2/Fedora 44 使用固定 Mihomo 1.19.32：首次 apply 直接 HTTP 200，无 probe 重试；回环 HTTP/SOCKS 通过；`kill -9` 后 `CORE_AFTER_KILL9_ALIVE=no`、端口释放，同目录重启恢复，最终正常停止 `FINAL_CORE=NONE`。
+- 边界：仅源码/候选和 WSL2 amd64 验证；已提交 main（`ede12bb`）并随 v0.2.5 发布，正式 v0.2.4 资产不含修复；Linux arm64/裸机/Docker/systemd/容量与真实远端节点未测。详见[WSL 实机运行与修复验收](<wsl-runtime-verification.md>)。
+
+## M23 — 全局出站网卡选择（2026-11-01 完成，随 v0.2.5 发布）
+
+- 用户要求“测试全局出站接口方案，提供选择物理网卡和 wlan 等网卡的方式”。范围为管理员全局设置 + 只读网卡枚举 + 设置页选择器，解决 Clash Verge TUN 经 `Meta` 适配器接管默认路由、导致 UniProxy 检测全部超时的环境问题。
+- 模型/编译：[types.go](<../internal/model/types.go>) 新增 `Settings.OutboundInterface`（空=自动）；[compiler.go](<../internal/core/compiler.go>) 在非空时写入顶层 `interface-name`，节点级 `interface-name` 仍由 `safeNativeValue` 拒绝。
+- 校验/接口：[validate.go](<../internal/app/validate.go>) 用 `net.InterfaceByName` 要求存在、`FlagUp`、非 `FlagLoopback`，并拒绝首尾空白；[interfaces.go](<../internal/app/interfaces.go>) 提供只读 `GET /api/interfaces`（name/up/loopback/addresses，过滤链路本地，不含网关/MAC/DNS）；`PATCH /api/settings` 白名单新增字段。
+- 前端：设置页新增「03 全局出站网络」，默认「自动（系统默认路由）」，列出启用且非回环网卡，支持刷新；当前值不可用时保留并标注，说明不创建虚拟网卡、不改系统路由。
+- 测试：`internal/app/outbound_interface_test.go`（校验矩阵、PATCH 往返与拒绝、接口结构）、`internal/core/compiler_interface_test.go`（空值不输出/非空输出/去空白/节点级仍拒绝）、`internal/core/interface_real_test.go`（真实 Mihomo 对未知网卡也不报错，证明必须管理层校验）、`tests/browser/outbound-interface.spec.ts`（下拉选项与只读枚举逐项一致、真实网卡保存后持久化并可改回自动、不存在网卡 PATCH 400 且不落库）全部通过；fixture UI 的 `verify.mjs` 也覆盖了网卡消失后的「当前不可用」标注与陈旧值不被静默改写。
+- 真实出站实测：用 `core.Build` 生成配置并改写端口后起临时 Mihomo，auto/以太网/WLAN/Meta 均 204；`Get-NetTCPConnection` 观察到以太网与 WLAN 出站源地址分别是各自网卡地址，证明绑定生效；不存在的网卡启动成功但拨号失败（`curl 35/000`，日志伪装成 DNS 失败），不回退直连。
+- 边界：已提交 main（`a4dd45d`）并随 v0.2.5 发布；正式 v0.2.4 资产不含该功能；只约束自有内核出站，不处理系统路由/DNS，不等价于 TUN 分流；Linux/macOS 网卡名与真实远端节点连通未在本轮验证。
+- 发布与部署：v0.2.5 发布不含部署；本机运行服务仍是 v0.2.4，替换需另行授权并先正常退出旧实例。详见[v0.2.5 发布验收](<release-0.2.5-verification.md>)。
+## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
+
+- 用户文件 `work/cainiao-pc/cainiao-pc-clash-25nodes.yaml` 导入后 25 节点全部 unhealthy；导出字段与源文件一致，TLS/WS 参数未被丢弃。
+- 主机 Clash Verge TUN 默认路由经 `198.18.0.2`/Meta，UniProxy Mihomo 出站继承该路由；绑定物理以太网 `192.168.2.3` 后代表节点 TLS/WS 正常，同版本 Mihomo 对照绑定 `interface-name: 以太网` 延迟 521ms、默认路由 Timeout。
+- 源文件 25 节点临时绑定测试 22/25 成功（约 371–938ms），香港10、美国04、台湾02 仍 Timeout；当前全失败主因是 Clash Verge TUN 路由冲突，不是 UniProxy 导入错误。服务 PID16568/内核28844 未改动。
+
 ## 3. 按优先级排列的剩余工作
 
 以下是建议顺序，不是用户已授权的新增开发任务。
@@ -118,12 +150,12 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 |---|---|---|---|
 | P0-01 | 已完成 / 2026-11-01 | v0.2.4已部署替换原v0.2.3实例；新主程序PID16568（bin/releases/v0.2.4/uniproxy-windows-amd64.exe）/内核28844，原数据目录保留，停机备份已校验 | 16:32复核health0.2.4、32节点/3分组/3池/6监听、内核运行；后续用户侧真实节点检测另记 |
 | P0-02 | 高 / 待授权实测 | 升级后用户侧重导入原文件；如需实际节点连通测试，另确认网络请求和流量范围 | 导入依赖不丢失、原节点去重；可用/不可用按真实检测记录，不把离线校验当连通 |
-| P1-01 | 中 / 待验证 | Linux 原生及 Docker bridge/host 实跑；需可用主机/Docker | 持久化重启、认证 TCP、host 回环 UDP、端口映射、停机/升级/恢复均有记录 |
+| P1-01 | 中 / 部分完成（WSL2 amd64） | Linux amd64 已在 WSL2 实机验证启动、认证 TCP、回环 HTTP/SOCKS、持久化重启、停机恢复；仍待裸机/其他发行版、Linux arm64、Docker bridge/host、host 回环 UDP、端口映射和系统服务验证 | 已有记录见[WSL 实机验收](<wsl-runtime-verification.md>)；其余范围需对应主机/Docker 再做 |
 | P1-02 | 中 / 待验证 | Go race 检测，需 C 工具链/受支持环境 | 并发应用、检测取消、订阅刷新/恢复通过 race；不得用普通单测替代 |
 | P1-03 | 中 / 待验证 | 目标硬件容量测试，使用受控节点/流量预算 | 500 节点管理、实际连接并发、UDP 流量、p95/CPU/RSS/错误率/长期运行报告 |
 | P1-04 | 中 / 部分完成 | 发布流程已实现并跑通（v0.2.0 已发布）；仍需项目所有者确定许可证 | 项目所有者确定许可证；符合内核 GPL 分发义务；版本注入已可区分构建，发布需真实推送标签 |
 | P1-05 | 中 / 候选 | CI 增加 UI 浏览器及固定内核集成验证 | 保留现有 Windows/Linux job；额外测试在 CI 真实运行，下载内核校验摘要、不使用用户密钥 |
-| P2-01 | 低 / 部分完成及候选 | M15已实现Windows自有子进程随主程序退出；自动重启/Windows常驻服务/优雅更新/Linux异常退出保护仍候选 | 先定策略与故障边界；不得重启不属于本应用的进程或自动采用旧内核 |
+| P2-01 | 低 / 修复已发布，待部署 | M22 已为 Linux 增加 `PrepareCommand`/`Pdeathsig` best-effort 保护并在 WSL2 复验，随 v0.2.5 发布；运行中的 v0.2.4 无此修复。自动重启/Windows常驻/优雅更新仍候选，Linux 仅 best-effort 非 Job 等价 | 先定策略与故障边界；不得重启不属于本应用的进程或自动采用旧内核；部署需另行授权 |
 | P2-02 | 低 / 候选 | dialer-proxy 策略组、更多配置变体、认证公网 UDP | 独立设计+需求确认+安全审查；保持不降级、不直连回退 |
 | P2-03 | 低 / 候选 | 独立概览/连接流量统计等增强 | 先确认指标来源/保留策略和界面范围，不以模拟数据交付 |
 

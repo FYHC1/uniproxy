@@ -1,6 +1,6 @@
 # UniProxy 开发指南
 
-更新：2026-10-19。先读[接续快照](<session-handoff.md>)和[需求基线](<requirements.md>)；本指南是工程操作说明，不授权改变运行中用户服务。
+更新：2026-11-01。先读[接续快照](<session-handoff.md>)和[需求基线](<requirements.md>)；本指南是工程操作说明，不授权改变运行中用户服务。
 
 ## 1. 工具链与源码定位
 
@@ -22,6 +22,7 @@
 | 持久化 | [store.go](<../internal/store/store.go>) | SQLite WAL、AES-GCM 配置快照、活动记录、规范空数组 |
 | 下载安全 | [fetch.go](<../internal/safehttp/fetch.go>)、[client.go](<../internal/safehttp/client.go>)、[doh.go](<../internal/safehttp/doh.go>)、[errors.go](<../internal/safehttp/errors.go>) | URL/公网DNS固定拨号、严格Fake-IP公共DoH复核、TLS/重定向/大小保护、无秘密分类诊断 |
 | 内核 | [compiler.go](<../internal/core/compiler.go>)、[manager.go](<../internal/core/manager.go>) | 稳定标签、原生策略、失效即拒绝、进程/验证/重载/回滚 |
+| 进程保护 | [processguard.go](<../internal/processguard/processguard.go>)、[Linux](<../internal/processguard/processguard_linux.go>)、[Windows](<../internal/processguard/processguard_windows.go>) | Windows Job 对象；Linux best-effort Pdeathsig=SIGTERM；其他平台 no-op |
 | 控制与探测 | [controller.go](<../internal/core/controller.go>)、[checks.go](<../internal/core/checks.go>) | 私有认证API、入口验证、实际延迟与下载 |
 | 嵌入前端 | [webui.go](<../internal/webui/webui.go>)、[Vite配置](<../vite.config.ts>) | 静态构建嵌入Go、CSP、缺少构建时503 |
 | 前端状态/API | [state.tsx](<../src/web/state.tsx>)、[api.ts](<../src/web/api.ts>)、[共享类型](<../src/shared/types.ts>) | 会话Token、轮询、错误/dirty、旧响应保护 |
@@ -72,7 +73,7 @@ Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.4 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.5 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
 [发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
@@ -199,7 +200,7 @@ go test ./internal/app ./tests/integration -run TestPrivateClash -count=1 -v
 
 1. 确认准确exe路径、PID/子进程、管理端口、进程工作目录/绝对数据目录和内核路径，不使用过期PID。
 2. 准备匹配的备份。优先受控导出或停机后一致拷贝整个数据目录；SQLite WAL运行期间不能只复制主db文件。备份包括主密钥，且仅私有保存。
-3. 正常退出应用并确认它的内核退出。不要盲杀所有mihomo；旧版和非Windows异常退出可能留孤儿进程，先核对归属。M15修复候选的Windows入口已用进程生命周期Job清理自己的子孙，但这不保护在线覆盖数据库。
+3. 正常退出应用并确认它的内核退出。不要盲杀所有mihomo；旧版或强杀场景仍可能留孤儿进程，先核对归属。Windows 入口用进程生命周期 Job 清理自己的子孙；Linux 通过 best-effort Pdeathsig 在父进程异常死亡时请求内核退出，但不是 Job 等价保证。两者都不保护在线覆盖数据库。
 4. 校验暂存文件哈希，保留旧exe到明确备份路径，再替换；任何覆盖/回滚前先确认目标。
 5. 用原数据目录启动；前端嵌入必须重启+刷新。检查bootstrap/runtime是否运行、版本一致、端口绑定正常；不要把仅health200当完整验收。
 6. 升级后更新[接续记录](<session-handoff.md>)的运行构建/哈希/时间。发布构建报告注入的版本+提交，未注入的本地构建显示开发版；仍以哈希核对具体文件。
