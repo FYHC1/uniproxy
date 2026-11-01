@@ -3,7 +3,7 @@ import './core-install.test.mjs';
 import assert from 'node:assert/strict';
 import {address,checkHttpUrl,formatDate,isIP,isLoopback,poolMembers,runtimeLabel} from '../utils.ts';
 import {emptyNodeGroupFilter,matchesNodeFilter,matchesNodeGroups,nodeRelay} from '../nodeFilters.ts';
-import {changePoolSelection,constrainPoolSelection,poolSelectionScope,selectedPoolNodes,withoutDeletedPoolNodes} from '../poolSelection.ts';
+import {changePoolSelection,constrainPoolSelection,matchesPoolNodeStatus,poolSelectionScope,selectedPoolNodes,sortPoolNodes,withoutDeletedPoolNodes} from '../poolSelection.ts';
 import {selectScope} from '../selection.ts';
 import {listenerIsLive,listenerState,nodeLatencyText,poolListenerState,poolNodeMetrics} from '../poolView.ts';
 import {MAX_IMPORT_BYTES,MAX_IMPORT_ERROR_DETAILS,canDropLocalFile,captureDroppedFiles,importErrorSummary,isFileTransfer,readLocalImport,validateImportContent} from '../importUtils.ts';
@@ -185,6 +185,37 @@ test('pool checkbox state shows dynamic matches and unchecking really excludes t
   assert.deepEqual(restored.excludeNodeIds,[]);
   assert.deepEqual(restored.nodeIds,[],'group nodes are not accidentally pinned to static membership');
   assert.deepEqual(poolMembers(nodes,restored).map(node=>node.id),['a','b']);
+});
+test('pool node status filters distinguish enablement from health',()=>{
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'unknown'},'all'),true);
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'unknown'},'enabled'),true);
+  assert.equal(matchesPoolNodeStatus({enabled:false,status:'unknown'},'enabled'),false);
+  assert.equal(matchesPoolNodeStatus({enabled:false,status:'unknown'},'disabled'),true);
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'healthy'},'healthy'),true);
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'unhealthy'},'healthy'),false);
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'unhealthy'},'unhealthy'),true);
+  assert.equal(matchesPoolNodeStatus({enabled:true,status:'unknown'},'unknown'),true);
+});
+test('pool node sorting is display-only and puts unmeasured values last',()=>{
+  const sortable=[
+    {id:'slow',name:'节点10',latencyMs:320,speedMbps:20,updatedAt:'2026-01-01T00:00:00Z'},
+    {id:'none',name:'节点2',latencyMs:null,speedMbps:null,updatedAt:'2026-03-01T00:00:00Z'},
+    {id:'fast',name:'节点1',latencyMs:48,speedMbps:80,updatedAt:'2026-02-01T00:00:00Z'},
+  ];
+  assert.deepEqual(sortPoolNodes(sortable,'latency').map(node=>node.id),['fast','slow','none']);
+  assert.deepEqual(sortPoolNodes(sortable,'speed').map(node=>node.id),['fast','slow','none']);
+  assert.deepEqual(sortPoolNodes(sortable,'updated').map(node=>node.id),['none','fast','slow']);
+  assert.deepEqual(sortPoolNodes(sortable,'name').map(node=>node.id),['fast','none','slow'],'numeric locale order keeps 节点1 before 节点2 and 节点10');
+  assert.deepEqual(sortable.map(node=>node.id),['slow','none','fast'],'sorting returns a copy and does not reorder the source');
+});
+test('status filtering a smaller view still preserves hidden members',()=>{
+  const pool=changePoolSelection({...base},nodes,['a','b','c']);
+  const scope=poolSelectionScope(nodes,pool);
+  const disabled=scope.filter(node=>matchesPoolNodeStatus(node,'disabled'));
+  assert.deepEqual(disabled.map(node=>node.id),['c']);
+  const afterRemovingVisible=changePoolSelection(pool,scope,['a','b']);
+  assert.deepEqual(selectedPoolNodes(nodes,afterRemovingVisible).map(node=>node.id),['a','b'],'hidden selected nodes survive an edit made in the filtered view');
+  assert.deepEqual(selectedPoolNodes(nodes,pool).map(node=>node.id),['a','b','c']);
 });
 test('pool selection preserves hidden values and legacy group exclusions until explicit action',()=>{
   const pool={...base,groupIds:['work'],nodeIds:['d'],excludeGroupIds:['asia'],excludeNodeIds:['c']};

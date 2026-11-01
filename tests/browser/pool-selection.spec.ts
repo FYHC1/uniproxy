@@ -1,3 +1,4 @@
+import type { Bootstrap } from '../../src/shared/types';
 import { byName, editPoolDialog, expect, groupChoices, newPoolDialog, nodeChoices, poolCard, savePoolDialog, submitNewPool, test, gotoWorkspace } from './fixtures';
 
 test('group-scoped bulk selection covers more than 100 results and preserves search-hidden choices', async ({ page, fixtures }) => {
@@ -16,8 +17,10 @@ test('group-scoped bulk selection covers more than 100 results and preserves sea
   await expect(choices.getByRole('checkbox', { name: outside.name, exact: true })).toHaveCount(0);
   await expect(choices.getByRole('button', { name: '再显示 100 项（共 125 项）', exact: true })).toBeVisible();
   await expect(bulk).toBeChecked();
+  // The bulk box edits membership immediately; there is no separate staging step.
   await bulk.uncheck();
   await expect(choices.locator('.selection-count')).toHaveText('0 已选');
+  await expect(bulk).not.toBeChecked();
   await dialog.getByRole('searchbox', { name: '搜索包含节点', exact: true }).fill(fixtures.name('search-hit-'));
   await expect(choices.getByRole('button', { name: '再显示 100 项（共 110 项）', exact: true })).toBeVisible();
   await bulk.check();
@@ -33,15 +36,16 @@ test('group-scoped bulk selection covers more than 100 results and preserves sea
   dialog = await editPoolDialog(page, name);
   choices = nodeChoices(dialog);
   bulk = choices.getByRole('checkbox', { name: '全选包含节点当前结果', exact: true });
-  await expect(bulk).toBeChecked({ indeterminate: true });
+  await expect(bulk).not.toBeChecked();
   await dialog.getByRole('searchbox', { name: '搜索包含节点', exact: true }).fill(fixtures.name('other-'));
   await bulk.check();
   await expect(choices.locator('.selection-count')).toHaveText('125 已选');
   await dialog.getByRole('searchbox', { name: '搜索包含节点', exact: true }).fill(fixtures.name('search-hit-'));
+  await expect(bulk).toBeChecked();
   await bulk.uncheck();
   await expect(choices.locator('.selection-count')).toHaveText('15 已选');
   await dialog.getByRole('searchbox', { name: '搜索包含节点', exact: true }).fill('');
-  await expect(bulk).toBeChecked({ indeterminate: true });
+  await expect(bulk).not.toBeChecked();
   await bulk.check();
   await expect(choices.locator('.selection-count')).toHaveText('125 已选');
   await savePoolDialog(dialog);
@@ -80,7 +84,9 @@ test('no selected groups exposes grouped and ungrouped nodes with full search se
   await expect(choices.getByRole('checkbox', { name: ungrouped[109].name, exact: true })).toBeChecked();
   await search.fill(retained.name);
   await choices.getByRole('checkbox', { name: retained.name, exact: true }).check();
+  await expect(choices.locator('.selection-count')).toHaveText('116 已选');
   await search.fill(fixtures.name('needle-'));
+  await expect(bulk).toBeChecked();
   await bulk.uncheck();
   await expect(choices.locator('.selection-count')).toHaveText('1 已选');
   await search.fill(fixtures.name('no-such-result'));
@@ -221,4 +227,90 @@ test('an open editor drops deleted node references without losing existing hidde
   const saved = byName((await fixtures.bootstrap()).pools, pool.name);
   expect(saved).toMatchObject({ nodeIds: [hiddenManual.id], excludeNodeIds: [hiddenExcluded.id], excludeGroupIds: [excluded.id], groupIds: [include.id] });
   expect([...saved.nodeIds, ...saved.excludeNodeIds]).not.toContain(deleted.id);
+});
+
+test('node status filtering and sorting are display-only and keep hidden members on save', async ({ page, fixtures }) => {
+  const [zeta, alpha] = await fixtures.importNodes([fixtures.proxy('view-zeta'), fixtures.proxy('view-alpha')]);
+  await fixtures.patchNode(alpha.id, { enabled: false });
+  const name = fixtures.name('filtered-view-pool');
+  const dialog = await newPoolDialog(page);
+  await dialog.getByLabel('代理池名称', { exact: true }).fill(name);
+  const choices = nodeChoices(dialog);
+  // Default name order is numeric-locale order, not fixture insertion order.
+  await expect(choices.locator('.choice-item').nth(0)).toContainText(alpha.name);
+  await expect(choices.locator('.choice-item').nth(1)).toContainText(zeta.name);
+  const alphaBox = choices.getByRole('checkbox', { name: alpha.name, exact: true });
+  const zetaBox = choices.getByRole('checkbox', { name: zeta.name, exact: true });
+  await zetaBox.check();
+  await alphaBox.check();
+  await expect(choices.locator('.selection-count')).toHaveText('2 已选');
+  await choices.getByRole('combobox', { name: '按节点状态筛选', exact: true }).selectOption('disabled');
+  await expect(zetaBox).toHaveCount(0);
+  await expect(alphaBox).toBeVisible();
+  await expect(choices.locator('.selection-count')).toHaveText('2 已选');
+  const testButton = choices.getByRole('button', { name: '测延迟', exact: true });
+  await expect(testButton).toBeDisabled();
+  await expect(testButton).toHaveAttribute('title', '需要内核运行且当前配置已应用。');
+  const created = await submitNewPool(page, dialog);
+  expect([...created.data.pool.nodeIds].sort()).toEqual([alpha.id, zeta.id].sort());
+  await expect(poolCard(page, name)).toContainText('1 个可转发 · 2 个已选节点');
+});
+
+test('the latency action submits only enabled selected nodes once the applied runtime is ready', async ({ page, fixtures }) => {
+  const group = await fixtures.group('pool-latency');
+  const [healthy, failed, disabled] = await fixtures.importNodes([
+    fixtures.proxy('pool-latency-healthy'), fixtures.proxy('pool-latency-failed'), fixtures.proxy('pool-latency-disabled'),
+  ], { groupIds: [group.id] });
+  await fixtures.patchNode(disabled.id, { enabled: false });
+  // Dismiss the genuine missing-core prompt before projecting a ready runtime.
+  await gotoWorkspace(page, '/#/pools');
+  await page.route('**/api/bootstrap', async route => {
+    const response = await route.fetch();
+    const state = await response.json() as Bootstrap;
+    // Runtime readiness is projected for this isolated UI test; /api/tests itself remains the real missing-core endpoint.
+    state.runtime = { ...state.runtime, available: true, running: true, applying: false, dirty: false, lastError: '', appliedRevision: state.revision };
+    await route.fulfill({ response, json: state });
+  });
+  await page.reload();
+  const dialog = await newPoolDialog(page);
+  await dialog.getByLabel('代理池名称', { exact: true }).fill(fixtures.name('latency-pool'));
+  await groupChoices(dialog).getByRole('checkbox', { name: group.name, exact: true }).check();
+  const choices = nodeChoices(dialog);
+  await expect(choices.locator('.selection-count')).toHaveText('3 已选');
+  const testButton = choices.getByRole('button', { name: '测延迟', exact: true });
+  await expect(testButton).toBeEnabled();
+  await expect(testButton).toHaveAttribute('title', '测试 2 个已启用节点的延迟；1 个已选节点不可测。');
+  const responsePromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/tests' && response.request().method() === 'POST');
+  await testButton.click();
+  const response = await responsePromise;
+  expect(response.status()).toBe(409);
+  const body = response.request().postDataJSON() as { kind: string; nodeIds: string[] };
+  expect(body.kind).toBe('latency');
+  expect([...body.nodeIds].sort()).toEqual([healthy.id, failed.id].sort());
+  await expect(dialog.getByRole('alert')).toContainText('代理内核未运行');
+});
+
+test('the group picker keeps four rows visible and scrolls any extra groups', async ({ page, fixtures }) => {
+  const groups = [];
+  for (let index = 0; index < 10; index++) groups.push(await fixtures.group('scroll-group-' + String(index).padStart(2, '0')));
+  await fixtures.importNodes([fixtures.proxy('scroll-node')], { groupIds: [groups[0].id] });
+  const dialog = await newPoolDialog(page);
+  const list = groupChoices(dialog).locator('.choice-list');
+  await expect(list.locator('.choice-item')).toHaveCount(10);
+  const metrics = await list.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  expect(metrics.overflowY).toBe('auto');
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
+  const rowHeight = await list.locator('.choice-item').first().evaluate(element => element.getBoundingClientRect().height);
+  expect(rowHeight).toBeGreaterThan(30);
+  expect(rowHeight).toBeLessThan(38);
+  // Four rows fit; a fifth one does not, so the box never grows past its fixed window.
+  expect(metrics.clientHeight).toBeGreaterThanOrEqual(rowHeight * 4);
+  expect(metrics.clientHeight).toBeLessThan(rowHeight * 5);
+  const lastRowVisibleAfterScroll = await list.evaluate(element => {
+    element.scrollTop = element.scrollHeight;
+    const box = element.getBoundingClientRect();
+    const last = element.querySelector('.choice-item:last-child')!.getBoundingClientRect();
+    return last.top >= box.top - 1 && last.bottom <= box.bottom + 1;
+  });
+  expect(lastRowVisibleAfterScroll).toBe(true);
 });

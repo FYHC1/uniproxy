@@ -1,5 +1,27 @@
 /* Pool workspace: real endpoint state, scoped member selection and local actions. */
 .choice-field--bulk .choice-list { max-height: 280px; }
+/* Denser rhythm keeps strategy, groups and members in view without scrolling the whole modal. */
+.pool-dialog.dialog-body { padding: 16px 22px 18px; gap: 12px; }
+.pool-dialog .form-fields { gap: 12px; }
+.pool-dialog .form-grid { gap: 10px 16px; }
+.pool-dialog .form-section-heading { padding-top: 13px; margin-top: 2px; }
+.pool-dialog .field-hint { line-height: 1.65; }
+.pool-dialog .form-section-heading h3 { font-size: 12px; }
+.pool-dialog .member-preview { padding: 10px 13px; }
+.pool-dialog .member-preview strong { font-size: 20px; }
+.pool-dialog .pool-advanced { padding-top: 11px; }
+.pool-dialog .pool-advanced > .form-fields { margin-top: 10px; }
+.pool-dialog .pool-advanced > summary { min-height: 34px; }
+/* Exactly four group rows stay visible; more groups scroll inside the field. */
+.pool-dialog .pool-group-field .choice-list { height: 167px; max-height: 167px; align-content: start; }
+.pool-dialog .pool-group-field .choice-item { min-height: 34px; padding: 5px 8px; align-items: center; }
+.pool-dialog .pool-group-field .choice-item .checkbox { margin-top: 0; }
+.pool-dialog .pool-group-field .choice-item > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pool-dialog .pool-node-field .choice-list { max-height: 240px; }
+.pool-dialog .pool-node-field .choice-item { min-height: 40px; }
+.pool-node-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.pool-node-controls select { width: auto; min-width: 0; min-height: 35px; padding-top: 4px; padding-bottom: 4px; font-size: 11px; }
+.pool-node-controls .button { min-width: 64px; min-height: 35px; }
 .choice-toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; margin: 7px 0; }
 .choice-select-all { display: inline-flex; align-items: center; gap: 9px; min-height: 40px; color: var(--ink); font-size: 12px; cursor: pointer; }
 .choice-select-all strong { font-family: var(--mono); font-weight: 500; }
@@ -10,7 +32,7 @@
 .pool-dialog .choice-item > span { min-width: 0; overflow-wrap: anywhere; }
 .pool-dialog .choice-item { align-items: flex-start; }
 .pool-dialog .choice-item .checkbox { margin-top: 4px; flex-shrink: 0; }
-.pool-selection-hint { padding: 11px 13px; background: var(--surface-subtle); border-left: 3px solid var(--teal); line-height: 1.8; }
+.pool-selection-hint { padding: 8px 11px; background: var(--surface-subtle); border-left: 3px solid var(--teal); line-height: 1.8; }
 .scope-notice { color: var(--amber); font-size: 12px; }
 .pool-dialog .note .button { margin-top: 10px; }
 .pool-advanced { border-top: 1px solid var(--line); padding-top: 15px; }

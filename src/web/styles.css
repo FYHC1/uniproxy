@@ -310,6 +310,8 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .choice-field legend { font-size: 12px; font-weight: 550; color: #4d6352; margin-bottom: 9px; width: 100%; display: flex; align-items: center; gap: 8px; }
 .selection-count { color: #7d8e78; font-size: 10px; font-weight: 400; margin-left: 8px; }
 .choice-field .search-field { max-width: none; margin-bottom: 8px; }
+.choice-search-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.choice-search-row > .search-field { flex: 1 1 160px; min-width: 0; margin-bottom: 0; }
 .choice-list { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 5px; max-height: 220px; overflow-y: auto; padding: 8px; border: 1px solid #e2e8dd; background: #fafcf7; border-radius: 6px; scrollbar-width: thin; }
 .form-grid .choice-list, .filter-popover .choice-list { grid-template-columns: 1fr; }
 .choice-item { display: flex; gap: 9px; align-items: flex-start; padding: 8px 6px; border-radius: 4px; font-size: 11px; color: #576e54; line-height: 1.6; cursor: pointer; min-width: 0; }

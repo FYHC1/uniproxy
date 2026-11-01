@@ -34,6 +34,26 @@ export function constrainPoolSelection<T extends PoolSelection>(nodes:ProxyNode[
   return {...pool,nodeIds:pool.nodeIds.filter(id => allowed.has(id))};
 }
 
+// Presentation-only helpers: filtering and sorting must never rewrite saved intent.
+export type PoolNodeStatusFilter = 'all'|'enabled'|'disabled'|'healthy'|'unhealthy'|'unknown';
+
+export function matchesPoolNodeStatus(node:Pick<ProxyNode,'enabled'|'status'>, filter:PoolNodeStatusFilter):boolean {
+  if (filter === 'all') return true;
+  if (filter === 'enabled') return node.enabled;
+  if (filter === 'disabled') return !node.enabled;
+  return node.status === filter;
+}
+
+export type PoolNodeSort = 'name'|'latency'|'speed'|'updated';
+
+export function sortPoolNodes<T extends Pick<ProxyNode,'name'|'latencyMs'|'speedMbps'|'updatedAt'>>(nodes:T[], sort:PoolNodeSort):T[] {
+  const ordered = [...nodes];
+  if (sort === 'latency') return ordered.sort((left,right) => (left.latencyMs ?? Infinity) - (right.latencyMs ?? Infinity));
+  if (sort === 'speed') return ordered.sort((left,right) => (right.speedMbps ?? -1) - (left.speedMbps ?? -1));
+  if (sort === 'updated') return ordered.sort((left,right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime());
+  return ordered.sort((left,right) => left.name.localeCompare(right.name,'zh-CN',{numeric:true}));
+}
+
 // Group matches remain dynamic. Unchecking a match creates an exclusion rather than a static snapshot.
 export function changePoolSelection<T extends PoolSelection>(pool:T, scope:ProxyNode[], selectedIds:string[]):T {
   const selected = new Set(selectedIds);
