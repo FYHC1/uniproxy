@@ -72,7 +72,7 @@ Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.3 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.4 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
 [发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
