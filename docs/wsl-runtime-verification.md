@@ -6,7 +6,7 @@
 
 - WSL：Fedora Linux 44 (WSL)，WSL2，内核 6.18.54.1-microsoft-standard-WSL2，x86_64，16 CPU、7.4 GiB 内存。
 - 初次验收程序：官方 [Linux amd64 发布资产](<../bin/releases/v0.2.4/uniproxy-linux-amd64>)，12,771,512 字节，SHA256 `c56a73ae7b6bb1985bf10750489b3e7642cadb1a52a544721e51b0ae306cecae`；`-version` 为 `UniProxy 0.2.4 · commit 72da273b5b81 · built 2026-11-01T04:18:10Z`。
-- 修复候选：本地构建 [.local/linux-fix/uniproxy-linux-amd64](<../.local/linux-fix/uniproxy-linux-amd64>)，13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`；`-version` 为 `UniProxy 0.2.4 · commit local-linux- · built 2026-11-01T09:41:18Z`（本地开发构建，未注入发布提交，源码工作树尚未提交）。该候选不是 GitHub Release 资产。
+- 修复候选：本地构建 [.local/linux-fix/uniproxy-linux-amd64](<../.local/linux-fix/uniproxy-linux-amd64>)，13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`；`-version` 为 `UniProxy 0.2.4 · commit local-linux- · built 2026-11-01T09:41:18Z`（本地开发构建，未注入发布提交）。该候选不是 GitHub Release 资产；修复本身已随后合入 v0.2.5 发布。
 - 内核：Mihomo 1.19.32 官方 linux-amd64-compatible 归档，22,877,876 字节，SHA256 `ba3ce607747a07f948fc35780e108a4a7c7f552a38b9bd4d115f313ebcb89c20`（与内置固定摘要一致）；解压后 62,054,526 字节，SHA256 `7a0d59da2e678d56c899a3db996a2ad8963286c4f3634b0451435db248f13fa1`，`-v` 输出 `Mihomo Meta v1.19.32 linux amd64 with go1.26.8 ... / Use tags: with_gvisor`。
 - 初次验收临时根目录为 `/tmp/uniproxy-wsl-d9vHBBzR`；修复复验使用 `/tmp/uniproxy-linux-fix-o3nR0VOq` 与最终候选的 `/tmp/uniproxy-linux-fix-CICrkHzY`。均为临时空数据/自建回环数据，测试结束后程序、内核与本地测试服务器均已停止，临时目录已清理，不含用户配置。
 
@@ -32,7 +32,7 @@
 
 ## 结论与边界
 
-- 两个 WSL 实机问题已在本地源码和本地 Linux 候选上修复并复验：首次 apply 不再需要重试，`kill -9` 不再遗留 Mihomo。正式 v0.2.4 GitHub Release 资产未包含该修复，本轮未提交、推送、发布或部署；Windows 运行服务 PID16568/内核28844 未改动。
+- 两个 WSL 实机问题已在本地源码和本地 Linux 候选上修复并复验：首次 apply 不再需要重试，`kill -9` 不再遗留 Mihomo。正式 v0.2.4 GitHub Release 资产未包含该修复；修复已提交 main（`ede12bb`）并随 v0.2.5 发布（不含部署）。
 - 边界：仅 Fedora 44 WSL2 amd64；Linux arm64 仍是交叉构建未实机；未覆盖裸机/其他发行版、Docker、systemd/服务管理、Linux 原生异常退出在更多线程模型下的保证、UDP、并发/容量/吞吐、真实公网节点和 Windows 服务变更。测试内核与测试源均为本机回环合成数据，不代表真实订阅或远端节点可用性。
 - 本机证据：`.local/wsl-runtime-verify/evidence/`（初次验收，未入库）与 `.local/linux-fix/`（修复候选/脚本，未入库）；临时根目录已在测试后清理。
 - Windows 运行服务复核（2026-11-01 17:48）：PID16568 官方 `bin/releases/v0.2.4/uniproxy-windows-amd64.exe` + 内核 PID28844，9090 归 16568，19090 无监听，health 0.2.4；本环节未停止、替换或修改该服务。

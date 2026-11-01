@@ -1,6 +1,6 @@
 # UniProxy v0.2.5 发布验收
 
-更新：2026-11-02（Asia/Shanghai）。本记录覆盖 M22（Linux 稳定性修复）与 M23（全局出站网卡）合并发布的源码、验证与正式资产。发布阶段状态：**发布前验证中**。
+更新：2026-11-02（Asia/Shanghai）。本记录覆盖 M22（Linux 稳定性修复）与 M23（全局出站网卡）合并发布的源码、验证与正式资产。发布阶段状态：**已于 2026-11-02 02:27:40（Asia/Shanghai）正式发布，未部署**。
 
 ## 1. 范围
 
@@ -44,8 +44,32 @@
 
 ## 3. CI 与正式资产
 
-- 待发布后填写：main CI、tag CI、Release run ID 与结论。
-- 待发布后填写：四平台资产字节数与 SHA256。
+### 推送与工作流
+
+- 源码提交：`ede12bb`（M22 Linux 稳定性）、`a4dd45d`（M23 全局出站网卡）、`1e1f144`（v0.2.5 版本与发布材料），已推送 origin main。
+- main CI [41336207092](<https://github.com/FYHC1/uniproxy/actions/runs/41336207092>)：Ubuntu 37s、Windows 1m52s，全部 success（仅 Node20 action 与 ubuntu-latest 迁移提示）。
+- annotated tag `v0.2.5`，tag 对象 `271ced2d6db943ae3205c190254c2cb3cbf2c619`，解引用为 `1e1f14417c677fdcc9a95858e03daeda41f1c3f8`。
+- 标签 CI [41336634581](<https://github.com/FYHC1/uniproxy/actions/runs/41336634581>)：success；Release [41336634537](<https://github.com/FYHC1/uniproxy/actions/runs/41336634537>)：四平台 build 与 release job 全部 success。
+- Release 于 2026-11-02 02:27:40（Asia/Shanghai）发布，非 draft、非 prerelease，并用 `gh release edit --notes-file docs/releases/v0.2.5.md --latest` 应用中文说明；远端 body 与本地文件一致（2336 字符）。
+
+### 正式资产（GitHub API 与下载副本双重核对）
+
+| 文件 | 字节 | SHA256 |
+|---|---:|---|
+| uniproxy-windows-amd64.exe | 13142528 | `570cd2e6aae76ab07f6b3c7d8ac72a04a4fb62ff0801a66ac88cecccb0320161` |
+| uniproxy-windows-arm64.exe | 12235776 | `36d89fbe1592152c58ee1a9e9f19059f866f9d026ba16ba22b88b8140ce49344` |
+| uniproxy-linux-amd64 | 12787896 | `a794bcabaea240037588657111667a1d5e6adcc1d44b26cf0b7c99c022458e70` |
+| uniproxy-linux-arm64 | 12124344 | `defea76d92163dcfdceefc9af8d0eced3702fc1c9df2149d8f00b20fd1e954e2` |
+| SHA256SUMS.txt | 360 | `c904ad372f69549fd9701820686818229ddfc5f59f2d2ef91015506eda80d2b2` |
+
+下载副本存于 `bin/releases/v0.2.5/`（gitignored），五个文件本地 SHA256 与 GitHub digest、`SHA256SUMS.txt` 逐项一致。
+
+### 正式 Windows 程序验收
+
+- `-version`：`UniProxy 0.2.5 · commit 1e1f14417c67 · built 2026-11-01T18:26:55Z`。
+- `UNIPROXY_TEST_APP_PATH` 指向正式资产、`UNIPROXY_TEST_CORE_PATH` 指向本机 Mihomo 1.19.32，`go test ./tests/integration -run 'TestBuilt|TestWindowsParentLifetime|TestStartup'` 通过（3.868s）：CLI 版本/语法/公网绑定保护、嵌入 UI、三轮强杀重启与子进程随退、启动失败隔离报告、healthcheck 不堆日志、6 格式订阅预览/保存。
+- `python scripts/test-windows-console.py <exe> <mihomo>`：两轮 WM_CLOSE 退出 0 且可重启；独立失败窗口保留并落盘报告后退出 1。
+- 历史 tag/Release 未变：v0.2.0 `a9d3fc8`、v0.2.1 `d8f394e`、v0.2.2 `22849c9`、v0.2.3 `5ed4cdf`、v0.2.4 `72da273`；v0.2.5 为唯一 Latest。
 
 ## 4. 部署边界
 

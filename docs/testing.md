@@ -120,6 +120,6 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 - [controller_verify_test.go](<../internal/core/controller_verify_test.go>) 覆盖 `/proxies` 先返回空映射后暴露原生出站的 `verifyProxies` 重试、1,200 ms 延迟绑定的 SOCKS listener（旧 750 ms 单次检查必失败）及父 deadline 到期；[processguard_linux_test.go](<../internal/processguard/processguard_linux_test.go>) 覆盖 `Pdeathsig = SIGTERM` 与 helper 父进程 `SIGKILL` 后子进程消失。
 - Windows `go test -mod=readonly ./internal/core -count=1` 通过（12.506s），全量中 processguard 1.835s；`go test ./internal/core -run TestVerifyListener -count=1 -v` 通过（1.22s/0.05s）；WSL Fedora 定向测试通过。
 - Windows 全量 `go test -mod=readonly -p 1 ./... -count=1` 通过（app 11.310s、core 12.106s、coreinstall 1.261s、integration 6.994s）；WSL `go test -mod=readonly ./internal/core ./internal/processguard -count=1` 通过（core 6.123s、processguard 0.010s）；`go vet ./...`、`gofmt -l internal cmd tests`、`git diff --check` 通过。
-- 最终本地 Linux 候选 `.local/linux-fix/uniproxy-linux-amd64`（13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`）在 WSL2/Fedora 44 实跑：首次 apply HTTP 200，回环 HTTP/SOCKS 通过，`kill -9` 后内核退出、端口释放，重启恢复，最终正常停止。仅本地验证，未提交/发布/部署。
+- 最终本地 Linux 候选 `.local/linux-fix/uniproxy-linux-amd64`（13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`）在 WSL2/Fedora 44 实跑：首次 apply HTTP 200，回环 HTTP/SOCKS 通过，`kill -9` 后内核退出、端口释放，重启恢复，最终正常停止。该候选仅本地验证；同一修复已提交 `ede12bb` 并随 v0.2.5 发布（不含部署）。
 
 具体测试源、命令和限制可复查，不以虚拟节点/虚构延迟填充生产界面。
