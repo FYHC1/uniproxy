@@ -114,6 +114,11 @@ func (a *App) Handler() http.Handler {
 		return map[string]any{"ok": true, "version": reported}, nil
 	})
 	route("GET /api/bootstrap", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.bootstrap(), nil })
+	// Read-only host interface inventory for the administrator's global outbound
+	// selector. Only names/flags/CIDRs are exposed; no routes, DNS or MAC data.
+	route("GET /api/interfaces", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		return hostInterfaces()
+	})
 	route("GET /api/core/installation", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.installationStatus(), nil })
 	route("POST /api/core/install", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		if err := emptyCoreRequest(w, r); err != nil {
@@ -413,7 +418,7 @@ func (a *App) Handler() http.Handler {
 		if e := decode(w, r, &p); e != nil {
 			return nil, e
 		}
-		if e := filterPatch(p, "testUrl", "speedTestUrl", "testTimeoutMs", "testConcurrency", "speedTestBytes", "healthIntervalSeconds", "portRangeStart", "portRangeEnd"); e != nil {
+		if e := filterPatch(p, "testUrl", "speedTestUrl", "testTimeoutMs", "testConcurrency", "speedTestBytes", "healthIntervalSeconds", "portRangeStart", "portRangeEnd", "outboundInterface"); e != nil {
 			return nil, e
 		}
 		return a.mutate(r.Context(), "更新全局设置", func(s *model.State) (any, error) {

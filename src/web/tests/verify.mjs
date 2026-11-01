@@ -18,7 +18,8 @@ console.log('PASS production Vite build (in memory, no output directory writes)'
 const now = '2026-01-01T00:00:00Z';
 let state = {
   nodes:[], groups:[], pools:[], listeners:[], subscriptions:[], revision:0,
-  settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999},
+  settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,outboundInterface:''},
+  interfaces:[{name:'以太网',up:true,loopback:false,addresses:['192.0.2.10/24']},{name:'WLAN',up:true,loopback:false,addresses:[]},{name:'离线网卡',up:false,loopback:false,addresses:['198.51.100.7/24']},{name:'Loopback Pseudo-Interface 1',up:true,loopback:true,addresses:['127.0.0.1/8']}],
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'',startedAt:'',dirty:false,listeners:[]},
   coreInstallation:{state:'idle',stage:'',version:'1.19.32',os:'windows',arch:'amd64',path:'/fixture/core/mihomo.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:''},
   activities:[], jobs:[]
@@ -70,6 +71,8 @@ await context.route('http://uniproxy.test/**',async route => {
   const body = request.postDataJSON();
   calls.push({path,method:request.method(),body});
   if (path === '/api/bootstrap') {bootstrapCount++;await route.fulfill({json:state});return;}
+  // The real endpoint responds with the raw object, not the {data,runtime} mutation envelope.
+  if (path === '/api/interfaces') {await route.fulfill({json:{interfaces:state.interfaces}});return;}
   if (path === '/api/import' && body.preview) {
     previewCount++;
     const reply = importMocks.preview ? await importMocks.preview(body) : {json:{nodes:[{name:'回归测试节点',protocol:'socks5',server:'127.0.0.1',port:1080,udp:true}],errors:[]}};
@@ -196,9 +199,24 @@ try {
   await clickNav('运行与设置');
   await page.getByRole('button',{name:'检测与端口',exact:true}).click();
   await page.getByLabel('并发数量',{exact:true}).fill('12');
+  const interfaceSelect = page.getByLabel('全局出站网卡',{exact:true});
+  await textVisible('仅列出已启用且非回环的网卡。');
+  const interfaceOptions = await interfaceSelect.locator('option').allTextContents();
+  assert.deepEqual([...interfaceOptions].sort(),['WLAN','以太网 · 192.0.2.10/24','自动（系统默认路由）'].sort(),'only up non-loopback interfaces are offered plus automatic');
+  await interfaceSelect.selectOption('以太网');
   await page.getByRole('button',{name:'保存设置',exact:true}).click();
   await textVisible('设置已同步');
   assert.equal(state.settings.testConcurrency,12);
+  assert.equal(state.settings.outboundInterface,'以太网');
+  state.interfaces = state.interfaces.filter(item => item.name !== '以太网');
+  await page.getByRole('button',{name:'刷新网卡列表',exact:true}).click();
+  await page.getByText('当前不可用（可能已禁用或拔出）').first().waitFor();
+  const refreshedOptions = await interfaceSelect.locator('option').allTextContents();
+  assert.equal(refreshedOptions[0],'自动（系统默认路由）');
+  assert.ok(refreshedOptions.includes('以太网（当前不可用）'),'the stale pin stays visible and marked');
+  assert.ok(!refreshedOptions.some(text => text.startsWith('以太网 ·')),'a missing adapter is not offered as selectable');
+  assert.equal(await interfaceSelect.inputValue(),'以太网','the stale pin is not silently rewritten');
+  state.interfaces.push({name:'以太网',up:true,loopback:false,addresses:['192.0.2.10/24']});
   await page.getByRole('button',{name:'备份与安全',exact:true}).click();
   await page.getByRole('button',{name:'导出备份',exact:true}).click();
   await page.getByRole('dialog',{name:'导出敏感配置备份？'}).waitFor();

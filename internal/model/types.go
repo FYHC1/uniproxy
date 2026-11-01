@@ -112,6 +112,10 @@ type Settings struct {
 	HealthIntervalSeconds int    `json:"healthIntervalSeconds"`
 	PortRangeStart        int    `json:"portRangeStart"`
 	PortRangeEnd          int    `json:"portRangeEnd"`
+	// OutboundInterface pins one native interface as the source of every
+	// core-originated outbound dial. Empty means the system default route.
+	// It is administrator-only: per-node interface-name stays blocked.
+	OutboundInterface string `json:"outboundInterface"`
 }
 type State struct {
 	Nodes         []Node         `json:"nodes"`

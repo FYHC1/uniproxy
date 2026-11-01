@@ -285,6 +285,12 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 		"proxies": proxies, "proxy-groups": groups, "listeners": inbounds,
 		"sub-rules": map[string]any{probeName: probeRules}, "rules": []string{"MATCH,REJECT"},
 	}
+	if name := strings.TrimSpace(state.Settings.OutboundInterface); name != "" {
+		// Administrator-only global pin. Per-node interface-name remains blocked
+		// by safeNativeValue so an imported subscription can never choose its own
+		// source interface.
+		document["interface-name"] = name
+	}
 	data, err := yaml.Marshal(document)
 	if err != nil {
 		return nil, errors.New("could not encode native core configuration")

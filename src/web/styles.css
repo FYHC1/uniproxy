@@ -413,6 +413,8 @@ input[type="number"] { font-variant-numeric: tabular-nums; }
 .settings-form .form-section-heading:first-child { padding-top: 0; border: 0; }
 .settings-footer { display: flex; align-items: center; gap: 10px; padding-top: 21px; margin-top: 22px; border-top: 1px solid var(--line); }
 .settings-footer > span { font-size: 11px; color: #8a9f77; margin-right: auto; }
+.settings-inline-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.settings-inline-actions > .field-hint { display: inline; }
 .job-list { display: flex; flex-direction: column; gap: 16px; }
 .job-card { padding: 19px; border: 1px solid #dfe9d4; border-radius: 8px; background: #fdfefb; }
 .job-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }

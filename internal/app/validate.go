@@ -297,5 +297,22 @@ func ValidateState(s model.State, adminPort int) error {
 	if !validURL(v.TestURL) || !validURL(v.SpeedTestURL) || v.TestTimeoutMS < 500 || v.TestTimeoutMS > 30000 || v.TestConcurrency < 1 || v.TestConcurrency > 32 || v.SpeedTestBytes < 1024 || v.SpeedTestBytes > 100*1024*1024 || v.HealthIntervalSeconds < 30 || v.HealthIntervalSeconds > 86400 || v.PortRangeStart < 1024 || v.PortRangeEnd > 65535 || v.PortRangeEnd < v.PortRangeStart {
 		return bad("检测设置或端口分配范围无效")
 	}
+	if name := strings.TrimSpace(v.OutboundInterface); name != "" {
+		if name != v.OutboundInterface {
+			return bad("全局出站网卡名称不能包含首尾空白")
+		}
+		iface, err := net.InterfaceByName(name)
+		if err != nil {
+			return bad("全局出站网卡不存在或名称不正确：" + name)
+		}
+		// The core itself accepts unknown names and only fails at dial time with a
+		// misleading DNS error, so reject unusable interfaces here instead.
+		if iface.Flags&net.FlagUp == 0 {
+			return bad("全局出站网卡当前未启用：" + name)
+		}
+		if iface.Flags&net.FlagLoopback != 0 {
+			return bad("全局出站网卡不能是回环接口：" + name)
+		}
+	}
 	return nil
 }

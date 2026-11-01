@@ -9,7 +9,8 @@ export type PoolListenerInput = Partial<Pick<ProxyListener,'name'|'protocol'|'ho
 export interface PoolCreateRequest {pool:PoolDraft;listener:PoolListenerInput}
 export interface PoolCreateResult {pool:ProxyPool;listener:ProxyListener}
 export interface Subscription {id:string;name:string;url:string;groupIds:string[];enabled:boolean;intervalMinutes:number;lastFetchedAt:string;lastError:string;nodeCount:number;createdAt:string;updatedAt:string}
-export interface Settings {testUrl:string;speedTestUrl:string;testTimeoutMs:number;testConcurrency:number;speedTestBytes:number;healthIntervalSeconds:number;portRangeStart:number;portRangeEnd:number}
+export interface NetworkInterface {name:string;up:boolean;loopback:boolean;addresses:string[]}
+export interface Settings {testUrl:string;speedTestUrl:string;testTimeoutMs:number;testConcurrency:number;speedTestBytes:number;healthIntervalSeconds:number;portRangeStart:number;portRangeEnd:number;outboundInterface:string}
 export interface RuntimeStatus {available:boolean;running:boolean;applying:boolean;version:string;appliedRevision:number;lastError:string;startedAt:string;dirty:boolean;listeners:{id:string;listening:boolean;error:string}[]}
 export interface CoreInstallation {
   state:'idle'|'installing'|'succeeded'|'failed';

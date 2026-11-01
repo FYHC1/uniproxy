@@ -6,7 +6,7 @@ import { expect } from '@playwright/test';
 const installation = patch => ({state:'idle',stage:'',version:'1.19.32',os:'windows',arch:'amd64',path:'C:/fixture/core/mihomo.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:'',...patch});
 const initial = () => ({
   nodes:[],groups:[],pools:[],listeners:[],subscriptions:[],revision:7,activities:[],jobs:[],
-  settings:{testUrl:'https://example.com/check',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999},
+  settings:{testUrl:'https://example.com/check',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,outboundInterface:''},
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'fixture: core is missing',startedAt:'',dirty:true,listeners:[]},
   coreInstallation:installation(),
 });
@@ -33,6 +33,7 @@ async function harness({browser,files},patch={}) {
       const reply=h.bootstrapReply?await h.bootstrapReply(structuredClone(h.state),request):{json:structuredClone(h.state)};
       await route.fulfill(reply);return;
     }
+    if(path==='/api/interfaces'){await route.fulfill({json:{interfaces:[{name:'以太网',up:true,loopback:false,addresses:['192.0.2.10/24']}]}});return;}
     if(path==='/api/core/installation'){await route.fulfill({json:h.state.coreInstallation});return;}
     if(path==='/api/core/install'){
       assert.equal(call.method,'POST');assert.deepEqual(call.body,{});

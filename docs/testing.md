@@ -41,6 +41,13 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 - [集成验证](<../tests/integration/subscription_formats_test.go>)的合成方言用例需显式CORE_PATH进行Mihomo `-t`；不启动上游节点。私有样例仅在用户授权后通过 `UNIPROXY_TEST_SUBSCRIPTION_MANIFEST` 指向仓库外JSON清单（File绝对路径、Nodes/Errors预期数、可选ErrorContains），执行 `go test ./tests/integration -run "^TestPrivateSubscriptionFilesOffline$" -count=1 -v`。文件读取有界，测试不下载URL、不打印文件路径/内容/凭据，不启动节点；有CORE_PATH时仅对零错误样例做配置校验。常规测试该变量必须为空。[真实回环TLS观察](<../tests/integration/subscription_tls_test.go>)仅本机ClientHello，服务端故意中止握手，断言显式SNI未被WS Host替换且测速不能假成功。[候选程序验收](<../tests/integration/subscription_binary_test.go>)在临时data/cache、显式不存在core下直接验证暂存编译程序的6种格式/结构文档预览与保存及活动冲突拒绝。
 - [浏览器用例](<../tests/browser/subscription-formats.spec.ts>)只用临时缺失core服务器和合成文档地址：TLS占位导入、静态CONF预览/保存不采用全局策略、真实TLS冲突阻止导入。具体本轮结果见[验收](<subscription-format-verification.md>)。
 
+## 全局出站网卡验证
+
+- 单元：[outbound_interface_test.go](<../internal/app/outbound_interface_test.go>) 覆盖空值/不存在/未启用/回环/首尾空白/可用网卡、PATCH 往返与拒绝、未知字段、`GET /api/interfaces` 结构与链路本地过滤；[compiler_interface_test.go](<../internal/core/compiler_interface_test.go>) 覆盖空值不写 key、非空写顶层、去空白、节点级 `interface-name` 仍拒绝。
+- 真实内核：[interface_real_test.go](<../internal/core/interface_real_test.go>) 需 `UNIPROXY_TEST_CORE_PATH`，证明 Mihomo `-t` 对未知网卡也接受，故必须管理层校验。
+- 真实出站（手工，未纳入 CI）：用 `core.Build` 生成配置改写端口后启动临时 Mihomo，比对 auto/以太网/WLAN/Meta 的 HTTP 结果，并用 `Get-NetTCPConnection -OwningProcess` 核对出站源地址随 `interface-name` 变化；不存在的网卡应表现为拨号失败而非直连回退。
+- 浏览器：[outbound-interface.spec.ts](<../tests/browser/outbound-interface.spec.ts>) 在隔离 19090 服务上断言下拉选项与 `GET /api/interfaces` 的启用非回环网卡逐项一致、只暴露 name/up/loopback/addresses、保存真实网卡后 bootstrap 持久化并可改回自动、不存在网卡 PATCH 返回 400 且不写库；用例自行清理 pin，不依赖其他 spec 的残留状态。[verify.mjs](<../src/web/tests/verify.mjs>) 的 fixture 覆盖网卡消失后的「当前不可用」标注与陈旧值不被静默改写。
+- 该设置只改变自有内核的出站源网卡，不是 TUN，不创建虚拟网卡，不改系统路由/DNS；浏览器用例只验证交互与持久化，不验证真实网卡出站效果，不能替代上述手工核对。
 ## 必测功能
 
 1. 各协议链接/Clash/sing-box 配置导入，非法参数及不支持变体明确拒绝，错误不泄漏密钥。
@@ -100,5 +107,19 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 - 最终Go全量显式Mihomo/暂存程序、vet/gofmt、严格TS、36工具、fixture UI、34真实API浏览器通过。
 - 下载器40函数/97子用例，92.0%覆盖，2个OS symlink子用例因宿主权限skip；本轮真实临时官网下载、摘要/版本检测、显式空配置启停通过。
 - 四平台仅交叉构建暂存，未部署/提交/发布。Linux/Docker/Windowsarm64实跑、race、私有订阅/公网节点/容量压测未做。[完整验收与失败调查](<core-install-verification.md>)。
+
+## WSL 实机运行轮（2026-11-01 17:02）
+
+- 在 Fedora Linux 44 (WSL2) x86_64 上运行官方 Linux amd64 v0.2.4 程序（SHA256 c56a73ae7b6bb1985bf10750489b3e7642cadb1a52a544721e51b0ae306cecae）和固定 Mihomo 1.19.32（解压后 SHA256 7a0d59da2e678d56c899a3db996a2ad8963286c4f3634b0451435db248f13fa1），使用临时空数据和自建回环上游。
+- 通过：健康/UI+CSP、固定内核起停、真实 HTTP/SOCKS5 转发（UNIPROXY-WSL-E2E-OK）、runtime stop、SIGTERM 后 WAL/SHM 清理、同数据目录重启自动应用、healthcheck、端口冲突与公网绑定保护、管理员 Token 401/200。
+- 初次发现：WSL 冷启动首次 apply 可能触发 750 ms 私有认证 probe 超时，重试恢复；`kill -9` 主程序会遗留 Mihomo 内核（当时 processguard 仅 Windows），手动 SIGINT 可清理，重启后数据恢复正常。两项均已由 M22 在本地修复并复验，正式 v0.2.4 资产不含该修复。
+- 边界：仅 WSL2/Fedora/amd64；未覆盖 arm64 实机、裸机、Docker、systemd、UDP、并发/容量/吞吐、真实远端节点。详见[WSL 实机验收](<wsl-runtime-verification.md>)。
+
+## Linux 进程保护与探针重试修复轮（2026-11-01 17:43）
+
+- [controller_verify_test.go](<../internal/core/controller_verify_test.go>) 覆盖 `/proxies` 先返回空映射后暴露原生出站的 `verifyProxies` 重试、1,200 ms 延迟绑定的 SOCKS listener（旧 750 ms 单次检查必失败）及父 deadline 到期；[processguard_linux_test.go](<../internal/processguard/processguard_linux_test.go>) 覆盖 `Pdeathsig = SIGTERM` 与 helper 父进程 `SIGKILL` 后子进程消失。
+- Windows `go test -mod=readonly ./internal/core -count=1` 通过（12.506s），全量中 processguard 1.835s；`go test ./internal/core -run TestVerifyListener -count=1 -v` 通过（1.22s/0.05s）；WSL Fedora 定向测试通过。
+- Windows 全量 `go test -mod=readonly -p 1 ./... -count=1` 通过（app 11.310s、core 12.106s、coreinstall 1.261s、integration 6.994s）；WSL `go test -mod=readonly ./internal/core ./internal/processguard -count=1` 通过（core 6.123s、processguard 0.010s）；`go vet ./...`、`gofmt -l internal cmd tests`、`git diff --check` 通过。
+- 最终本地 Linux 候选 `.local/linux-fix/uniproxy-linux-amd64`（13,656,224 字节，SHA256 `8ff1916249b5cd6486cb3921b11aa253f1490b4110c4630b20f19460b057f2dc`）在 WSL2/Fedora 44 实跑：首次 apply HTTP 200，回环 HTTP/SOCKS 通过，`kill -9` 后内核退出、端口释放，重启恢复，最终正常停止。仅本地验证，未提交/发布/部署。
 
 具体测试源、命令和限制可复查，不以虚拟节点/虚构延迟填充生产界面。
