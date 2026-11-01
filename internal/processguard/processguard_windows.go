@@ -5,6 +5,7 @@ package processguard
 import (
 	"errors"
 	"fmt"
+	"os/exec"
 	"sync"
 	"unsafe"
 
@@ -46,6 +47,10 @@ var systemJobAPI = jobAPI{
 }
 
 func enable() error { return lifetime.enable(systemJobAPI) }
+
+// The Windows job object contains descendants automatically; no per-command
+// setup is needed here.
+func prepareCommand(*exec.Cmd) {}
 
 func (g *lifetimeGuard) enable(api jobAPI) error {
 	g.once.Do(func() {

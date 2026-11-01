@@ -21,6 +21,7 @@ import (
 
 	"github.com/uniproxy/uniproxy/internal/coreinstall"
 	"github.com/uniproxy/uniproxy/internal/model"
+	"github.com/uniproxy/uniproxy/internal/processguard"
 	"gopkg.in/yaml.v3"
 )
 
@@ -302,6 +303,7 @@ func (m *Manager) inspectBinaryWithTimeout(ctx context.Context, timeout time.Dur
 	defer cancel()
 	output := &boundedLog{limit: 16 << 10}
 	cmd := m.command(inspectCtx, resolved, "-v")
+	processguard.PrepareCommand(cmd)
 	secureCommandEnvironment(cmd)
 	cmd.Stdout = output
 	cmd.Stderr = output
@@ -379,6 +381,7 @@ func (m *Manager) validateConfig(ctx context.Context, data []byte) error {
 	defer cancel()
 	output := &boundedLog{limit: 32 << 10}
 	cmd := m.command(validationCtx, m.binary.path, "-t", "-d", m.options.DataDir, "-f", "-")
+	processguard.PrepareCommand(cmd)
 	cmd.Stdin = bytes.NewReader(data)
 	secureCommandEnvironment(cmd)
 	cmd.Stdout = output
@@ -398,6 +401,7 @@ func (m *Manager) start(ctx context.Context, data []byte) error {
 		return err
 	}
 	cmd := m.startCommand(m.binary.path, "-d", m.options.DataDir, "-f", "-")
+	processguard.PrepareCommand(cmd)
 	cmd.Stdin = bytes.NewReader(data)
 	secureCommandEnvironment(cmd)
 	cmd.Stdout = m.logs

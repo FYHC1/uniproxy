@@ -99,17 +99,8 @@ func (m *Manager) verify(ctx context.Context, cfg *compiledConfig) error {
 	}
 	verifyCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	// Confirm the native proxy graph, not simply a listening unrelated process.
-	var reply struct {
-		Proxies map[string]json.RawMessage `json:"proxies"`
-	}
-	if err := m.controller(verifyCtx, http.MethodGet, "/proxies", nil, &reply); err != nil {
+	if err := m.verifyProxies(verifyCtx, cfg); err != nil {
 		return err
-	}
-	for id := range cfg.nodes {
-		if _, ok := reply.Proxies[nodeTag(id)]; !ok {
-			return errors.New("core did not expose a requested native outbound")
-		}
 	}
 	if err := verifyListener(verifyCtx, cfg.probe); err != nil {
 		return errors.New("private authenticated core probe did not become ready")
@@ -143,12 +134,85 @@ func (m *Manager) verify(ctx context.Context, cfg *compiledConfig) error {
 	return verifyCtx.Err()
 }
 
-func verifyListener(ctx context.Context, listener model.Listener) error {
-	checkCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
+const (
+	proxyVerifyTimeout           = 3 * time.Second
+	proxyVerifyRetryInterval     = 100 * time.Millisecond
+	listenerVerifyTimeout        = 3 * time.Second
+	listenerVerifyAttemptTimeout = time.Second
+	listenerVerifyRetryInterval  = 100 * time.Millisecond
+)
+
+// verifyProxies confirms the native proxy graph, not simply a listening
+// unrelated process. A fresh core can answer its controller version before the
+// submitted configuration is visible there, so a bounded retry avoids treating
+// that startup race as a bad configuration.
+func (m *Manager) verifyProxies(ctx context.Context, cfg *compiledConfig) error {
+	waitCtx, cancel := context.WithTimeout(ctx, proxyVerifyTimeout)
 	defer cancel()
+	var lastErr error
+	for {
+		var reply struct {
+			Proxies map[string]json.RawMessage `json:"proxies"`
+		}
+		lastErr = m.controller(waitCtx, http.MethodGet, "/proxies", nil, &reply)
+		if lastErr == nil {
+			missing := false
+			for id := range cfg.nodes {
+				if _, ok := reply.Proxies[nodeTag(id)]; !ok {
+					missing = true
+					break
+				}
+			}
+			if !missing {
+				return nil
+			}
+			lastErr = errors.New("core did not expose a requested native outbound")
+		}
+		if waitCtx.Err() != nil {
+			return lastErr
+		}
+		timer := time.NewTimer(proxyVerifyRetryInterval)
+		select {
+		case <-waitCtx.Done():
+			timer.Stop()
+			return lastErr
+		case <-timer.C:
+		}
+	}
+}
+
+// verifyListener waits for a fresh core to finish binding. The first probe can
+// race the kernel launch on a cold host even though the authenticated controller
+// is already ready, so a single short check is not reliable. Each attempt stays
+// bounded, and the outer deadline caps the total wait for one listener.
+func verifyListener(ctx context.Context, listener model.Listener) error {
+	waitCtx, cancel := context.WithTimeout(ctx, listenerVerifyTimeout)
+	defer cancel()
+	var lastErr error
+	for {
+		attemptCtx, attemptCancel := context.WithTimeout(waitCtx, listenerVerifyAttemptTimeout)
+		lastErr = verifyListenerOnce(attemptCtx, listener)
+		attemptCancel()
+		if lastErr == nil {
+			return nil
+		}
+		if waitCtx.Err() != nil {
+			return lastErr
+		}
+		timer := time.NewTimer(listenerVerifyRetryInterval)
+		select {
+		case <-waitCtx.Done():
+			timer.Stop()
+			return lastErr
+		case <-timer.C:
+		}
+	}
+}
+
+func verifyListenerOnce(ctx context.Context, listener model.Listener) error {
 	if listener.Protocol == "http" || listener.Protocol == "mixed" {
 		if len(listener.Users) > 0 {
-			if err := verifyHTTP(checkCtx, listener, nil, http.StatusProxyAuthRequired); err != nil {
+			if err := verifyHTTP(ctx, listener, nil, http.StatusProxyAuthRequired); err != nil {
 				return err
 			}
 		}
@@ -156,12 +220,12 @@ func verifyListener(ctx context.Context, listener model.Listener) error {
 		if len(listener.Users) > 0 {
 			credential = &listener.Users[0]
 		}
-		if err := verifyHTTP(checkCtx, listener, credential, http.StatusBadRequest); err != nil {
+		if err := verifyHTTP(ctx, listener, credential, http.StatusBadRequest); err != nil {
 			return err
 		}
 	}
 	if listener.Protocol == "socks" || listener.Protocol == "mixed" {
-		if err := verifySOCKS(checkCtx, listener); err != nil {
+		if err := verifySOCKS(ctx, listener); err != nil {
 			return err
 		}
 	}
