@@ -180,12 +180,12 @@ func parseURI(text string) (model.ParsedNode, error) {
 		}
 		q.set(out, "packet-encoding", "packetEncoding", "packet-encoding")
 		uriTLS(q, out, protocol, false)
-		uriTransport(q, out)
+		uriTransport(q, out, protocol)
 	case "trojan":
 		out["password"] = passwordUser(u.User)
 		out["udp"] = true
 		uriTLS(q, out, protocol, true)
-		uriTransport(q, out)
+		uriTransport(q, out, protocol)
 	case "hysteria":
 		if u.User != nil {
 			out["auth-str"] = passwordUser(u.User)
@@ -337,8 +337,17 @@ func uriTLS(q *query, out map[string]any, protocol string, defaultTLS bool) {
 	q.set(out, "client-fingerprint", "fp", "client-fingerprint")
 	q.set(out, "fingerprint", "fingerprint", "pinSHA256", "pinSHA256Cert")
 	q.set(out, "name-cert-verify", "name-cert-verify")
+	q.set(out, "name-cert-verify", "vcn")
+	q.set(out, "fingerprint", "pcs")
 	if alpn, ok := q.take("alpn"); ok {
 		out["alpn"] = strings.Split(alpn, ",")
+	}
+	if ech, ok := q.take("ech"); ok {
+		if ech == "" {
+			q.fail("invalid ECH config")
+		} else {
+			out["ech-opts"] = map[string]any{"enable": true, "config": ech}
+		}
 	}
 	publicKey, hasKey := q.take("pbk", "public-key")
 	shortID, hasID := q.take("sid", "short-id")
@@ -347,15 +356,95 @@ func uriTLS(q *query, out map[string]any, protocol string, defaultTLS bool) {
 	} else if hasKey || hasID {
 		q.fail("Reality options require security=reality")
 	}
+	if v, ok := q.take("spx"); ok && v != "" && v != "/" {
+		q.fail("Reality spider-X is unsupported by the pinned core")
+	}
+	if v, ok := q.take("pqv"); ok && v != "" {
+		q.fail("Reality ML-DSA-65 verification is unsupported by the pinned core")
+	}
+	if v, ok := q.take("fm"); ok && v != "" {
+		q.fail("Xray finalmask is unsupported by the pinned core")
+	}
 }
 
-func uriTransport(q *query, out map[string]any) {
+func uriTransport(q *query, out map[string]any, protocol string) {
 	network, ok := q.take("type", "network")
 	if !ok || network == "" {
 		network = "tcp"
 	}
+	network = strings.ToLower(network)
 	if network == "websocket" {
 		network = "ws"
+	}
+	if network == "raw" || network == "tcp" {
+		network = "tcp"
+	}
+	if network == "mkcp" {
+		network = "kcp"
+	}
+	if network == "kcp" {
+		if protocol != "vmess" {
+			q.fail("KCP transport is unsupported for this protocol")
+		}
+		out["network"] = "kcp"
+		readKCPURI(q, out)
+		return
+	}
+	if network == "xhttp" {
+		if protocol != "vless" {
+			q.fail("XHTTP transport is unsupported by the pinned VMess adapter")
+			return
+		}
+		out["network"] = "xhttp"
+		path, hasPath := q.take("path")
+		host, hasHost := q.take("host")
+		mode, hasMode := q.take("mode")
+		if header, ok := q.take("headerType"); ok && header != "" && header != "none" {
+			q.fail("unsupported XHTTP header variant")
+		}
+		if extra, ok := q.take("extra"); ok {
+			raw, err := parseXHTTPExtra(extra)
+			if err != nil {
+				q.fail("invalid XHTTP extra")
+				return
+			}
+			options, err := xhttpExtraOptions(raw, path, host, mode, hasPath, hasHost, hasMode)
+			if err != nil {
+				q.fail(err.Error())
+				return
+			}
+			out["xhttp-opts"] = options
+		} else {
+			options := map[string]any{}
+			if path != "" {
+				options["path"] = path
+			}
+			if host != "" {
+				options["host"] = host
+			}
+			if mode != "" {
+				options["mode"] = mode
+			}
+			out["xhttp-opts"] = options
+		}
+		return
+	}
+	if network == "httpupgrade" {
+		if header, ok := q.take("headerType"); ok && header != "" && header != "none" {
+			q.fail("unsupported HTTP upgrade header variant")
+		}
+		out["network"] = "ws"
+		options := map[string]any{"v2ray-http-upgrade": true}
+		path, ok := q.take("path")
+		if !ok || path == "" {
+			path = "/"
+		}
+		options["path"] = path
+		if host, ok := q.take("host"); ok {
+			options["headers"] = map[string]any{"Host": host}
+		}
+		out["ws-opts"] = options
+		return
 	}
 	if header, ok := q.take("headerType"); ok {
 		if header == "http" && network == "tcp" {

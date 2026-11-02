@@ -1,6 +1,6 @@
 # UniProxy 技术与产品决策记录
 
-更新：2026-11-01。每条记录区分用户选择、工程实现与尚未验证边界。要推翻决策，应新增取代记录和迁移/测试方案，不覆盖历史理由。
+更新：2026-11-02。每条记录区分用户选择、工程实现与尚未验证边界。要推翻决策，应新增取代记录和迁移/测试方案，不覆盖历史理由。
 
 入口：[需求基线](<requirements.md>) · [当前状态](<session-handoff.md>) · [开发计划](<development-plan.md>)。
 
@@ -247,3 +247,16 @@ M21 的 WSL 实跑暴露出两个 Linux 行为差异：冷启动首次 apply 时
 为什么必须由 Go 侧校验：实测 `bin/mihomo.exe -t` 对 `interface-name: definitely-not-an-interface` 返回 0 并输出 `test is successful`；实际启动也成功，只在拨号时失败，且日志是误导性的 `dns resolve failed: couldn't find ip`。因此 `internal/app/validate.go` 在保存前用 `net.InterfaceByName` 要求网卡存在、`FlagUp`、非 `FlagLoopback`，并对首尾空白直接报错。`GET /api/interfaces` 只返回 `name/up/loopback/addresses`（CIDR，已过滤 fe80::/10 与 169.254/16），不暴露路由、网关、MAC 或 DNS 状态。
 
 边界：该设置只约束 UniProxy 自有内核的出站源网卡，不创建虚拟网卡、不是 TUN、不修改系统路由表或 DNS、不影响其他程序；系统级 TUN/VPN 仍可能按路由规则接管。绑定失效网卡时不会回退直连——Mihomo 直接拨号失败（实测 curl 35/000），不会绕过限制。selected 网卡名区分大小写并直接对应操作系统适配器名（Windows 为 `Get-NetAdapter` 的 Name 列，如 `以太网`）。
+
+## D27 — 现代 VLESS/VMess 只映射固定内核可证明的等价字段
+
+**状态：2026-11-02 按 R29 在本地实现并验证；计划随 v0.2.6 发布（不含部署）。见[验证记录](<modern-protocol-verification.md>)、[计划](<development-plan.md>) M24。**
+
+社区反馈的“最新版 VLESS/VMess 无法识别”不是单个 URI 字段问题，而是旧解析器只按有限的 transport/TLS 白名单接受字段。处理原则是：**只把固定 Mihomo 1.19.32 源码中确实存在且有分支语义的字段写入 native 输出；没有等价字段的现代参数明确报错，不把未知 network 交给默认 TCP 分支静默降级。**
+
+- VLESS XHTTP 使用 `network: xhttp` + `xhttp-opts`，对 Xray `extra` 做 camelCase 到 kebab-case 映射；外层 `path/host/mode` 显式优先，缺省时才采用 `extra` 内层值，避免外层被内层覆盖。`download-settings` 只接受 `tls/reality/none` 并显式关闭 uplink 证书校验/Reality 的继承。
+- HTTPUpgrade 在 Mihomo 中不是独立 network，而是 WS 的 `v2ray-http-upgrade` 标志，因此映射为 `network: ws` + `ws-opts.v2ray-http-upgrade: true`；VMess KCP 使用 `kcp-opts`；ECH 使用 `ech-opts`；`vcn`/`pcs` 映射到验证名/证书 pin；VLESS Encryption 保留在 `encryption` 并校验格式。
+- VMess XHTTP 在固定 VMess 适配器中没有 `XHTTPOpts`，必须拒绝；Reality `spx`/`pqv`/`fm`、`flow=xtls-rprx-vision-udp443`、XHTTP 无对应字段的 `noSSEHeader` 等同样拒绝。这样宁可给出来源错误，也不产生“解析成功但实际走 TCP/丢失校验”的假成功。
+- 验证不能只依赖 `mihomo -t`：实测它不校验 transport 名称，未知 network 仍可报 `test is successful` 并走默认 TCP。测试因此断言 native map、URI/native 边界和拒绝分支，另用合成配置做核心语法检查。
+
+TLS/证书校验、SSRF/文件访问边界、节点身份和固定内核版本均不改；本轮未做真实远端节点连通/吞吐测试，发布不等于部署。

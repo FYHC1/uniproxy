@@ -1,6 +1,6 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-02 02:38（Asia/Shanghai）。v0.2.5 已正式发布（未部署）。此前记录的运行实例——主程序 PID22076（`bin/releases/v0.2.4/uniproxy-windows-amd64.exe`）+ 内核 PID5536——在 02:38 复核时已不在运行：无任何 uniproxy/mihomo 进程（仅 Clash Verge 的 verge-mihomo PID2304），127.0.0.1:9090 与 19090 均无监听，health 无响应。本轮未停止或替换该实例，退出原因未查证。部署 v0.2.5 未获授权、未执行。操作前仍须重新核对当前进程。**
+**最后核对：2026-11-02 15:20（Asia/Shanghai）。v0.2.5 已正式发布（未部署）。此前记录的运行实例——主程序 PID22076（`bin/releases/v0.2.4/uniproxy-windows-amd64.exe`）+ 内核 PID5536——在 02:38 复核时已不在运行：无任何 uniproxy/mihomo 进程（仅 Clash Verge 的 verge-mihomo PID2304），127.0.0.1:9090 与 19090 均无监听，health 无响应。本轮未停止或替换该实例，退出原因未查证。部署 v0.2.5 未获授权、未执行。2026-11-02 15:20 另完成 M24 现代 VLESS/VMess 本地实现与验证，计划随 v0.2.6 发布（不含部署）；操作前仍须重新核对当前进程。**
 
 ## 30秒摘要
 
@@ -11,6 +11,7 @@
 - 当前栈仍为 Go + React/TS + SQLite 加密 payload + 外置 Mihomo1.19.32；v0.2.5 新增 `Settings.OutboundInterface` + 只读 `GET /api/interfaces` + 顶层 `interface-name` 编译，以及 Linux 探针有界重试与 `Pdeathsig`；无 schema 迁移、无内核版本变化。
 - 2026-11-01 另在 WSL2/Fedora 44 amd64 使用官方 Linux v0.2.4 与固定 Mihomo 1.19.32 完成实机运行验收，并用本地 0.2.5 候选完成 M22 修复复验（首次 apply、回环 HTTP/SOCKS、`kill -9` 清理、重启恢复、正常停止）。
 - WSL 发现的两项 Linux 问题（私有认证探针超时、强杀遗留内核）已修复并随 v0.2.5 发布；正式 v0.2.4 资产不含该修复。
+- 2026-11-02 15:20 完成 M24 现代 VLESS/VMess 协议兼容：新增 VLESS XHTTP（Xray extra/download/reuse）、HTTPUpgrade→WS、VMess KCP、ECH、`vcn`/`pcs`、VLESS Encryption 与 URI 别名；VMess XHTTP/`spx`/`pqv`/`fm`/`flow=xtls-rprx-vision-udp443` 等无固定内核等价字段明确拒绝。计划随 v0.2.6 发布（不含部署）；详见[验证记录](<modern-protocol-verification.md>)。
 
 ## 当前运行服务
 

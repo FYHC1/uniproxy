@@ -3,12 +3,25 @@ package importer
 import "strings"
 
 func readTransport(r *fields, out map[string]any, protocol string) {
-	network := r.text("network", false)
+	network := strings.ToLower(r.text("network", false))
 	if network == "" {
 		network = "tcp"
 	}
-	if !oneOf(network, "tcp", "ws", "grpc", "http", "h2") || protocol == "trojan" && !oneOf(network, "tcp", "ws", "grpc") {
+	httpUpgrade := network == "httpupgrade"
+	if httpUpgrade {
+		if protocol != "vless" && protocol != "vmess" {
+			r.fail("HTTP upgrade transport is unsupported for this protocol")
+		}
+		network = "ws"
+	}
+	if !oneOf(network, "tcp", "ws", "grpc", "http", "h2", "kcp", "xhttp") || protocol == "trojan" && !oneOf(network, "tcp", "ws", "grpc") {
 		r.fail("unsupported transport; transport will not be silently downgraded")
+	}
+	if network == "kcp" && protocol != "vmess" {
+		r.fail("KCP transport is unsupported for this protocol")
+	}
+	if network == "xhttp" && protocol != "vless" {
+		r.fail("XHTTP transport is unsupported by the pinned VMess adapter")
 	}
 	out["network"] = network
 	// The pinned core's WebSocket branches do not use Reality at all. Accepting
@@ -55,12 +68,20 @@ func readTransport(r *fields, out map[string]any, protocol string) {
 			}
 			options["early-data-header-name"] = header
 		}
-		for _, key := range []string{"v2ray-http-upgrade", "v2ray-http-upgrade-fast-open"} {
-			if ws.has(key) {
-				if ws.boolean(key, false) {
-					ws.fail("WebSocket HTTP upgrade variants are unsupported")
-				}
+		upgrade := false
+		if ws.has("v2ray-http-upgrade") {
+			upgrade = ws.boolean("v2ray-http-upgrade", false)
+			options["v2ray-http-upgrade"] = upgrade
+		}
+		if ws.has("v2ray-http-upgrade-fast-open") {
+			fastOpen := ws.boolean("v2ray-http-upgrade-fast-open", false)
+			if fastOpen && !upgrade && !httpUpgrade {
+				ws.fail("WebSocket fast open requires HTTP upgrade")
 			}
+			options["v2ray-http-upgrade-fast-open"] = fastOpen
+		}
+		if httpUpgrade {
+			options["v2ray-http-upgrade"] = true
 		}
 		if err := ws.finish(); err != nil {
 			r.fail(err.Error())
@@ -117,6 +138,10 @@ func readTransport(r *fields, out map[string]any, protocol string) {
 			r.fail(err.Error())
 		}
 		out["http-opts"] = options
+	case "xhttp":
+		if r.has("xhttp-opts") {
+			readXHTTPOptions(r, out)
+		}
 	case "h2":
 		h2 := newFields(r.object("h2-opts"))
 		options := map[string]any{}

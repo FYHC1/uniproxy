@@ -18,7 +18,7 @@ func TestRejectMalformedAndUnsupportedURIs(t *testing.T) {
 		"unknown://secret@example.com:443", "ssr://not-supported", "file:///etc/passwd", "vless://missing@example.com:443",
 		"vless://" + testUUID + "@example.com", "vless://" + testUUID + "@example.com:0", "vless://" + testUUID + "@example.com:65536", "vless://" + testUUID + "@example.com:notaport",
 		"vless://" + testUUID + "@2001:db8::1:443", "vless://" + testUUID + "@[fe80::1%25eth0]:443", "vless://" + testUUID + "@example.com:443/unmapped",
-		"vless://" + testUUID + "@example.com:443?type=kcp", "vless://" + testUUID + "@example.com:443?type=xhttp", "vless://" + testUUID + "@example.com:443?encryption=mlkem768x25519plus.native.0rtt",
+		"vless://" + testUUID + "@example.com:443?type=kcp", "vless://" + testUUID + "@example.com:443?type=xhttp&mode=bad", "vless://" + testUUID + "@example.com:443?encryption=mlkem768x25519plus.native.0rtt",
 		"vless://" + testUUID + "@example.com:443?security=xtls", "vless://" + testUUID + "@example.com:443?security=none&sni=tls.example", "vless://" + testUUID + "@example.com:443?flow=xtls-rprx-vision",
 		"vless://" + testUUID + "@example.com:443?security=tls&flow=xtls-rprx-vision&type=ws", "vless://" + testUUID + "@example.com:443?security=tls&flow=xtls-rprx-direct",
 		"vless://" + testUUID + "@example.com:443?security=reality&pbk=invalid", "vless://" + testUUID + "@example.com:443?pbk=" + testPublicKey,
@@ -77,7 +77,10 @@ func TestRejectUnsafeNativeOptions(t *testing.T) {
 			m["network"] = "ws"
 			m["ws-opts"] = map[string]any{"headers": map[string]any{"Host": "a", "host": "b"}}
 		}},
-		{"ws-upgrade", "vless", func(m map[string]any) { m["network"] = "ws"; m["ws-opts"] = map[string]any{"v2ray-http-upgrade": true} }},
+		{"ws-fast-open-without-upgrade", "vless", func(m map[string]any) {
+			m["network"] = "ws"
+			m["ws-opts"] = map[string]any{"v2ray-http-upgrade-fast-open": true}
+		}},
 		{"reality-short-id", "vless", func(m map[string]any) {
 			m["reality-opts"] = map[string]any{"public-key": testPublicKey, "short-id": "xyz"}
 		}},

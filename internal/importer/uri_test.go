@@ -188,7 +188,7 @@ func TestVMessVariants(t *testing.T) {
 		}
 	})
 	for _, mutation := range []func(map[string]any){
-		func(m map[string]any) { m["v"] = "3" }, func(m map[string]any) { m["net"] = "kcp" }, func(m map[string]any) { m["tls"] = "xtls" }, func(m map[string]any) { m["host"] = "ignored.example" }, func(m map[string]any) { m["type"] = "srtp" }, func(m map[string]any) { m["scy"] = "unknown" }, func(m map[string]any) { m["id"] = "not-a-uuid" }, func(m map[string]any) { m["dialer-proxy"] = "other" }, func(m map[string]any) { m["port"] = 1.5 },
+		func(m map[string]any) { m["v"] = "3" }, func(m map[string]any) { m["tls"] = "xtls" }, func(m map[string]any) { m["host"] = "ignored.example" }, func(m map[string]any) { m["type"] = "srtp" }, func(m map[string]any) { m["scy"] = "unknown" }, func(m map[string]any) { m["id"] = "not-a-uuid" }, func(m map[string]any) { m["dialer-proxy"] = "other" }, func(m map[string]any) { m["port"] = 1.5 },
 	} {
 		obj := vmessBase()
 		mutation(obj)

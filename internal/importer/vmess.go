@@ -67,6 +67,10 @@ func parseVMessJSON(text string) (model.ParsedNode, error) {
 	}
 	if r.has("allowInsecure") {
 		out["skip-cert-verify"] = r.boolean("allowInsecure", false)
+	} else if r.has("insecure") {
+		// v2rayN's VMess QR JSON uses "insecure" ("1"/"0"), while some
+		// older exporters used allowInsecure. Accept both spellings.
+		out["skip-cert-verify"] = r.boolean("insecure", false)
 	}
 	if alpn := r.text("alpn", false); alpn != "" {
 		out["alpn"] = strings.Split(alpn, ",")
@@ -74,38 +78,84 @@ func parseVMessJSON(text string) (model.ParsedNode, error) {
 	if r.has("packetEncoding") {
 		out["packet-encoding"] = r.text("packetEncoding", false)
 	}
-	network := r.text("net", false)
-	if network == "" {
+	if vcn := r.text("vcn", false); vcn != "" {
+		out["name-cert-verify"] = vcn
+	}
+	if pcs := r.text("pcs", false); pcs != "" {
+		out["fingerprint"] = pcs
+	}
+	network := strings.ToLower(r.text("net", false))
+	if network == "" || network == "raw" {
 		network = "tcp"
 	}
-	kind := r.text("type", false)
-	if network == "tcp" && kind == "http" {
-		network = "http"
-	} else if !oneOf(kind, "", "none", "gun") {
-		r.fail("unsupported VMess transport header variant")
+	if network == "mkcp" {
+		network = "kcp"
 	}
+	kind := strings.ToLower(r.text("type", false))
 	host := r.text("host", false)
 	path := r.text("path", false)
-	out["network"] = network
 	switch network {
+	case "kcp":
+		options := map[string]any{}
+		if kind != "" && kind != "none" {
+			options["header"] = kind
+		}
+		if path != "" {
+			options["seed"] = path
+		}
+		if host != "" {
+			r.fail("KCP transport does not support a host option")
+		}
+		out["network"] = "kcp"
+		out["kcp-opts"] = options
+	case "xhttp":
+		r.fail("VMess XHTTP transport is unsupported by the pinned core")
+	case "httpupgrade":
+		if !oneOf(kind, "", "none", "gun") {
+			r.fail("unsupported VMess transport header variant")
+		}
+		options := map[string]any{"v2ray-http-upgrade": true, "path": path}
+		if path == "" {
+			options["path"] = "/"
+		}
+		if host != "" {
+			options["headers"] = map[string]any{"Host": host}
+		}
+		out["network"] = "ws"
+		out["ws-opts"] = options
 	case "ws":
+		if !oneOf(kind, "", "none", "gun") {
+			r.fail("unsupported VMess transport header variant")
+		}
 		options := map[string]any{"path": path}
 		if host != "" {
 			options["headers"] = map[string]any{"Host": host}
 		}
 		out["ws-opts"] = options
+		out["network"] = network
 	case "grpc":
+		if !oneOf(kind, "", "none", "gun") {
+			r.fail("unsupported VMess transport header variant")
+		}
 		if host != "" {
 			r.fail("VMess gRPC authority override is unsupported")
 		}
 		out["grpc-opts"] = map[string]any{"grpc-service-name": path}
+		out["network"] = network
 	case "h2":
+		if !oneOf(kind, "", "none", "gun") {
+			r.fail("unsupported VMess transport header variant")
+		}
 		options := map[string]any{"path": path}
 		if host != "" {
 			options["host"] = strings.Split(host, ",")
 		}
 		out["h2-opts"] = options
+		out["network"] = network
 	case "http":
+		if !oneOf(kind, "", "none", "gun") {
+			r.fail("unsupported VMess transport header variant")
+		}
 		options := map[string]any{}
 		if path != "" {
 			options["path"] = strings.Split(path, ",")
@@ -114,9 +164,28 @@ func parseVMessJSON(text string) (model.ParsedNode, error) {
 			options["headers"] = map[string]any{"Host": strings.Split(host, ",")}
 		}
 		out["http-opts"] = options
+		out["network"] = network
 	default:
-		if host != "" || path != "" {
-			r.fail("transport host or path would be ignored for this VMess transport")
+		if kind != "" && kind != "none" {
+			if kind == "http" && network == "tcp" {
+				network = "http"
+				out["network"] = network
+				options := map[string]any{}
+				if path != "" {
+					options["path"] = strings.Split(path, ",")
+				}
+				if host != "" {
+					options["headers"] = map[string]any{"Host": strings.Split(host, ",")}
+				}
+				out["http-opts"] = options
+			} else {
+				r.fail("unsupported VMess transport header variant")
+			}
+		} else {
+			if host != "" || path != "" {
+				r.fail("transport host or path would be ignored for this VMess transport")
+			}
+			out["network"] = network
 		}
 	}
 	if err := r.finish(); err != nil {

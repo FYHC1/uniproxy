@@ -68,12 +68,7 @@ func normalizeNative(input map[string]any) (model.ParsedNode, error) {
 	switch protocol {
 	case "vless":
 		out["uuid"] = normalizeUUID(r, "uuid")
-		if r.has("encryption") {
-			v := r.text("encryption", false)
-			if !oneOf(v, "", "none") {
-				r.fail("unsupported VLESS encryption")
-			}
-		}
+		readVLESSEncryption(r, out)
 		if r.has("flow") {
 			flow := r.text("flow", false)
 			if !oneOf(flow, "", "xtls-rprx-vision") {
@@ -87,8 +82,11 @@ func normalizeNative(input map[string]any) (model.ParsedNode, error) {
 		readTLS(r, out, protocol, false)
 		readTransport(r, out, protocol)
 		if out["flow"] != "" && out["flow"] != nil {
-			if out["tls"] != true || out["network"] != "tcp" {
-				r.fail("VLESS Vision requires TLS over TCP")
+			// Xray permits Vision either over TLS/TCP or with VLESS Encryption,
+			// where the encrypted stream is independent of the outer transport.
+			encrypted, _ := out["encryption"].(string)
+			if encrypted == "" && (out["tls"] != true || out["network"] != "tcp") {
+				r.fail("VLESS Vision requires TLS over TCP or VLESS Encryption")
 			}
 		}
 	case "vmess":
@@ -107,6 +105,7 @@ func normalizeNative(input map[string]any) (model.ParsedNode, error) {
 		copyBool(r, out, "authenticated-length")
 		readTLS(r, out, protocol, false)
 		readTransport(r, out, protocol)
+		readKCPOptions(r, out)
 	case "trojan":
 		out["password"] = r.text("password", true)
 		readTLS(r, out, protocol, true)
@@ -370,7 +369,7 @@ func readTLS(r *fields, out map[string]any, protocol string, implicit bool) {
 		if r.has("skip-cert-verify") && r.boolean("skip-cert-verify", false) {
 			r.fail("TLS options require TLS to be enabled")
 		}
-		for _, key := range []string{"name-cert-verify", "fingerprint", "alpn", "client-fingerprint", "reality-opts"} {
+		for _, key := range []string{"name-cert-verify", "fingerprint", "alpn", "client-fingerprint", "ech-opts", "reality-opts"} {
 			if r.has(key) {
 				r.fail("TLS options require TLS to be enabled")
 			}
@@ -428,9 +427,13 @@ func readTLS(r *fields, out map[string]any, protocol string, implicit bool) {
 		}
 		out["client-fingerprint"] = value
 	}
+	readECHOptions(r, out, protocol)
 	if r.has("reality-opts") {
 		if !oneOf(protocol, "vless", "vmess", "trojan") {
 			r.fail("Reality is unsupported for this protocol")
+		}
+		if out["ech-opts"] != nil {
+			r.fail("Reality and ECH cannot be combined")
 		}
 		reality := newFields(r.object("reality-opts"))
 		key := reality.text("public-key", true)

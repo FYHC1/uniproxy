@@ -1,6 +1,13 @@
 # UniProxy 变更记录
 
-日期按 Asia/Shanghai。v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
+日期按 Asia/Shanghai。v0.2.6 计划于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
+
+## 0.2.6 — 2026-11-02 · 现代 VLESS/VMess 协议兼容
+
+- 修复新版 VLESS/VMess URI 被严格白名单拒绝的问题：支持 VLESS XHTTP（含 Xray `extra`、`downloadSettings`、`xmux`、reuse/download 选项与 Xray camelCase 映射）、HTTPUpgrade（映射为 WS `v2ray-http-upgrade: true`）、VMess KCP/mKCP（`kcp-opts`）、ECH、`vcn`/`pcs`、VLESS Encryption、`raw`/`tcp`、`websocket` 等现代别名及 URI 大小写归一。
+- VMess JSON 支持 v2rayN 的 `net=raw/kcp/httpupgrade` 与 `insecure` 字段；VMess XHTTP 因固定内核 VMess 适配器没有 XHTTP 选项而明确报错，不静默降级。
+- 明确拒绝无固定内核等价字段：Reality `spx`（非空/非 `/`）、`pqv`、`fm`、`flow=xtls-rprx-vision-udp443`、`noSSEHeader`、`scMaxBufferedPosts`、`scStreamUpServerSecs`、`serverMaxHeaderBytes`、`h2Params`；新增 `modern.go`/`modern_test.go` 及 native/URI 回归。
+- 本地验证：`go test -mod=readonly -p 1 ./... -count=1`（显式本机 Mihomo）、`go vet ./...`、`gofmt -l internal cmd tests`、importer fuzz 全部通过；本版计划随[v0.2.6](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.6>)发布，发布不自动部署，运行实例替换需另行授权。
 
 ## 0.2.5 — 2026-11-02 · Linux 稳定性与全局出站网卡
 
