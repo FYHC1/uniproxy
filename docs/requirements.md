@@ -1,6 +1,6 @@
 # UniProxy 需求基线
 
-更新：2026-11-02（Asia/Shanghai）。这是已经讨论的产品需求与当前实现边界，不是未经批准的新功能清单。
+更新：2026-11-03（Asia/Shanghai）。这是已经讨论的产品需求与当前实现边界，不是未经批准的新功能清单。
 
 入口：[文档索引](<README.md>) · [开发计划](<development-plan.md>) · [接续快照](<session-handoff.md>)。
 
@@ -49,6 +49,7 @@
 | R28 | 提供全局出站网卡选择：可在设置中选用物理以太网、WLAN 等本机网卡出站，默认自动 | 本地实现/实测：Settings 新增 `outboundInterface`，非空时编译写入 Mihomo 顶层 `interface-name`；保存前 Go 侧校验存在/已启用/非回环（Mihomo `-t` 不校验）；新增只读 `GET /api/interfaces` 与设置页「03 全局出站网络」；绑定以太网/WLAN 时实测出站源地址分别变化，失效网卡直接失败不回退直连；节点级 interface-name 仍拒绝。已随 v0.2.5 发布（不含部署）；[决策](<decisions.md>) D26、[计划](<development-plan.md>) M23 |
 | R29 | 修复社区反馈的最新版 VLESS/VMess 协议无法识别问题，覆盖现代传输、加密与 URI 参数 | 本地实现/验证：新增 VLESS XHTTP（含 Xray `extra`/download/reuse）、HTTPUpgrade、VMess KCP、ECH、`vcn`/`pcs`、VLESS Encryption 解析；`mihomo -t` 不校验 transport，故按固定内核源码语义映射，VMess XHTTP/`spx`/`pqv`/`fm`/`flow=xtls-rprx-vision-udp443` 等无等价字段明确拒绝；Go 全量/vet/gofmt 与 importer fuzz 通过。已随 v0.2.6 发布（不含部署）；[验证记录](<modern-protocol-verification.md>)、[计划](<development-plan.md>) M24 |
 | R30 | 增加链式代理：将 2–16 个节点按顺序串接为一条出口链路，入口监听可绑定整条链 | 本地实现/验证：新增独立「代理链」页与创建/编辑窗口；每条链编译为有序合成出站副本，前一跳通过 `dialer-proxy` 连接后一跳，监听只指向末跳；任一跳缺失、禁用或中转异常则整链不生成且入口 REJECT，不缩短、不回退直连；删除被引用节点会停用整条链与入口；整链延迟经实际末跳检测，不写节点健康。已随 v0.2.7 发布（不含部署）；[验收](<chain-verification.md>)、[计划](<development-plan.md>) M25 |
+| R31 | 调整新建代理链弹窗布局：入口监听移到代理链名称下方、节点库上方，访问认证留最下面；节点库至少显示三排三列节点；端口可留空自动分配或手工填写 | 本地实现/验证：入口监听单行五列，端口空白提交 `0`、手工端口限制 1024–65535；节点库桌面三列×三排（9 个），窄屏两列/单列；删除重复说明并保留安全警告；CHANGELOG M26、计划 M26、决策 D29；未提交/发布/部署 |
 
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 

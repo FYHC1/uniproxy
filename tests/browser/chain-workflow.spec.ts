@@ -30,6 +30,14 @@ test('create an ordered chain with an atomic listener, inspect it, then delete w
   ]);
   const name = fixtures.name('ordered-chain');
   const dialog = await openNewChain(page);
+  const entryBox = await dialog.locator('.chain-entry').boundingBox();
+  const layoutBox = await dialog.locator('.chain-layout').boundingBox();
+  const credentialsBox = await dialog.locator('.credentials-section').boundingBox();
+  expect(entryBox).not.toBeNull();
+  expect(layoutBox).not.toBeNull();
+  expect(credentialsBox).not.toBeNull();
+  expect(entryBox!.y).toBeLessThan(layoutBox!.y);
+  expect(credentialsBox!.y).toBeGreaterThanOrEqual(layoutBox!.y + layoutBox!.height - 1);
   await dialog.getByLabel('代理链名称', { exact: true }).fill(name);
   await addHop(dialog, entry.name);
   await addHop(dialog, middle.name);
@@ -79,6 +87,55 @@ test('create an ordered chain with an atomic listener, inspect it, then delete w
   const retained = after.listeners.find(item => item.id === listener!.id);
   expect(retained?.enabled).toBe(false);
   expect(retained?.targetId).toBe(chain!.id);
+});
+
+test('entry listener keeps a compact layout above the library and accepts a manual port', async ({ page, fixtures }) => {
+  const [entry, exit] = await fixtures.importNodes([
+    fixtures.proxy('manual-entry'), fixtures.proxy('manual-exit'), fixtures.proxy('manual-extra-a'),
+    fixtures.proxy('manual-extra-b'), fixtures.proxy('manual-extra-c'), fixtures.proxy('manual-extra-d'),
+    fixtures.proxy('manual-extra-e'), fixtures.proxy('manual-extra-f'), fixtures.proxy('manual-extra-g'),
+  ]);
+  const dialog = await openNewChain(page);
+  const cards = dialog.locator('.chain-node-card');
+  await expect(cards).toHaveCount(9);
+  const cardPositions = await cards.evaluateAll(elements => ({ rows: new Set(elements.map(element => Math.round(element.getBoundingClientRect().top))).size, columns: new Set(elements.map(element => Math.round(element.getBoundingClientRect().left))).size }));
+  expect(cardPositions.rows).toBeGreaterThanOrEqual(3);
+  expect(cardPositions.columns).toBeGreaterThanOrEqual(3);
+  await dialog.getByLabel('代理链名称', { exact: true }).fill(fixtures.name('manual-port-chain'));
+  const entrySection = dialog.locator('.chain-entry');
+  const library = dialog.locator('.chain-library');
+  const credentials = dialog.locator('.credentials-section');
+  const entryBox = await entrySection.boundingBox();
+  const libraryBox = await library.boundingBox();
+  const credentialsBox = await credentials.boundingBox();
+  expect(entryBox).not.toBeNull();
+  expect(libraryBox).not.toBeNull();
+  expect(credentialsBox).not.toBeNull();
+  expect(entryBox!.y).toBeLessThan(libraryBox!.y);
+  expect(credentialsBox!.y).toBeGreaterThan(libraryBox!.y + libraryBox!.height - 1);
+  await expect(entrySection.getByLabel('名称', { exact: true })).toBeVisible();
+  await expect(entrySection.getByLabel('协议', { exact: true })).toBeVisible();
+  await expect(entrySection.getByLabel('地址', { exact: true })).toBeVisible();
+  await expect(entrySection.getByLabel('端口', { exact: true })).toBeVisible();
+  await expect(entrySection.getByRole('switch', { name: 'UDP', exact: true })).toBeVisible();
+  await addHop(dialog, entry.name);
+  await addHop(dialog, exit.name);
+  const port = await fixtures.unusedConfiguredPort();
+  const portInput = entrySection.getByLabel('端口', { exact: true });
+  await portInput.fill('80');
+  let createCalls = 0;
+  page.on('request', request => { if (new URL(request.url()).pathname === '/api/chains/with-listener' && request.method() === 'POST') createCalls++; });
+  await dialog.getByRole('button', { name: '创建代理链与监听', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('端口必须为 1024–65535 的整数');
+  expect(createCalls).toBe(0);
+  await portInput.fill(String(port));
+  const requestPromise = page.waitForResponse(response => new URL(response.url()).pathname === '/api/chains/with-listener' && response.request().method() === 'POST');
+  await dialog.getByRole('button', { name: '创建代理链与监听', exact: true }).click();
+  const response = await requestPromise;
+  expect(response.status()).toBe(200);
+  const payload = response.request().postDataJSON();
+  expect(payload.listener).toMatchObject({ host: '127.0.0.1', port, udp: false, enabled: true, users: [] });
+  await expect(dialog).not.toBeVisible();
 });
 
 test('a disabled listener can be saved when its chain is unavailable', async ({ page, fixtures }) => {

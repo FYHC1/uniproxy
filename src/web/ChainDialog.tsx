@@ -30,8 +30,7 @@ export function ChainDialog({chain,onClose}:{chain?:ProxyChain;onClose:()=>void}
   const [listenerName,setListenerName] = useState('');
   const [protocol,setProtocol] = useState<'mixed'|'http'|'socks'>('mixed');
   const [host,setHost] = useState('127.0.0.1');
-  const [automaticPort,setAutomaticPort] = useState(true);
-  const [port,setPort] = useState(state.settings.portRangeStart);
+  const [port,setPort] = useState('');
   const [listenerUDP,setListenerUDP] = useState(false);
   const [users,setUsers] = useState<UserDraft[]>([]);
   const runtimeReady = state.runtime.available && state.runtime.running && !state.runtime.dirty && !state.runtime.applying && state.runtime.appliedRevision === state.revision;
@@ -98,11 +97,13 @@ export function ChainDialog({chain,onClose}:{chain?:ProxyChain;onClose:()=>void}
       let listener:ChainCreateRequest['listener'];
       if (withListener) {
         if (!isIP(host)) throw new Error('监听地址必须是有效的 IPv4 或 IPv6 地址，不支持域名和方括号。');
-        if (!automaticPort && (!Number.isInteger(port) || port < 1024 || port > 65535)) throw new Error('端口必须为 1024–65535 的整数。');
+        const manualPort = port.trim();
+        const listenerPort = manualPort ? Number(manualPort) : 0;
+        if (manualPort && (!Number.isInteger(listenerPort) || listenerPort < 1024 || listenerPort > 65535)) throw new Error('端口必须为 1024–65535 的整数；留空时自动分配。');
         const credentials = serializedUsers(users,[]);
         if (!isLoopback(host) && !credentials.length) throw new Error('非回环地址必须设置至少一组用户名和密码。');
         if (listenerUDP && (!isLoopback(host) || !allNodesUDP || protocol === 'http')) throw new Error('UDP 需要每一跳都支持 UDP、回环地址及 mixed / SOCKS5 监听。');
-        listener = {name:listenerName.trim() || undefined,protocol,host:host.trim(),port:automaticPort ? 0 : port,udp:listenerUDP,users:credentials,enabled:true};
+        listener = {name:listenerName.trim() || undefined,protocol,host:host.trim(),port:listenerPort,udp:listenerUDP,users:credentials,enabled:true};
       }
       await mutate<ChainCreateResult>('/api/chains/with-listener','POST',{chain:payload,listener},'代理链已创建');
     }
@@ -113,9 +114,21 @@ export function ChainDialog({chain,onClose}:{chain?:ProxyChain;onClose:()=>void}
   return <><Modal title={chain ? '编辑代理链' : '新建代理链'} description="按顺序组合节点：前一跳承载后一跳的出站流量。链路不会修改原始节点，也不等同于代理组。" onClose={onClose} busy={action.running} wide contentClassName="chain-dialog-modal">
     <form onSubmit={event => {event.preventDefault();void action.execute(save);}}><div className="dialog-body chain-dialog"><fieldset className="form-fields chain-dialog-fields" disabled={action.running}>
       <div className="chain-dialog-heading"><Field label="代理链名称" required><input autoFocus required maxLength={100} value={draft.name} onChange={event => update('name',event.target.value)} placeholder="例如：日本入口 → 美国出口" /></Field><Toggle label="启用此代理链" checked={draft.enabled} onChange={value => update('enabled',value)} description="停用后关联监听会被拒绝转发，不会回退直连。" /></div>
+      {!chain && <section className="chain-entry" aria-labelledby="chain-entry-title">
+        <div className="chain-entry-head"><h3 id="chain-entry-title">入口监听</h3><Toggle label="创建" checked={withListener} onChange={setWithListener} /></div>
+        {withListener && <div className="chain-entry-fields">
+          <Field label="名称"><input value={listenerName} onChange={event => setListenerName(event.target.value)} maxLength={100} placeholder={draft.name || '同代理链名称'} /></Field>
+          <Field label="协议"><select value={protocol} onChange={event => {const value=event.target.value as 'mixed'|'http'|'socks';setProtocol(value);if(value === 'http') setListenerUDP(false);}}><option value="mixed">Mixed · HTTP + SOCKS5</option><option value="http">HTTP</option><option value="socks">SOCKS5</option></select></Field>
+          <Field label="地址" required><input required value={host} onChange={event => setHost(event.target.value)} className="mono" spellCheck={false} placeholder="127.0.0.1" /></Field>
+          <Field label="端口"><input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={5} value={port} onChange={event => setPort(event.target.value.replace(/\D/g,'').slice(0,5))} placeholder="自动" title={'留空时在 ' + state.settings.portRangeStart + '–' + state.settings.portRangeEnd + ' 内自动分配'} /></Field>
+          <div className="chain-entry-flag" title={protocol === 'http' ? 'HTTP 监听不支持 UDP' : !allNodesUDP ? (draft.nodeIds.length < 2 ? '至少选择两个支持 UDP 的节点后可用' : '链路中的节点并非全部支持 UDP') : '仅允许回环地址，且 UDP 不受账号密码保护'}><Toggle label="UDP" checked={listenerUDP} onChange={setListenerUDP} disabled={protocol === 'http' || !allNodesUDP} /></div>
+        </div>}
+        {withListener && !isLoopback(host) && <Note tone="warning">非回环监听可能允许其他设备访问，必须设置认证并在主机防火墙限制来源。</Note>}
+        {withListener && listenerUDP && <Note tone="warning">原生 UDP 数据包不执行用户名密码认证，仅允许回环地址。</Note>}
+      </section>}
       <div className="chain-layout">
         <section className="chain-library" aria-label="节点库">
-          <div className="chain-library-head"><div><h3>节点库</h3><p>点击卡片按顺序加入右侧链路。</p></div><Badge>{state.nodes.length} 个节点</Badge></div>
+          <div className="chain-library-head"><div><h3>节点库</h3></div><Badge>{state.nodes.length} 个节点</Badge></div>
           <div className="chain-group-strip" role="group" aria-label="按分组筛选节点"><button type="button" className={!group ? 'active' : ''} onClick={() => setGroup('')}>全部</button>{state.groups.map(item => <button type="button" key={item.id} className={group === item.id ? 'active' : ''} onClick={() => setGroup(item.id)}><span className="group-dot" style={{backgroundColor:/^#[0-9a-f]{6}$/i.test(item.color) ? item.color : '#718096'}} />{item.name}</button>)}</div>
           <div className="chain-library-toolbar"><SearchInput value={query} onChange={setQuery} label="搜索节点" placeholder="搜索名称、地址或协议…" /><select aria-label="按节点状态筛选" value={status} onChange={event => setStatus(event.target.value as PoolNodeStatusFilter)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已禁用</option><option value="healthy">检测健康</option><option value="unhealthy">检测异常</option><option value="unknown">尚未检测</option></select><select aria-label="节点排序" value={sort} onChange={event => setSort(event.target.value as PoolNodeSort)}><option value="name">按名称</option><option value="latency">按延迟</option><option value="speed">按速度</option><option value="updated">按最近更新</option></select><Button small disabled={!runtimeReady || !visible.some(node => node.enabled && !node.dialerError) || jobRunning || anyJobRunning || action.running} title={!runtimeReady ? '需要内核运行且当前配置已应用' : '测试当前筛选结果中的可测节点'} onClick={() => void action.execute(() => testNodes(visible.filter(node => node.enabled && !node.dialerError).map(node => node.id)))}><Gauge size={15} />测试可见节点</Button></div>
           {hiddenSelected.length > 0 && <p className="chain-filter-note" role="status">筛选外仍有 {hiddenSelected.length} 个已选节点保留在链路中，不会因筛选被移除。</p>}
@@ -138,15 +151,7 @@ export function ChainDialog({chain,onClose}:{chain?:ProxyChain;onClose:()=>void}
           {chain && <div className="chain-route-test"><Button small disabled={!runtimeReady || !chain.enabled || action.running || orderChanged || draft.nodeIds.length < 2 || blockedNodes > 0 || missingNodes > 0} title={!chain.enabled ? '代理链已停用' : orderChanged ? '请先保存新的跳转顺序，整链测试只验证已保存配置' : !runtimeReady ? '需要内核运行且当前配置已应用' : '使用真实入口测试已保存的整条链路'} onClick={() => void action.execute(testChain)}><Gauge size={16} />测试已保存链路</Button>{orderChanged && <p className="field-hint">顺序或成员已变化，保存后测试的是新链路。</p>}{testedChain && <p className={testedChain.ok ? 'text-teal' : 'text-danger'} role="status">{testedChain.ok ? '整链延迟 ' + (testedChain.latencyMs ?? '—') + ' ms' : testedChain.error}</p>}</div>}
         </aside>
       </div>
-      {!chain && <details className="chain-entry" open={withListener}><summary><span>入口监听</span><Badge tone={withListener ? 'teal' : 'neutral'}>{withListener ? '一并创建' : '仅保存代理链'}</Badge></summary><div className="chain-entry-body"><Toggle label="同时创建入口监听" checked={withListener} onChange={setWithListener} description="代理链与监听一次校验、一次保存；失败不会留下半成品。" />
-        {withListener && <><div className="form-grid"><Field label="监听名称" hint="留空时使用代理链名称。"><input value={listenerName} onChange={event => setListenerName(event.target.value)} maxLength={100} placeholder={draft.name || '代理链名称'} /></Field><Field label="监听协议"><select value={protocol} onChange={event => {const value=event.target.value as 'mixed'|'http'|'socks';setProtocol(value);if(value === 'http') setListenerUDP(false);}}><option value="mixed">Mixed · HTTP + SOCKS5</option><option value="http">HTTP</option><option value="socks">SOCKS5</option></select></Field></div>
-          <div className="form-grid"><Field label="监听地址" required hint="IPv4 / IPv6 地址，默认仅本机可访问。"><input required value={host} onChange={event => setHost(event.target.value)} className="mono" spellCheck={false} /></Field><Field label="端口" required>{automaticPort ? <input value="自动分配" disabled readOnly /> : <input type="number" min={1024} max={65535} value={port} onChange={event => setPort(Number(event.target.value))} required />}</Field></div>
-          <Toggle label="自动分配空闲端口" checked={automaticPort} onChange={setAutomaticPort} description={'在 ' + state.settings.portRangeStart + '–' + state.settings.portRangeEnd + ' 范围内选择，跳过已有监听和占用端口。'} />
-          <Toggle label="UDP 转发" checked={listenerUDP} onChange={setListenerUDP} disabled={protocol === 'http' || !allNodesUDP} description={protocol === 'http' ? 'HTTP 监听不支持 UDP' : !allNodesUDP ? '只有每一跳都支持 UDP 时才能启用' : '仅允许回环地址；原生 UDP 不受用户名密码保护'} />
-          {!allNodesUDP && draft.nodeIds.length >= 2 && <p className="field-hint">链路中有节点不支持 UDP，因此入口只能监听 TCP。</p>}
-          {!isLoopback(host) && <Note tone="warning">非回环监听可能允许其他设备访问，必须设置认证并在主机防火墙限制来源。</Note>}
-          {listenerUDP && <Note tone="warning">原生 UDP 数据包不执行用户名密码认证，仅允许回环地址。</Note>}
-          <CredentialsEditor users={users} onChange={setUsers} /></>}</div></details>}
+      {!chain && withListener && <CredentialsEditor users={users} onChange={setUsers} />}
     </fieldset><ErrorBox message={action.error || selectionError} /></div><FormFooter onClose={onClose} busy={action.running} label={chain ? '保存代理链' : withListener ? '创建代理链与监听' : '创建代理链'}>{chain ? '保存后自动应用配置' : withListener ? '链路与入口一次校验后保存' : '仅保存链路，稍后可在监听端口页绑定入口'}</FormFooter></form>
   </Modal>{confirmation && <ConfirmDialog confirmation={confirmation} onClose={() => setConfirmation(null)} />}</>;
 }
