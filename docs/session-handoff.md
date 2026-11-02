@@ -1,11 +1,11 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-03 00:36（Asia/Shanghai）。v0.2.7 已正式发布并设 Latest（未部署）；M25 代理链已随 v0.2.7 发布。当前工作树为 M26「新建代理链弹窗布局调整」的本地未提交改动（入口监听移至代理链名称下方、节点库上方，访问认证在底部，节点库 3×3，端口空白自动/手工可填；严格 TS、生产 Web 构建、链浏览器 6/6 通过），尚未提交、发布或部署。2026-11-03 00:36 实测未发现 UniProxy 主程序或其内核在运行，9090/19090/20006 无监听；此前记录的用户预览 PID24580+内核 PID14272 已不在运行，本轮未停止、替换或读取用户数据库。操作前仍须重新核对当前进程。**
+**最后核对：2026-11-03 01:09（Asia/Shanghai）。v0.2.7 已正式发布并设 Latest（未部署）；M25 代理链已随 v0.2.7 发布。M26「新建代理链弹窗布局调整」已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），包含入口监听移至代理链名称下方、节点库上方，访问认证在底部，节点库 3×3，端口空白自动/手工可填；严格 TS、生产 Web 构建、链浏览器 6/6 通过；未发布、未部署。2026-11-03 00:36 实测未发现 UniProxy 主程序或其内核在运行，9090/19090/20006 无监听；此前记录的用户预览 PID24580+内核 PID14272 已不在运行，本轮未停止、替换或读取用户数据库。操作前仍须重新核对当前进程。**
 
 ## 30秒摘要
 
 - 正式发布：[UniProxy v0.2.7](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.7>)，四平台程序与 SHA256SUMS；[中文说明](<releases/v0.2.7.md>)已同步到 Release body（2019 字符，GitHub API 实测逐字一致）。
-- 本地未提交：M26「新建代理链弹窗布局调整」已完成入口监听上移、访问认证置底、节点库 3×3、端口空白自动/手工填写；严格 TS、生产 Web 构建、链浏览器 6/6 通过，未提交/发布/部署。见[计划 M26](<development-plan.md>)与[需求 R31](<requirements.md>)。
+- M26 已提交：M26「新建代理链弹窗布局调整」已完成入口监听上移、访问认证置底、节点库 3×3、端口空白自动/手工填写；严格 TS、生产 Web 构建、链浏览器 6/6 通过，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布/部署。见[计划 M26](<development-plan.md>)与[需求 R31](<requirements.md>)。
 - M25 代理链已随 v0.2.7 发布：独立「代理链」页面、双栏节点选择器、2–16 跳合成出站串接、chain 监听、整链检测与原子创建；发布前 Go 全量、42/42 UI 工具、48/48 隔离浏览器、真实两跳回环链路与 Windows 候选程序验收均通过；v0.2.7 不部署。详见[代理链验收](<chain-verification.md>)与[v0.2.7 发布验收](<release-0.2.7-verification.md>)。
 - 发布源码 [14cc9f570b44422b9dfc1deec94b3556749a1a05](<https://github.com/FYHC1/uniproxy/commit/14cc9f570b44422b9dfc1deec94b3556749a1a05>)（M25 代理链，49 文件），annotated tag 对象 `568f8639935eef3cbdd9090b19ff4d2b0dde53da`，解引用为该提交。
 - main CI [41456237334](<https://github.com/FYHC1/uniproxy/actions/runs/41456237334>)、标签 CI [41456604601](<https://github.com/FYHC1/uniproxy/actions/runs/41456604601>)、Release [41456604526](<https://github.com/FYHC1/uniproxy/actions/runs/41456604526>) 全部成功；2026-11-02 21:52:52 +08 发布并设 Latest。
@@ -17,16 +17,16 @@
 ## 当前运行服务
 
 - 2026-11-03 00:36 实测：未发现 UniProxy 主程序或 UniProxy 自有内核进程；`127.0.0.1:9090`、19090、20006 均无监听。此前记录的用户自行启动预览 PID24580 + 内核 PID14272 已不在运行，原因未由本轮操作造成。本轮未停止、替换、读取或修改用户数据库。
-- v0.2.7 未部署；发布只创建 GitHub Release 与附件。M26 仅为本地 UI 改动，未生成发布资产。
+- v0.2.7 未部署；发布只创建 GitHub Release 与附件。M26 仅为 UI 改动，已提交并推送 main，未生成发布资产。
 - 部署前置条件（若后续获授权）：确认无实例与子内核在运行，或先让其正常退出并确认内核退出 → 需要备份时停机后复制 → 替换主程序并沿用原数据目录/启动参数 → health 与 /api/core/inspect 复核；禁止在运行中复制或覆盖 SQLite 数据库，禁止混用不同库的 WAL/SHM。
 
-## 新建代理链弹窗布局（M26，2026-11-03，本地未提交/未发布/未部署）
+## 新建代理链弹窗布局（M26，2026-11-03，已提交/未发布/未部署）
 
 - 用户要求（m08966/m09131）：入口监听从原折叠区移到代理链名称下方、节点库上方；访问认证留最下面；去掉不必要的二级标签和说明；端口留空自动分配，也可手工填写；节点库左侧至少显示三排三列节点，尽量显示更多。
 - 实现：`src/web/ChainDialog.tsx` 入口监听为单行五列（名称/协议/地址/端口/UDP），块头仅“入口监听 + 创建”开关；`CredentialsEditor` 位于 `chain-layout` 之后、fieldset 末尾；删除自动分配开关及冗余说明，仅保留非回环与 UDP 安全警告。端口状态改为字符串，空白提交 `port: 0`，手工仅接受 1024–65535 整数。
 - 样式：`src/web/chainStyles.css` 新增 `.chain-entry` 面板和响应式五列/两列；`.chain-node-grid` 桌面固定三列，配合紧凑卡片与弹窗间距可在 1440×1000 内容纳 3×3 共 9 个节点，访问认证与 footer 仍可见；窄屏两列/单列。
 - 测试：`tests/browser/chain-workflow.spec.ts` 新增入口监听/认证位置、9 节点 3×3、空白端口提交 0、手工端口透传、非法端口本地拦截断言；`pnpm exec playwright test tests/browser/chain-workflow.spec.ts` 6/6 通过（12.8s）。`pnpm exec tsc --noEmit --noUnusedLocals --noUnusedParameters` 与 `pnpm run build:web` 通过（最终 CSS 84.99kB/gzip17.13，JS 556.44kB/gzip162.16，仅有 Vite chunk 体积提示）。
-- 视觉：`.local/chain-preview/chain-dialog-new.png`（1440×1000，3×3 九节点）与 `chain-dialog-new-390.png`（390×844，无水平溢出）已检查；临时视觉 spec 交付前删除。未改动 API/模型/schema/Mihomo/安全策略，未提交、未发布、未部署。见[计划 M26](<development-plan.md>)、[需求 R31](<requirements.md>)、[决策 D29](<decisions.md>)。
+- 视觉：`.local/chain-preview/chain-dialog-new.png`（1440×1000，3×3 九节点）与 `chain-dialog-new-390.png`（390×844，无水平溢出）已检查；临时视觉 spec 交付前删除。未改动 API/模型/schema/Mihomo/安全策略，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布、未部署。见[计划 M26](<development-plan.md>)、[需求 R31](<requirements.md>)、[决策 D29](<decisions.md>)。
 
 ## 代理链（M25，已随 v0.2.7 发布，不含部署）
 
