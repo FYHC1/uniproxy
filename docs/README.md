@@ -40,8 +40,8 @@
 | [v0.2.3发布验收](<release-0.2.3-verification.md>) | 订阅解析兼容正式发布、源码/CI/四平台资产与Windows程序核验 | M18已发布；资产/程序验收及未部署边界见记录 |
 | [v0.2.4发布与部署验收](<release-0.2.4-verification.md>) | M19正式发布、四平台资产与Windows程序核验，以及本机部署替换、一致备份和运行复核 | M20已发布并部署；部署事实、备份与验证边界见记录 |
 | [v0.2.5发布验收](<release-0.2.5-verification.md>) | M22/M23（Linux 稳定性、全局出站网卡）正式发布、四平台资产与Windows程序核验 | 2026-11-02 02:27:40已发布并设Latest；不含部署 |
-| [v0.2.6发布验收](<release-0.2.6-verification.md>) | M24 现代 VLESS/VMess 兼容正式发布、四平台资产与 Windows 程序核验 | 发布准备中；发布后回填 CI/资产；不含部署 |
-| [现代VLESS/VMess协议验证](<modern-protocol-verification.md>) | M24：v2rayN/Mihomo 源码对照、XHTTP/HTTPUpgrade/VMess KCP/ECH/VLESS Encryption 映射、拒绝边界与本地测试 | 2026-11-02 本地实现/验证；计划随 v0.2.6 发布（不含部署） |
+| [v0.2.6发布验收](<release-0.2.6-verification.md>) | M24 现代 VLESS/VMess 兼容正式发布、四平台资产与 Windows 程序核验 | 2026-11-02 16:00:55已发布并设Latest；CI/资产已回填；不含部署 |
+| [现代VLESS/VMess协议验证](<modern-protocol-verification.md>) | M24：v2rayN/Mihomo 源码对照、XHTTP/HTTPUpgrade/VMess KCP/ECH/VLESS Encryption 映射、拒绝边界与本地测试 | 2026-11-02 已随 v0.2.6 发布（不含部署） |
 | [WSL实机运行与Linux修复验收](<wsl-runtime-verification.md>) | Linux amd64 WSL2 真实启动、固定内核、回环HTTP/SOCKS、持久化重启、认证与异常终止观察，以及探针重试/Pdeathsig 修复复验 | M21实机证据与M22修复；修复随v0.2.5发布；不替代裸机/ARM64/Docker/容量与真实远端节点 |
 | [归档协作备注](<coordination.md>) | 早期并行划分和结束状态 | 归档，不用于判断剩余工作 |
 | [CHANGELOG](<../CHANGELOG.md>) | 用户可见变化和交付节点 | 每个变更完成时追加；不等于已发布 |

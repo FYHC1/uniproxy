@@ -250,7 +250,7 @@ M21 的 WSL 实跑暴露出两个 Linux 行为差异：冷启动首次 apply 时
 
 ## D27 — 现代 VLESS/VMess 只映射固定内核可证明的等价字段
 
-**状态：2026-11-02 按 R29 在本地实现并验证；计划随 v0.2.6 发布（不含部署）。见[验证记录](<modern-protocol-verification.md>)、[计划](<development-plan.md>) M24。**
+**状态：2026-11-02 按 R29 实现并验证；已随 v0.2.6 发布（不含部署）。见[验证记录](<modern-protocol-verification.md>)、[计划](<development-plan.md>) M24。**
 
 社区反馈的“最新版 VLESS/VMess 无法识别”不是单个 URI 字段问题，而是旧解析器只按有限的 transport/TLS 白名单接受字段。处理原则是：**只把固定 Mihomo 1.19.32 源码中确实存在且有分支语义的字段写入 native 输出；没有等价字段的现代参数明确报错，不把未知 network 交给默认 TCP 分支静默降级。**
 

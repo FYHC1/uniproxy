@@ -1,8 +1,8 @@
 # UniProxy 开发计划与任务状态
 
-最后更新：2026-11-02 15:20（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
+最后更新：2026-11-02 16:05（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M24完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；02:38复核时本机已无 UniProxy 实例在运行，本轮未启动/替换；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容已完成本地实现与验证，计划随 v0.2.6 发布（不含部署）。**
+**当前结论：M0–M24完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -135,16 +135,17 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 测试：`internal/app/outbound_interface_test.go`（校验矩阵、PATCH 往返与拒绝、接口结构）、`internal/core/compiler_interface_test.go`（空值不输出/非空输出/去空白/节点级仍拒绝）、`internal/core/interface_real_test.go`（真实 Mihomo 对未知网卡也不报错，证明必须管理层校验）、`tests/browser/outbound-interface.spec.ts`（下拉选项与只读枚举逐项一致、真实网卡保存后持久化并可改回自动、不存在网卡 PATCH 400 且不落库）全部通过；fixture UI 的 `verify.mjs` 也覆盖了网卡消失后的「当前不可用」标注与陈旧值不被静默改写。
 - 真实出站实测：用 `core.Build` 生成配置并改写端口后起临时 Mihomo，auto/以太网/WLAN/Meta 均 204；`Get-NetTCPConnection` 观察到以太网与 WLAN 出站源地址分别是各自网卡地址，证明绑定生效；不存在的网卡启动成功但拨号失败（`curl 35/000`，日志伪装成 DNS 失败），不回退直连。
 - 边界：已提交 main（`a4dd45d`）并随 v0.2.5 发布；正式 v0.2.4 资产不含该功能；只约束自有内核出站，不处理系统路由/DNS，不等价于 TUN 分流；Linux/macOS 网卡名与真实远端节点连通未在本轮验证。
-- 发布与部署：v0.2.5 已发布但未部署；02:38 复核时本机无 UniProxy 实例在运行（原 v0.2.4 实例已由用户自行退出），部署需另行授权。详见[v0.2.5 发布验收](<release-0.2.5-verification.md>)。
+- 发布与部署：v0.2.5 已发布但未部署；2026-11-02 16:01 发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换，部署需另行授权。详见[v0.2.5 发布验收](<release-0.2.5-verification.md>)。
 
-## M24 — 现代 VLESS/VMess 协议兼容（2026-11-02 完成，计划随 v0.2.6 发布）
+## M24 — 现代 VLESS/VMess 协议兼容（2026-11-02 完成，已随 v0.2.6 发布）
 
 - 用户反馈“社区用户称 uniproxy 无法识别最新版的 VLESS 和 VMess 协议”，要求深入检查并修复。范围限定为导入器解析/规范化和测试；不改 API、数据库 schema、内核版本或运行服务。
 - 调研：对照 v2rayN master 的 `BaseFmt`/`VmessFmt`/`V2rayOutboundService` 与固定 Mihomo 1.19.32 出站源码；确认 `mihomo -t` 不校验 transport 名称，未知 network 会静默走 TCP，因此不能只靠 `-t`。
 - 实现：新增 [modern.go](<../internal/importer/modern.go>) 与 `modern_test.go`，扩展 [uri.go](<../internal/importer/uri.go>)、[transport.go](<../internal/importer/transport.go>)、[native.go](<../internal/importer/native.go>)、[vmess.go](<../internal/importer/vmess.go>)：VLESS XHTTP（Xray extra/download/xmux）、HTTPUpgrade→WS `v2ray-http-upgrade`、VMess KCP、ECH、`vcn`/`pcs`、VLESS Encryption、URI 别名与大小写归一；VMess JSON `insecure`/`raw` 兼容。
 - 明确拒绝：VMess XHTTP（VMess 适配器无 XHTTPOpts）、`spx`（非空且非 `/`）、`pqv`、`fm`、`flow=xtls-rprx-vision-udp443`（固定内核截断为 Vision）、`noSSEHeader`/`scMaxBufferedPosts`/`scStreamUpServerSecs`/`serverMaxHeaderBytes`/`h2Params` 等无固定内核等价字段；不静默降级、不改变 TLS/证书校验。
 - 验证：`go test -mod=readonly -p 1 ./... -count=1`（显式 `UNIPROXY_TEST_CORE_PATH=C:\CustomFiles\CodeProjects\Github\uniproxy\bin\mihomo.exe`）全通过（cmd0.120s、app9.121s、core8.805s、coreinstall0.482s、importer0.751s、integration4.069s 等）；`go vet ./...`、`gofmt -l internal cmd tests`、`FuzzParseNeverPanics` 15s/246481 execs 通过；`bin/mihomo.exe -t -f` 对 VLESS XHTTP+VMess KCP+VLESS ECH 合成配置报成功。
-- 边界：计划随 v0.2.6 发布（不含部署）；用户运行实例未触碰；未做真实远端节点连通/吞吐测试；固定 Mihomo 无等价字段按错误处理。详见[现代协议验证](<modern-protocol-verification.md>)。
+- 发布：源码提交 `dba132cb379fe113b897b787fef3a94ab91b8bef`；main CI `41409672766`、tag CI `41409873967`、Release workflow `41409873947` 全部成功；`v0.2.6` 于 2026-11-02 16:00:55 +08 发布并设 Latest，四平台资产与 SHA256SUMS 已核验。
+- 边界：已随 v0.2.6 发布（不含部署）；用户运行实例未触碰；未做真实远端节点连通/吞吐测试；固定 Mihomo 无等价字段按错误处理。详见[现代协议验证](<modern-protocol-verification.md>)。
 
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 

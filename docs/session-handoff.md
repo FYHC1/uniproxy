@@ -1,24 +1,22 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-02 15:20（Asia/Shanghai）。v0.2.5 已正式发布（未部署）。此前记录的运行实例——主程序 PID22076（`bin/releases/v0.2.4/uniproxy-windows-amd64.exe`）+ 内核 PID5536——在 02:38 复核时已不在运行：无任何 uniproxy/mihomo 进程（仅 Clash Verge 的 verge-mihomo PID2304），127.0.0.1:9090 与 19090 均无监听，health 无响应。本轮未停止或替换该实例，退出原因未查证。部署 v0.2.5 未获授权、未执行。2026-11-02 15:20 另完成 M24 现代 VLESS/VMess 本地实现与验证，计划随 v0.2.6 发布（不含部署）；操作前仍须重新核对当前进程。**
+**最后核对：2026-11-02 16:05（Asia/Shanghai）。v0.2.6 已正式发布并设 Latest（未部署）。发布验收时本机仍有用户自行启动的 v0.2.5：主程序 PID29920（`bin/releases/v0.2.5/uniproxy-windows-amd64.exe`，2026-11-02 13:04:17 启动）+ 内核 PID11688（`C:\ProgramData\UniProxy\core\mihomo.exe`），127.0.0.1:9090 归主程序；本轮未停止、未替换、未读取或修改其数据目录。2026-11-02 15:20 完成的 M24 现代 VLESS/VMess 兼容已随 v0.2.6 发布；操作前仍须重新核对当前进程。**
 
 ## 30秒摘要
 
-- 正式发布：[UniProxy v0.2.5](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.5>)，四平台程序与 SHA256SUMS；[中文说明](<releases/v0.2.5.md>)已同步到 Release body（2336 字符，逐字一致）。
-- 发布源码 [1e1f14417c677fdcc9a95858e03daeda41f1c3f8](<https://github.com/FYHC1/uniproxy/commit/1e1f14417c677fdcc9a95858e03daeda41f1c3f8>)（前置 `ede12bb` M22、`a4dd45d` M23），annotated tag 对象 `271ced2d6db943ae3205c190254c2cb3cbf2c619`，解引用为该提交。
-- main CI [41336207092](<https://github.com/FYHC1/uniproxy/actions/runs/41336207092>)、标签 CI [41336634581](<https://github.com/FYHC1/uniproxy/actions/runs/41336634581>)、Release [41336634537](<https://github.com/FYHC1/uniproxy/actions/runs/41336634537>) 全部成功；2026-11-02 02:27:40 发布并设 Latest。
-- v0.2.5 **只发布、未部署**：本轮未停止或替换任何运行实例，未触碰 `C:\ProgramData\UniProxy` 数据目录、数据库或主密钥。（v0.2.4 部署时原 v0.2.3 实例已退出，数据目录保留；停机备份在 `C:\ProgramData\UniProxy-backups\20261101-122319-pre-v0.2.4`。）
-- 当前栈仍为 Go + React/TS + SQLite 加密 payload + 外置 Mihomo1.19.32；v0.2.5 新增 `Settings.OutboundInterface` + 只读 `GET /api/interfaces` + 顶层 `interface-name` 编译，以及 Linux 探针有界重试与 `Pdeathsig`；无 schema 迁移、无内核版本变化。
-- 2026-11-01 另在 WSL2/Fedora 44 amd64 使用官方 Linux v0.2.4 与固定 Mihomo 1.19.32 完成实机运行验收，并用本地 0.2.5 候选完成 M22 修复复验（首次 apply、回环 HTTP/SOCKS、`kill -9` 清理、重启恢复、正常停止）。
-- WSL 发现的两项 Linux 问题（私有认证探针超时、强杀遗留内核）已修复并随 v0.2.5 发布；正式 v0.2.4 资产不含该修复。
-- 2026-11-02 15:20 完成 M24 现代 VLESS/VMess 协议兼容：新增 VLESS XHTTP（Xray extra/download/reuse）、HTTPUpgrade→WS、VMess KCP、ECH、`vcn`/`pcs`、VLESS Encryption 与 URI 别名；VMess XHTTP/`spx`/`pqv`/`fm`/`flow=xtls-rprx-vision-udp443` 等无固定内核等价字段明确拒绝。计划随 v0.2.6 发布（不含部署）；详见[验证记录](<modern-protocol-verification.md>)。
+- 正式发布：[UniProxy v0.2.6](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.6>)，四平台程序与 SHA256SUMS；[中文说明](<releases/v0.2.6.md>)已同步到 Release body（2315 字符，GitHub API 实测一致）。
+- 发布源码 [dba132cb379fe113b897b787fef3a94ab91b8bef](<https://github.com/FYHC1/uniproxy/commit/dba132cb379fe113b897b787fef3a94ab91b8bef>)（M24 现代 VLESS/VMess 协议兼容），annotated tag 对象 `24346228a70db7c5e4530c2744389bed87db441a`，解引用为该提交。
+- main CI [41409672766](<https://github.com/FYHC1/uniproxy/actions/runs/41409672766>)、标签 CI [41409873967](<https://github.com/FYHC1/uniproxy/actions/runs/41409873967>)、Release [41409873947](<https://github.com/FYHC1/uniproxy/actions/runs/41409873947>) 全部成功；2026-11-02 16:00:55 +08 发布并设 Latest。
+- v0.2.6 **只发布、未部署**：本轮未停止或替换任何运行实例，未触碰 `C:\ProgramData\UniProxy` 数据目录、数据库或主密钥。当前用户运行的是 v0.2.5。
+- 当前栈仍为 Go + React/TS + SQLite 加密 payload + 外置 Mihomo1.19.32；M24 新增 VLESS XHTTP（Xray extra/download/reuse）、HTTPUpgrade→WS、VMess KCP、ECH、`vcn`/`pcs`、VLESS Encryption 与 URI 别名；VMess XHTTP/`spx`/`pqv`/`fm`/`flow=xtls-rprx-vision-udp443` 等无固定内核等价字段明确拒绝；无 schema 迁移、无内核版本变化。
+- 历史：v0.2.5 于 2026-11-02 02:27:40 发布（M22/M23，未部署）；v0.2.4 于 2026-11-01 12:18:53 发布并部署替换本机实例，停机备份在 `C:\ProgramData\UniProxy-backups\20261101-122319-pre-v0.2.4`；v0.2.3 及更早标签与资产不变。
+- 2026-11-01 在 WSL2/Fedora 44 amd64 使用官方 Linux v0.2.4 与固定 Mihomo 1.19.32 完成实机运行验收，并用本地 0.2.5 候选完成 M22 修复复验（首次 apply、回环 HTTP/SOCKS、`kill -9` 清理、重启恢复、正常停止）；正式 v0.2.4 资产不含该修复。
 
 ## 当前运行服务
 
-- 02:38 复核：**没有任何 UniProxy 实例在运行**。`Get-Process` 未发现 uniproxy/mihomo 进程（只剩 Clash Verge 的 `verge-mihomo` PID2304），`Get-NetTCPConnection` 对 9090、19090 均无监听，`GET /api/health` 无响应。
-- 此前记录的主程序 PID22076（`bin/releases/v0.2.4/uniproxy-windows-amd64.exe`，2026-11-01 18:55:04）与内核 PID5536 均已退出，属用户自行停止，退出时间与原因未查证；本轮未停止、未重启、未替换任何实例。
-- 数据目录 `C:\ProgramData\UniProxy` 未被本轮读取或修改；部署 v0.2.5 未获授权、未执行。
-- 部署前置条件（若后续获授权）：确认无实例与子内核在运行 → 正常退出并等 WAL/SHM 清理 → 需要备份时停机后复制 → 替换主程序并沿用原数据目录/启动参数 → health 与 /api/core/inspect 复核。
+- 2026-11-02 16:01 实测：主程序 PID29920（`C:\CustomFiles\CodeProjects\Github\uniproxy\bin\releases\v0.2.5\uniproxy-windows-amd64.exe`，13:04:17 启动，无参数）+ 内核 PID11688（`C:\ProgramData\UniProxy\core\mihomo.exe`，父进程 29920）；`127.0.0.1:9090` 归主程序，19090 未监听。该实例由用户自行启动，不是本轮启动或测试残留；本轮未停止、未替换、未读取或修改其数据目录。
+- v0.2.6 未部署；发布只创建 GitHub Release 与附件。
+- 部署前置条件（若后续获授权）：确认无实例与子内核在运行，或先让其正常退出并确认内核退出 → 需要备份时停机后复制 → 替换主程序并沿用原数据目录/启动参数 → health 与 /api/core/inspect 复核；禁止在运行中复制或覆盖 SQLite 数据库，禁止混用不同库的 WAL/SHM。
 
 ## 菜鸟 25 节点延迟诊断（2026-11-01，仅观察，未改服务）
 - 用户文件 `C:\CustomFiles\CodeProjects\Project\networkTools\work\cainiao-pc\cainiao-pc-clash-25nodes.yaml` 导入后 25 节点全部 unhealthy；`/api/export/nodes` 的 TLS/WS/Host/skip-cert-verify 与源文件一致，排除导入丢字段。
@@ -56,24 +54,24 @@
 - 验证：`go test -mod=readonly -p 1 ./... -count=1`（显式本机内核）全通过；`go vet`、gofmt 干净；39/39 UI 工具；43/43 隔离浏览器（含新增 `tests/browser/outbound-interface.spec.ts`）；`src/web/tests/verify.mjs` fixture 全绿。
 - 边界：只约束自有内核出站，不创建虚拟网卡、不改系统路由/DNS，不等价 TUN 分流；Linux/macOS 网卡命名与真实远端节点连通未在本轮验证。已提交 main（`a4dd45d`）并随 v0.2.5 发布。
 
-## 正式下载副本
+## 正式下载副本（v0.2.6）
 
 | 产物 | 字节 | SHA256 |
 |---|---:|---|
-| [Windows amd64](<../bin/releases/v0.2.5/uniproxy-windows-amd64.exe>) | 13142528 | `570cd2e6aae76ab07f6b3c7d8ac72a04a4fb62ff0801a66ac88cecccb0320161` |
-| [Windows arm64](<../bin/releases/v0.2.5/uniproxy-windows-arm64.exe>) | 12235776 | `36d89fbe1592152c58ee1a9e9f19059f866f9d026ba16ba22b88b8140ce49344` |
-| [Linux amd64](<../bin/releases/v0.2.5/uniproxy-linux-amd64>) | 12787896 | `a794bcabaea240037588657111667a1d5e6adcc1d44b26cf0b7c99c022458e70` |
-| [Linux arm64](<../bin/releases/v0.2.5/uniproxy-linux-arm64>) | 12124344 | `defea76d92163dcfdceefc9af8d0eced3702fc1c9df2149d8f00b20fd1e954e2` |
-| [SHA256SUMS](<../bin/releases/v0.2.5/SHA256SUMS.txt>) | 360 | `c904ad372f69549fd9701820686818229ddfc5f59f2d2ef91015506eda80d2b2` |
+| [Windows amd64](<../bin/releases/v0.2.6/uniproxy-windows-amd64.exe>) | 13,244,416 | `3757fd9218d20eceaf1078930fe1dbc9931f9619d237603292f822188205190c` |
+| [Windows arm64](<../bin/releases/v0.2.6/uniproxy-windows-arm64.exe>) | 12,326,400 | `f0a72a685ffab56739585f897aa68f0543f5e775ea6df59909cc06eb62ebc26f` |
+| [Linux amd64](<../bin/releases/v0.2.6/uniproxy-linux-amd64>) | 12,890,296 | `0dd697146b6f8dc1c83e36c850c736417b29e523b22c25766804771bb0f4f2fb` |
+| [Linux arm64](<../bin/releases/v0.2.6/uniproxy-linux-arm64>) | 12,189,880 | `f2fdca77f67c6b833b472b398e4e0c9cd574227c9e3b452cdb3abc972a805d56` |
+| [SHA256SUMS](<../bin/releases/v0.2.6/SHA256SUMS.txt>) | 360 | `a2f2cb8328f41b3afb096d4ecb3256d0d05119e1a861b6b034fd6dcb7f93b43a` |
 
-副本位于 `bin/releases/v0.2.5/`（gitignored），五个文件与 GitHub digest 及 manifest 逐项一致；正式 Windows 程序版本为 `UniProxy 0.2.5 · commit 1e1f14417c67 · built 2026-11-01T18:26:55Z`。
+副本位于 `bin/releases/v0.2.6/`（gitignored），五个文件与 GitHub digest 及 `SHA256SUMS.txt` 逐项一致；正式 Windows 程序版本为 `UniProxy 0.2.6 · commit dba132cb379f · built 2026-11-02T08:00:13Z`。
 
 ## 结束状态与下一步
 
-- v0.2.5 已发布并设 Latest；**未部署**，本轮未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。
-- 02:38 复核：无 uniproxy/mihomo 进程（仅 Clash Verge 的 verge-mihomo PID2304），9090 与 19090 均无监听。此前记录的 PID22076/5536 已退出，退出时间与原因未查证，不是本轮操作结果。
-- 若用户要求部署：先确认没有任何 UniProxy 实例在运行（或先让其正常退出并确认内核退出），再替换可执行文件并沿用原数据目录与启动参数；禁止在运行中复制或覆盖数据库，禁止混用不同库的 WAL/SHM。
+- v0.2.6 已发布并设 Latest；**未部署**，本轮未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。
+- 当前用户自行启动的 v0.2.5（PID29920 + 内核 PID11688）仍在运行，`127.0.0.1:9090` 归主程序；这是发布验收时观察到的既有实例，不是本轮启动或测试残留。
+- 若用户要求部署 v0.2.6：先确认没有任何 UniProxy 实例在运行，或先让其正常退出并确认内核退出；再替换可执行文件并沿用原数据目录与启动参数；禁止在运行中复制或覆盖数据库，禁止混用不同库的 WAL/SHM。
 - 用户侧真实节点连通/日常使用需另行观察；发布与程序验收不等于节点可用或吞吐达标。不要因会话恢复自动启动/停止服务。
-- Linux amd64 已在 WSL2/Fedora 44 用 0.2.5 候选复验（M22 修复）；Linux arm64 仅构建与摘要核对，未实机运行。Docker、race、容量/吞吐与真实远端连通未在本轮验证。
+- Linux amd64 已在 WSL2/Fedora 44 用 0.2.5 候选复验（M22 修复）；v0.2.6 的 Linux 资产仅构建与摘要核对，未实机运行；Linux arm64 仅构建与摘要核对。Docker、race、容量/吞吐与真实远端连通未在本轮验证。
 - 常规测试清空 UNIPROXY_TEST_SUBSCRIPTION_MANIFEST/IMPORT_FILE/SUBSCRIPTION_HOST/CORE_DOWNLOAD 与 UNIPROXY_TEST_APP_PATH/UNIPROXY_TEST_CORE_PATH。既有 Docker 忽略未排除 .local，不构建/上传本机 Docker 上下文。
-- 前端产物：`pnpm run build:web` 已重建 `internal/webui/assets/dist`（`assets/index-D4iDTw75.js` 525508B + `assets/index-BM9nabfr.css` 71736B，2026-11-01 21:37:17；仅非失败 chunk 提示）；dist 被 .gitignore 忽略，发布资产由 CI 重新构建，故正式程序含该界面。
+- 前端产物：发布验证使用 `pnpm run build:web` 生成生产包（`assets/index-D4iDTw75.js` 525.51kB / gzip 155.08kB、`assets/index-BM9nabfr.css` 71.74kB / gzip 15.02kB，仅非失败 chunk 提示）；dist 被 .gitignore 忽略，正式资产由 CI 重新构建。

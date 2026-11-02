@@ -1,7 +1,7 @@
 # UniProxy v0.2.6 发布验收
 
 更新日期：2026-11-02
-发布阶段状态：**发布前验证完成；CI 与正式资产待回填**
+发布阶段状态：**已发布并核验（2026-11-02 16:00:55 +08）；不含部署**
 
 ## 1. 范围
 
@@ -104,14 +104,32 @@ go test -mod=readonly -p 1 ./... -count=1
 
 ## 3. CI 与正式资产
 
-待发布后回填：
+### 3.1 提交流与 CI
 
-- main CI run id、Ubuntu/Windows 结果。
-- tag CI run id 与四平台构建结果。
-- Release 发布时间、Latest 状态、四个主程序与 SHA256SUMS 的字节数/SHA256。
-- 正式 Windows 程序 `-version` 与程序验收结果。
-- 历史 v0.2.0–v0.2.5 标签与资产保持不变。
+- 源码提交：`dba132cb379fe113b897b787fef3a94ab91b8bef`（`feat: support modern VLESS and VMess protocol variants`，24 files，1911 insertions / 58 deletions）。
+- main CI [41409672766](<https://github.com/FYHC1/uniproxy/actions/runs/41409672766>)：success；Ubuntu 31s、Windows 1m32s。
+- annotated tag `v0.2.6`：tag 对象 `24346228a70db7c5e4530c2744389bed87db441a`，解引用 `dba132cb379fe113b897b787fef3a94ab91b8bef`。
+- tag CI [41409873967](<https://github.com/FYHC1/uniproxy/actions/runs/41409873967>)：success；Ubuntu 39s、Windows 1m22s。
+- Release workflow [41409873947](<https://github.com/FYHC1/uniproxy/actions/runs/41409873947>)：四平台构建均成功；linux-amd64 40s、linux-arm64 54s、windows-amd64 42s、windows-arm64 47s、release job 8s。
+
+### 3.2 Release 与正式资产
+
+- [v0.2.6 Release](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.6>)：非 draft、非 prerelease，发布时间 `2026-11-02T08:00:55Z`（2026-11-02 16:00:55 +08），已设 **Latest**；中文发布说明已应用 `docs/releases/v0.2.6.md`。
+
+| 文件 | 字节 | SHA256 |
+|---|---:|---|
+| uniproxy-windows-amd64.exe | 13,244,416 | `3757fd9218d20eceaf1078930fe1dbc9931f9619d237603292f822188205190c` |
+| uniproxy-windows-arm64.exe | 12,326,400 | `f0a72a685ffab56739585f897aa68f0543f5e775ea6df59909cc06eb62ebc26f` |
+| uniproxy-linux-amd64 | 12,890,296 | `0dd697146b6f8dc1c83e36c850c736417b29e523b22c25766804771bb0f4f2fb` |
+| uniproxy-linux-arm64 | 12,189,880 | `f2fdca77f67c6b833b472b398e4e0c9cd574227c9e3b452cdb3abc972a805d56` |
+| SHA256SUMS.txt | 360 | `a2f2cb8328f41b3afb096d4ecb3256d0d05119e1a861b6b034fd6dcb7f93b43a` |
+
+- 已将五个附件下载到 `bin/releases/v0.2.6/`（gitignored），本地 SHA256 与 `SHA256SUMS.txt` 及 GitHub 资产 digest 全部一致。
+- 正式 Windows x64 `-version`：`UniProxy 0.2.6 · commit dba132cb379f · built 2026-11-02T08:00:13Z`。
+- 正式 Windows x64 程序验收：`TestBuiltCLIVersionAndPublicBindGuard`、`TestBuiltServiceWithEmbeddedUI`、`TestBuiltWindowsAbruptExitAndRestart`（3 轮）、`TestBuiltWindowsStartupFailureWritesIsolatedReport`、`TestBuiltWindowsHealthcheckFailuresDoNotAccumulateLogs`、`TestBuiltSubscriptionCompatibility` 全部通过（包级 1.525s）。
+- 正式 Windows x64 真实控制台：WM_CLOSE 两轮均 exit 0 且可重启；独立失败窗口 `report_saved=true`、关闭后 exit 1。
+- 历史 `v0.2.0`–`v0.2.5` 标签对象与解引用提交保持不变。
 
 ## 4. 部署边界
 
-本版**不部署**。发布只创建 GitHub Release 与附件，不停止、不替换、不启动任何运行实例。用户如要升级，需先正常退出旧实例并确认内核退出，再替换主程序、沿用原数据目录与匹配主密钥；禁止在运行中复制或覆盖 SQLite 数据库。发布前的本机检查未发现 UniProxy 运行实例；不得把测试候选当作正式发布资产。
+本版**不部署**。发布只创建 GitHub Release 与附件，不停止、不替换、不启动任何运行实例。发布验收时本机仍运行用户自行启动的 v0.2.5：主程序 PID 29920（`bin/releases/v0.2.5/uniproxy-windows-amd64.exe`，2026-11-02 13:04:17 启动）+ 内核 PID 11688（`C:\ProgramData\UniProxy\core\mihomo.exe`），`127.0.0.1:9090` 归主程序；本轮未停止、未替换、未改其数据目录。用户如要升级，需先正常退出旧实例并确认内核退出，再替换主程序、沿用原数据目录与匹配主密钥；禁止在运行中复制或覆盖 SQLite 数据库。不得把测试候选当作正式发布资产。
