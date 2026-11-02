@@ -147,7 +147,7 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 发布：源码提交 `dba132cb379fe113b897b787fef3a94ab91b8bef`；main CI `41409672766`、tag CI `41409873967`、Release workflow `41409873947` 全部成功；`v0.2.6` 于 2026-11-02 16:00:55 +08 发布并设 Latest，四平台资产与 SHA256SUMS 已核验。
 - 边界：已随 v0.2.6 发布（不含部署）；用户运行实例未触碰；未做真实远端节点连通/吞吐测试；固定 Mihomo 无等价字段按错误处理。详见[现代协议验证](<modern-protocol-verification.md>)。
 
-## M25 — 链式代理（2026-11-02 完成，计划随 v0.2.7 发布，不含部署）
+## M25 — 链式代理（2026-11-02 完成并随 v0.2.7 发布，不含部署）
 
 - 用户批准的设计：独立「代理链」页；创建窗口左侧分组节点库、右侧有序代理链配置；打开时对可见可测节点自动测一次延迟，点击延迟可重测；入口监听可折叠并在同一事务创建。范围包含模型/存储/校验、编译器、检测、API、前端与测试，不改变节点协议、订阅解析、内核版本或系统网络。
 - 模型/API：新增 `Chain{ID,Name,NodeIDs,Enabled,CreatedAt,UpdatedAt}` 与 `State.Chains`；新增 `GET/POST /api/chains`、`PUT/DELETE /api/chains/{id}`、`POST /api/chains/with-listener`、`POST /api/chains/{id}/test`；监听 `kind` 增加 `chain`，目标为链 ID；入口复用池监听的协议/地址/端口/认证/UDP 校验和自动端口分配。
@@ -156,8 +156,9 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 前端：新增 [ChainsPage](<../src/web/ChainsPage.tsx>) 与 [ChainDialog](<../src/web/ChainDialog.tsx>)，独立导航「代理链」；双栏节点库/链路配置、分组筛选/状态筛选/排序/搜索/真实延迟、链路顺序上移/下移/移除、入口/出口标签、少于 2 跳提示、清空确认、创建/编辑/复制/启停/删除/整链测试；监听页目标类型增加代理链。
 - 测试：新增 `internal/app/chain_*_test.go`、`internal/core/compiler_chain_test.go`、`internal/core/chain_real_test.go`、`src/web/chainSelection.ts` 纯函数测试、`tests/browser/chain-workflow.spec.ts`（5 例）。真实内核测试用两个回环 SOCKS 上游与本地 HTTP origin，确认两跳都收到连接；独立审查后补上删除节点/UDP 事务、整链检测失败 HTTP 200、重复 hop fail-closed、停用监听保存失效链等回归；本机全量 Go、严格 TS、生产 Web 构建、UI 工具（42/42）、链浏览器 5/5 与全量浏览器 48/48 通过。
 - 本地预览构建（2026-11-02 19:56）：`bin/updates/chain-preview/uniproxy-windows-amd64.exe`，14,205,440 字节，SHA256 `5c8705f9451b9cceb1a7d62df738b3a3c04b96b1268d88c16a950cfced67e148`，身份 `0.2.6-chain-preview.1 · commit local-chain- · built 2026-11-02T11:56:52Z`；隔离 19091 启动/health/嵌入首页通过，针对该 exe 的 TestBuilt 集成测试全部 PASS（1.518s）；说明见 `bin/updates/chain-preview/使用说明.md`。仍为本地预览，不是发布资产。
-- 边界：代理链只支持本应用自有内核的 TCP 入口；UDP 要求每一跳节点支持；不承诺真实公网远端链路性能/可用性；未做多平台实跑、Docker、race 或容量测试。本版计划随 v0.2.7 发布，不部署，用户运行实例未触碰。
+- 边界：代理链只支持本应用自有内核的 TCP 入口；UDP 要求每一跳节点支持；不承诺真实公网远端链路性能/可用性；未做多平台实跑、Docker、race 或容量测试。本版已随 v0.2.7 发布，不部署，用户运行实例未触碰。
 - 运行排障（2026-11-02 20:52）：9router 代理池 20006 的 `JP-US` 链曾报 ECONNRESET；隔离进程验证为第一跳台湾节点无法承载到第二跳的嵌套 TLS/Reality（美国直连 735ms、日本→美国 1967ms 成功、台湾→美国 8s 超时，去掉 Vision 仍失败），非编译器问题。通过 API 将第一跳改为日本原生01 后，链测试 3/3 通过（1404/1882/1444ms），20006 HTTP/SOCKS 204，9router `JP-US1` 20:49:07 测试成功并 active。只改运行配置，未改源码/数据库。
+- 发布（2026-11-02 21:52:52 +08）：源码提交 `14cc9f570b44422b9dfc1deec94b3556749a1a05`，annotated tag `v0.2.7`（对象 `568f8639935eef3cbdd9090b19ff4d2b0dde53da`）；main CI `41456237334`、tag CI `41456604601`、Release `41456604526` 全部成功；四平台资产与 SHA256SUMS 已核验；正式 Windows 程序 `UniProxy 0.2.7 · commit 14cc9f570b44 · built 2026-11-02T13:51:54Z`，TestBuilt 4.385s 与真实控制台通过。发布不含部署，用户预览实例未触碰。
 
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 

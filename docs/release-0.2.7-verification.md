@@ -1,7 +1,7 @@
 # UniProxy v0.2.7 发布验收
 
 更新日期：2026-11-02
-发布阶段状态：**发布前验证完成；CI 与正式资产待回填**
+发布阶段状态：**2026-11-02 21:52:52（Asia/Shanghai）已正式发布并设 Latest；不含部署**
 
 ## 1. 范围
 
@@ -102,26 +102,27 @@ go test -mod=readonly -p 1 ./... -count=1
 
 ### 3.1 提交流与 CI
 
-- 源码提交：待回填。
-- main CI：待回填。
-- annotated tag `v0.2.7`：待回填。
-- tag CI：待回填。
-- Release workflow：待回填。
+- 源码提交：[`14cc9f570b44422b9dfc1deec94b3556749a1a05`](<https://github.com/FYHC1/uniproxy/commit/14cc9f570b44422b9dfc1deec94b3556749a1a05>)（`feat: add chained proxies for v0.2.7`，49 文件，+1919/−80）。
+- main CI [41456237334](<https://github.com/FYHC1/uniproxy/actions/runs/41456237334>)：成功；Ubuntu 47s、Windows 1m52s，均完成 `pnpm run build:web`、`go test ./...`、`go vet ./...`、`go build ./cmd/uniproxy`。
+- annotated tag `v0.2.7`：tag 对象 `568f8639935eef3cbdd9090b19ff4d2b0dde53da`，解引用为 `14cc9f570b44422b9dfc1deec94b3556749a1a05`。
+- tag CI [41456604601](<https://github.com/FYHC1/uniproxy/actions/runs/41456604601>)：成功；Ubuntu 39s、Windows 1m49s。
+- Release workflow [41456604526](<https://github.com/FYHC1/uniproxy/actions/runs/41456604526>)：成功；linux-amd64、linux-arm64、windows-amd64、windows-arm64 四个构建 job 与 release job 全部完成。
 
 ### 3.2 Release 与正式资产
 
-- `v0.2.7` Release：待回填。
+- `v0.2.7` Release：<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.7>，发布于 2026-11-02 21:52:52（Asia/Shanghai，UTC 13:52:52），非 draft、非 prerelease、已设 Latest；中文说明通过 `gh release edit --notes-file` 应用，与 [docs/releases/v0.2.7.md](<releases/v0.2.7.md>) 正文逐字一致（2019 字符）。
 
 | 文件 | 字节 | SHA256 |
 |---|---:|---|
-| uniproxy-windows-amd64.exe | 待回填 | 待回填 |
-| uniproxy-windows-arm64.exe | 待回填 | 待回填 |
-| uniproxy-linux-amd64 | 待回填 | 待回填 |
-| uniproxy-linux-arm64 | 待回填 | 待回填 |
-| SHA256SUMS.txt | 待回填 | 待回填 |
+| uniproxy-windows-amd64.exe | 13,328,896 | `9eff0c7de7cb4b9c869fdbf697abeb7a0a7f236430d98c1244779cf430d41cbb` |
+| uniproxy-windows-arm64.exe | 12,412,928 | `792f4083d87a3fc8e64d36c2165beb9ce23230d0d3326509f612f9890a9fa1db` |
+| uniproxy-linux-amd64 | 12,972,216 | `1d6b937714ec60aeef58d2a6b172c21d4b104a4ee10599963b2b2cfbf4e8e1f2` |
+| uniproxy-linux-arm64 | 12,320,952 | `fd549e9daa6ee72f0f906924561da87a7cca3942aa75815147f2e8db4ddb2aa4` |
+| SHA256SUMS.txt | 360 | `cc23e3ba0b45fb8e2949be9a86b012e7c3fcdc27fd5f25113f2f6c6264ec5739` |
 
-- 正式 Windows x64 程序验收：待回填。
-- 历史 `v0.2.0`–`v0.2.6` 标签对象与解引用提交保持不变（发布后复核）。
+- 正式 Windows x64 程序：`UniProxy 0.2.7 · commit 14cc9f570b44 · built 2026-11-02T13:51:54Z`；官方 `TestBuilt*` 全部 PASS（4.385s）；真实控制台 WM_CLOSE 两轮退出 0 并重启、独立失败窗口保留报告后退出 1，均通过。
+- 五个正式资产已下载到 `bin/releases/v0.2.7/`（gitignored），大小与 SHA256 和 GitHub digest、`SHA256SUMS.txt` 逐项一致。
+- 历史 `v0.2.6` tag 对象仍为 `24346228a70db7c5e4530c2744389bed87db441a`（解引用 `dba132cb379fe113b897b787fef3a94ab91b8bef`）；`v0.2.0`–`v0.2.5` 标签与 Release 未改动。
 
 ## 4. 部署边界
 
