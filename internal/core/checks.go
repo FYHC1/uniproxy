@@ -37,17 +37,14 @@ func failedCheck(result model.CheckResult, err error) (model.CheckResult, error)
 	return result, err
 }
 
-// Check uses Mihomo's actual outbound URL-test, not a TCP reachability ping.
-func (m *Manager) Check(ctx context.Context, nodeID, testURL string, timeout time.Duration) (model.CheckResult, error) {
-	result := model.CheckResult{NodeID: nodeID}
-	if _, err := m.testSnapshot(nodeID); err != nil {
-		return failedCheck(result, err)
-	}
+// checkProxyTag performs the native URL-test through one already-live outbound.
+// Both single nodes and the final hop of a chain use the same controller path.
+func (m *Manager) checkProxyTag(ctx context.Context, tag, testURL string, timeout time.Duration) (*int64, error) {
 	if err := validTestURL(testURL); err != nil {
-		return failedCheck(result, err)
+		return nil, err
 	}
 	if timeout <= 0 {
-		return failedCheck(result, errors.New("test timeout must be positive"))
+		return nil, errors.New("test timeout must be positive")
 	}
 	// v1.19.32 parses the API timeout with strconv.ParseInt(..., 16).
 	if timeout > 32767*time.Millisecond {
@@ -62,15 +59,55 @@ func (m *Manager) Check(ctx context.Context, nodeID, testURL string, timeout tim
 	var reply struct {
 		Delay *int64 `json:"delay"`
 	}
-	err := m.controller(testCtx, http.MethodGet, "/proxies/"+url.PathEscape(nodeTag(nodeID))+"/delay?"+query.Encode(), nil, &reply)
+	err := m.controller(testCtx, http.MethodGet, "/proxies/"+url.PathEscape(tag)+"/delay?"+query.Encode(), nil, &reply)
+	if err != nil {
+		return nil, err
+	}
+	if reply.Delay == nil || *reply.Delay <= 0 || *reply.Delay > 65535 {
+		return nil, errors.New("core returned an invalid URL-test delay")
+	}
+	return reply.Delay, nil
+}
+
+// Check uses Mihomo's actual outbound URL-test, not a TCP reachability ping.
+func (m *Manager) Check(ctx context.Context, nodeID, testURL string, timeout time.Duration) (model.CheckResult, error) {
+	result := model.CheckResult{NodeID: nodeID}
+	if _, err := m.testSnapshot(nodeID); err != nil {
+		return failedCheck(result, err)
+	}
+	delay, err := m.checkProxyTag(ctx, nodeTag(nodeID), testURL, timeout)
 	if err != nil {
 		return failedCheck(result, err)
 	}
-	if reply.Delay == nil || *reply.Delay <= 0 || *reply.Delay > 65535 {
-		return failedCheck(result, errors.New("core returned an invalid URL-test delay"))
+	result.OK = true
+	result.LatencyMS = delay
+	return result, nil
+}
+
+// CheckChain reports end-to-end latency through the final synthetic hop. It is
+// read-only and never mutates node health or the stored chain configuration.
+func (m *Manager) CheckChain(ctx context.Context, chainID, testURL string, timeout time.Duration) (model.CheckResult, error) {
+	result := model.CheckResult{ChainID: chainID}
+	m.mu.RLock()
+	if !m.status.Running || !processAlive(m.process) || m.live == nil {
+		m.mu.RUnlock()
+		return failedCheck(result, ErrNotRunning)
+	}
+	if m.status.Applying {
+		m.mu.RUnlock()
+		return failedCheck(result, errors.New("core configuration is being applied; retry the test"))
+	}
+	tag, ok := m.live.chainTags[chainID]
+	m.mu.RUnlock()
+	if !ok {
+		return failedCheck(result, errors.New("chain is disabled or absent from the live configuration"))
+	}
+	delay, err := m.checkProxyTag(ctx, tag, testURL, timeout)
+	if err != nil {
+		return failedCheck(result, err)
 	}
 	result.OK = true
-	result.LatencyMS = reply.Delay
+	result.LatencyMS = delay
 	return result, nil
 }
 

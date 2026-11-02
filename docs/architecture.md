@@ -5,7 +5,7 @@
 - 单管理员 Web + REST API，Windows / Linux / Docker，面向数百代理节点。
 - 上游 VLESS、VMess、Trojan、Shadowsocks、Hysteria/Hysteria2、TUIC、SSH、SOCKS5、HTTP(S)。
 - 下游 HTTP-only、SOCKS5-only、mixed，同一 mixed 端口兼容 HTTP 与 SOCKS5；SOCKS5 UDP 纳入第一版。
-- 独享入口绑定单节点；共享入口绑定代理池。池策略 URL Test、轮询、一致性哈希、内核原生粘性会话。
+- 独享入口绑定单节点；共享入口绑定代理池；链式入口绑定一条有序代理链。池策略 URL Test、轮询、一致性哈希、内核原生粘性会话。
 - 节点多分组；池静态节点 + 分组任一/全部 + 排除规则。订阅完整成功刷新时自动清理已移除的来源节点。
 - 修改校验后自动应用，失败明确显示运行版本与待应用版本；高影响操作提示。
 
@@ -31,13 +31,16 @@ Mihomo 独立进程负责协议转接与 TCP/UDP 流量。管理 API 不转发�
 - Group：独立 ID、名称、颜色；节点多对多关系。
 - Subscription：URL、分组、刷新间隔、错误状态。UI 隐藏敏感 URL 路径/query。
 - Pool：策略、hashKey、静态成员、分组匹配模式、排除成员、UDP、独立 URL 检测设置。
-- Listener：监听地址、端口、mixed/http/socks、绑定节点/池、UDP 开关、代理认证列表。
+- Chain：稳定 ID、名称、2–16 个有序节点 ID、启用状态；不复制节点配置，不形成代理组。
+- Listener：监听地址、端口、mixed/http/socks、绑定节点/池/代理链、UDP 开关、代理认证列表。
 - Settings：全局检测 URL、下载测速目标、并发、超时、流量上限、端口分配范围。
 - Runtime：内核版本、运行状态、应用版本、实际监听状态、错误；与数据库配置版本分离。
 
 ## 选路语义
 
-不添加 DIRECT 兜底。所有入口显式绑定目标，空池和过期目标拒绝；全局最终规则 REJECT。未知健康状态不直接视为失败，池内健康判定交由内核。
+不添加 DIRECT 兜底。所有入口显式绑定目标，空池、过期目标和不可用代理链拒绝；全局最终规则 REJECT。未知健康状态不直接视为失败，池内健康判定交由内核。
+
+代理链是合成出站串接而非 proxy-group：每一跳生成独立 outbound 副本，第二跳起用 `dialer-proxy` 指向前一跳，入口只绑定末跳。任一跳缺失、禁用、中转异常或跳数越界时整链不生成并让绑定入口 REJECT，不能缩短链或回退直连。删除被引用节点停用整条链与入口但保留原顺序；整链延迟通过末跳 tag 的真实内核检测，不写节点健康。
 
 轮询单位是连接/内核流，而非每个 HTTP 业务请求；Keep-Alive 和 HTTP/2 会复用原连接。一致性哈希默认使用目标地址。粘性会话默认来源+目标，使用内核缓存（10 分钟，有限容量，可被淘汰）。支持 hash-key=in-user 的池必须在每个接入入口配置认证；用户名是已注册的代理访问凭据，不是任意动态 Session ID。
 
@@ -47,7 +50,7 @@ Mihomo 独立进程负责协议转接与 TCP/UDP 流量。管理 API 不转发�
 
 HTTP 和 SSH 上游不具备原生 UDP 能力。启用 UDP 的池仅选择 UDP-capable 节点；UDP 入口不能绑定未开启 UDP 的池。mixed 与 socks 的 UDP 关联仍有 TCP 控制连接；客户端必须支持 SOCKS5 UDP ASSOCIATE。浏览器通过 HTTP CONNECT 不等于使用 SOCKS5 UDP。
 
-安全限制：固定版本 Mihomo 的原生 SOCKS UDP 处理不执行用户名/密码认证，也不携带 InUser。第一版仅允许回环 IP 的 UDP 监听，并拒绝 UDP 入口绑定 hash-key=in-user 代理池。即使 TCP 有认证，不能将 UDP 对外监听视为安全。
+安全限制：固定版本 Mihomo 的原生 SOCKS UDP 处理不执行用户名/密码认证，也不携带 InUser。第一版仅允许回环 IP 的 UDP 监听，并拒绝 UDP 入口绑定 hash-key=in-user 代理池；UDP 代理链入口还要求每一跳节点声明 UDP 能力。即使 TCP 有认证，不能将 UDP 对外监听视为安全。
 
 Docker bridge 模式第一版提供对外认证 TCP 入口，不能直接向宿主映射本机回环 UDP。Linux 需要本机 UDP 时可用 host 网络并绑定127.0.0.1；Windows建议原生运行。未实现经过认证的公网 UDP 网关，不能通过关闭校验绕过限制。端口范围外创建的入口不能自动出现在宿主机。
 

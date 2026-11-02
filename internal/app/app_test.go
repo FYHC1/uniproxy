@@ -28,6 +28,7 @@ type fakeCore struct {
 	applied       model.State
 	probeStarted  chan struct{}
 	probeRelease  chan struct{}
+	chainCheckErr error
 }
 
 func (f *fakeCore) Inspect(context.Context) model.RuntimeStatus { return f.Status() }
@@ -75,6 +76,13 @@ func (f *fakeCore) Check(ctx context.Context, id, url string, timeout time.Durat
 	}
 	v := int64(12)
 	return model.CheckResult{NodeID: id, OK: true, LatencyMS: &v}, nil
+}
+func (f *fakeCore) CheckChain(ctx context.Context, id, url string, timeout time.Duration) (model.CheckResult, error) {
+	if f.chainCheckErr != nil {
+		return model.CheckResult{ChainID: id, OK: false, Error: f.chainCheckErr.Error()}, f.chainCheckErr
+	}
+	v := int64(12)
+	return model.CheckResult{ChainID: id, OK: true, LatencyMS: &v}, nil
 }
 func (f *fakeCore) Speed(ctx context.Context, id, url string, timeout time.Duration, max int64) (model.CheckResult, error) {
 	v := 12.3

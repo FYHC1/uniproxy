@@ -135,7 +135,7 @@ POST /api/listeners，PUT /api/listeners/{id}。
 }
 ~~~
 
-独享入口改kind为node，targetId为节点ID。监听列表返回hasPassword而不返回password。编辑同一username时省略或留空password表示保留旧密码；新增/改名账户必须提供密码。users:[]移除认证，只允许回环IP。UDP只允许回环IP且协议mixed/socks。
+独享入口改kind为node，targetId为节点ID；代理链入口使用kind为chain，targetId为链ID。监听列表返回hasPassword而不返回password。编辑同一username时省略或留空password表示保留旧密码；新增/改名账户必须提供密码。users:[]移除认证，只允许回环IP。UDP只允许回环IP且协议mixed/socks。
 
 批量端口POST /api/listeners/batch：
 
@@ -144,6 +144,33 @@ POST /api/listeners，PUT /api/listeners/{id}。
 ~~~
 
 服务在设置中的端口范围分配，整个批次通过校验后一次应用。 监听名称由服务生成为“<节点名> · 独享”，节点名接近160字符上限时会按字符边界截断并保留后缀，不会让整批失败。显示名称统一限制1–160个字符；导入的超长上游标签会截断保留节点，预览与保存结果一致。
+
+## 代理链与入口
+
+代理链把 2–16 个节点按顺序串接：`nodeIds` 的顺序就是转发顺序，入口只连接最后一跳。创建和一步创建入口：
+
+~~~json
+{
+  "name": "日本入口到美国出口",
+  "nodeIds": ["replace-with-entry-node-id", "replace-with-exit-node-id"],
+  "enabled": true
+}
+~~~
+
+POST /api/chains 创建链；POST /api/chains/with-listener 在同一事务创建链与 chain 监听：
+
+~~~json
+{
+  "chain": {"name": "日本入口到美国出口", "nodeIds": ["replace-with-entry-node-id", "replace-with-exit-node-id"], "enabled": true},
+  "listener": {"name": "链路入口", "protocol": "mixed", "host": "127.0.0.1", "port": 0, "udp": false, "users": []}
+}
+~~~
+
+- `listener` 可省略；kind、targetId 由服务端固定为 chain 和新链 ID，不接受客户端注入。port:0 或省略时在设置范围内自动分配，校验失败不会留下链或监听半成品。
+- GET /api/chains 返回全部链；PUT /api/chains/{id} 完整替换可编辑字段；DELETE /api/chains/{id} 删除链并停用关联 chain 监听，保留监听配置。
+- POST /api/chains/{id}/test 返回 `{chainId,ok,latencyMs}`，通过内核末跳 tag 的真实 delay 接口测试整链，不修改节点健康状态。
+- 每条链编译为有序合成出站副本，第二跳起使用 dialer-proxy 指向前一跳。任一跳缺失、禁用、中转异常或跳数不在 2–16 时，整链不生成、关联入口 REJECT；不缩短链、不回退直连。删除被链引用的节点会停用整条链和入口，保留原 NodeIDs 以便修复。
+- UDP chain 入口只在所有跳节点都声明 UDP 能力时允许，且仍只允许回环地址。
 
 ## 节点批量操作
 

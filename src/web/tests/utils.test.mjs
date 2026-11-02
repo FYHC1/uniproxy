@@ -6,6 +6,7 @@ import {emptyNodeGroupFilter,matchesNodeFilter,matchesNodeGroups,nodeRelay} from
 import {changePoolSelection,constrainPoolSelection,matchesPoolNodeStatus,poolSelectionScope,selectedPoolNodes,sortPoolNodes,withoutDeletedPoolNodes} from '../poolSelection.ts';
 import {selectScope} from '../selection.ts';
 import {listenerIsLive,listenerState,nodeLatencyText,poolListenerState,poolNodeMetrics} from '../poolView.ts';
+import {chainBlockedReason,chainCandidates,chainEndpoints,chainSupportsUDP,moveChainNode,orderedChainNodes,removeChainNode,toggleChainNode} from '../chainSelection.ts';
 import {MAX_IMPORT_BYTES,MAX_IMPORT_ERROR_DETAILS,canDropLocalFile,captureDroppedFiles,importErrorSummary,isFileTransfer,readLocalImport,validateImportContent} from '../importUtils.ts';
 
 const nodes = [
@@ -309,4 +310,41 @@ test('listener state is shared by every page and never claims a stale revision i
   assert.equal(listenerState(listener,{...runtime,listeners:[{id:'l1',listening:true,error:'bind failed'}]},3).label,'未监听');
   // The pool card keeps using the same function through its alias.
   assert.equal(poolListenerState(listener,runtime,4).label,listenerState(listener,runtime,4).label);
+});
+const chainNodes = [
+  {id:'h1',name:'东京入口',protocol:'vless',server:'2001:db8::1',port:443,udp:true,enabled:true,groupIds:['asia'],status:'healthy',latencyMs:32,speedMbps:null,updatedAt:'2026-01-01T00:00:00Z'},
+  {id:'h2',name:'洛杉矶中转',protocol:'vmess',server:'198.51.100.8',port:8443,udp:false,enabled:true,groupIds:['us'],status:'unknown',latencyMs:null,speedMbps:null,updatedAt:'2026-01-02T00:00:00Z'},
+  {id:'h3',name:'法兰克福出口',protocol:'trojan',server:'203.0.113.9',port:443,udp:true,enabled:true,groupIds:['eu'],status:'healthy',latencyMs:180,speedMbps:null,updatedAt:'2026-01-03T00:00:00Z'},
+  {id:'h4',name:'停用线路',protocol:'socks5',server:'192.0.2.7',port:1080,udp:true,enabled:false,groupIds:[],status:'unknown',latencyMs:null,speedMbps:null,updatedAt:''},
+];
+test('chain candidates filter by group, status, query and keep display sort independent of route order',()=>{
+  assert.deepEqual(chainCandidates(chainNodes,'asia','','all','name').map(node=>node.id),['h1']);
+  assert.deepEqual(chainCandidates(chainNodes,'','','enabled','latency').map(node=>node.id),['h1','h3','h2']);
+  assert.deepEqual(chainCandidates(chainNodes,'','trojan','all','name').map(node=>node.id),['h3']);
+  assert.deepEqual(chainCandidates(chainNodes,'','192.0.2','disabled','name').map(node=>node.id),['h4']);
+});
+test('chain route editing appends, removes and swaps neighbours without mutating input',()=>{
+  const original=['h1','h2','h3'];
+  assert.deepEqual(toggleChainNode(original,'h2'),['h1','h3']);
+  assert.deepEqual(toggleChainNode(['h1','h3'],'h2'),['h1','h3','h2']);
+  assert.deepEqual(moveChainNode(original,2,-1),['h1','h3','h2']);
+  assert.deepEqual(moveChainNode(original,0,1),['h2','h1','h3']);
+  assert.deepEqual(moveChainNode(original,0,-1),original);
+  assert.deepEqual(moveChainNode(original,2,1),original);
+  assert.deepEqual(removeChainNode(original,'h2'),['h1','h3']);
+  assert.deepEqual(original,['h1','h2','h3']);
+});
+test('chain endpoints and availability reflect saved order, missing hops and every-hop UDP',()=>{
+  assert.deepEqual(orderedChainNodes({nodeIds:['h3','h1']},chainNodes).map(node=>node?.id),['h3','h1']);
+  assert.deepEqual(chainEndpoints({nodeIds:['h1','h2','h3']},chainNodes),{entry:'东京入口',exit:'法兰克福出口',missing:0});
+  assert.deepEqual(chainEndpoints({nodeIds:['h1','deleted']},chainNodes),{entry:'东京入口',exit:'节点缺失',missing:1});
+  assert.equal(chainSupportsUDP({nodeIds:['h1','h2','h3']},chainNodes),false);
+  assert.equal(chainSupportsUDP({nodeIds:['h1','h3']},chainNodes),true);
+  assert.equal(chainSupportsUDP({nodeIds:['h1']},chainNodes),false);
+  assert.equal(chainBlockedReason({nodeIds:['h1','h3']},chainNodes),'');
+  assert.equal(chainBlockedReason({nodeIds:['h1']},chainNodes),'至少需要 2 个节点');
+  assert.equal(chainBlockedReason({nodeIds:['h1','missing']},chainNodes),'包含已被删除的节点');
+  assert.equal(chainBlockedReason({nodeIds:['h1','h4']},chainNodes),'包含已停用的节点');
+  assert.equal(chainBlockedReason({nodeIds:['h1','h2']},chainNodes.map(node=>node.id==='h2'?{...node,dialerId:'h1'}:node)),'包含已设置中转的节点');
+  assert.equal(chainBlockedReason({nodeIds:['h1','h2']},chainNodes.map(node=>node.id==='h2'?{...node,dialerError:'依赖节点缺失'}:node)),'包含中转异常的节点');
 });

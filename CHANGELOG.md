@@ -2,6 +2,19 @@
 
 日期按 Asia/Shanghai。v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
 
+## 0.2.7 — 2026-11-02 · 代理链
+
+本版为代理链功能；正式发布信息与验证见 [v0.2.7 发布验收](<docs/release-0.2.7-verification.md>)。
+
+### 代理链
+
+- 新增独立「代理链」页面：按顺序组合 2–16 个节点，入口监听可绑定整条链；创建窗口提供分组/状态筛选、名称/延迟排序、真实延迟检测、上移/下移/移除、入口/出口标记、少于 2 跳提示和清空确认。
+- 每条链编译为有序合成出站副本：前一跳通过 `dialer-proxy` 连接后一跳，入口只绑定末跳。任一跳缺失/禁用/中转异常或跳数越界时整链不生成、入口 REJECT，绝不缩短链或回退直连。
+- 新增 `GET/POST /api/chains`、`PUT/DELETE /api/chains/{id}`、`POST /api/chains/with-listener`、`POST /api/chains/{id}/test`；监听 `kind` 增加 `chain`。链与入口可在同一事务创建，端口支持自动分配。
+- 删除被链引用的节点会停用整条链及其入口，保留 NodeIDs 原顺序；整链延迟通过内核末跳真实检测，不写节点健康。UDP 入口要求所有跳支持 UDP。
+- 整链校验加固：重复 hop 或 nativeProxy 构造失败时 fail-closed 整链不生成，运行态核对每一跳；删除节点事务不会因已停用链的 UDP 标记误报；整链检测失败返回结构化 CheckResult（HTTP 200）；编辑/启停清理旧测试结果，自动测速等待运行态就绪，停用监听可保存失效链。
+- 验证：Go 全量、严格 TS、生产 Web 构建、42/42 UI 工具、链浏览器 5/5、全量隔离浏览器 48/48 与真实两跳回环 SOCKS 链路通过。真实公网远端、Docker、race 和容量未测。
+
 ## 0.2.6 — 2026-11-02 · 现代 VLESS/VMess 协议兼容
 
 - 修复新版 VLESS/VMess URI 被严格白名单拒绝的问题：支持 VLESS XHTTP（含 Xray `extra`、`downloadSettings`、`xmux`、reuse/download 选项与 Xray camelCase 映射）、HTTPUpgrade（映射为 WS `v2ray-http-upgrade: true`）、VMess KCP/mKCP（`kcp-opts`）、ECH、`vcn`/`pcs`、VLESS Encryption、`raw`/`tcp`、`websocket` 等现代别名及 URI 大小写归一。

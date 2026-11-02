@@ -164,6 +164,19 @@ func (m *Manager) verifyProxies(ctx context.Context, cfg *compiledConfig) error 
 				}
 			}
 			if !missing {
+				for _, tags := range cfg.chainHops {
+					for _, tag := range tags {
+						if _, ok := reply.Proxies[tag]; !ok {
+							missing = true
+							break
+						}
+					}
+					if missing {
+						break
+					}
+				}
+			}
+			if !missing {
 				return nil
 			}
 			lastErr = errors.New("core did not expose a requested native outbound")

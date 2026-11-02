@@ -74,7 +74,7 @@ func ValidateState(s model.State, adminPort int) error {
 	if err != nil || len(encoded) > 32*1024*1024 {
 		return bad("配置快照超过32 MiB限制；请减少节点/私钥数据")
 	}
-	if len(s.Nodes) > 5000 || len(s.Pools) > 500 || len(s.Listeners) > 2000 || len(s.Subscriptions) > 200 || len(s.Groups) > 1000 {
+	if len(s.Nodes) > 5000 || len(s.Pools) > 500 || len(s.Chains) > 500 || len(s.Listeners) > 2000 || len(s.Subscriptions) > 200 || len(s.Groups) > 1000 {
 		return bad("配置数量超过安全限制")
 	}
 	ids := map[string]bool{}
@@ -189,6 +189,48 @@ func ValidateState(s model.State, adminPort int) error {
 		}
 		pools[p.ID] = p
 	}
+	chains := map[string]model.Chain{}
+	chainBlocked := model.RelayErrors(s.Nodes)
+	for _, c := range s.Chains {
+		if e := checkID(c.ID); e != nil {
+			return e
+		}
+		if !nameOK(c.Name) {
+			return nameError("代理链")
+		}
+		if len(c.NodeIDs) < 2 || len(c.NodeIDs) > 16 {
+			return bad("代理链必须包含 2–16 个节点")
+		}
+		seen := map[string]bool{}
+		for _, id := range c.NodeIDs {
+			if seen[id] {
+				return bad("代理链不能重复使用同一节点")
+			}
+			seen[id] = true
+			n, ok := nodes[id]
+			if !ok {
+				// A disabled chain keeps its original ordered identity after a hop
+				// is deleted; it must never be silently shortened or re-enabled
+				// with missing hops.
+				if c.Enabled {
+					return bad("代理链引用不存在的节点")
+				}
+				continue
+			}
+			if c.Enabled {
+				if !n.Enabled {
+					return bad("代理链包含未启用的节点")
+				}
+				if n.DialerID != "" {
+					return bad("代理链节点不能同时设置中转")
+				}
+				if chainBlocked[n.ID] != "" {
+					return bad("代理链包含中转依赖异常的节点")
+				}
+			}
+		}
+		chains[c.ID] = c
+	}
 	for i, l := range s.Listeners {
 		if e := checkID(l.ID); e != nil {
 			return e
@@ -211,7 +253,7 @@ func ValidateState(s model.State, adminPort int) error {
 		if l.Protocol == "http" && l.UDP {
 			return bad("HTTP 入口不支持 SOCKS5 UDP")
 		}
-		if l.Kind != "node" && l.Kind != "pool" {
+		if l.Kind != "node" && l.Kind != "pool" && l.Kind != "chain" {
 			return bad("入口绑定类型无效")
 		}
 		if !loopback(l.Host) && len(l.Users) == 0 {
@@ -246,7 +288,7 @@ func ValidateState(s model.State, adminPort int) error {
 			if l.UDP && ok && !n.UDP {
 				return bad("节点不支持 UDP")
 			}
-		} else {
+		} else if l.Kind == "pool" {
 			p, ok := pools[l.TargetID]
 			if l.Enabled && !ok {
 				return bad("入口目标代理池不存在")
@@ -259,6 +301,22 @@ func ValidateState(s model.State, adminPort int) error {
 			}
 			if ok && p.HashKey == "in-user" && l.Enabled && len(l.Users) == 0 {
 				return bad("按用户名分配的代理池入口必须配置认证")
+			}
+		} else {
+			c, ok := chains[l.TargetID]
+			if l.Enabled && !ok {
+				return bad("入口目标代理链不存在")
+			}
+			if l.Enabled && c.Enabled && l.UDP {
+				for _, id := range c.NodeIDs {
+					n, exists := nodes[id]
+					if !exists {
+						return bad("代理链包含不存在的节点")
+					}
+					if !n.UDP {
+						return bad("代理链包含不支持 UDP 的节点")
+					}
+				}
 			}
 		}
 	}

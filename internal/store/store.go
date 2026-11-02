@@ -185,6 +185,9 @@ func Normalize(s *model.State) {
 	if s.Pools == nil {
 		s.Pools = []model.Pool{}
 	}
+	if s.Chains == nil {
+		s.Chains = []model.Chain{}
+	}
 	if s.Listeners == nil {
 		s.Listeners = []model.Listener{}
 	}
@@ -219,6 +222,11 @@ func Normalize(s *model.State) {
 		}
 		if p.ExcludeGroupIDs == nil {
 			p.ExcludeGroupIDs = []string{}
+		}
+	}
+	for i := range s.Chains {
+		if s.Chains[i].NodeIDs == nil {
+			s.Chains[i].NodeIDs = []string{}
 		}
 	}
 	for i := range s.Listeners {

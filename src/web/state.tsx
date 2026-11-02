@@ -89,7 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const next = await api<Bootstrap>('/api/bootstrap', 'GET', undefined, current.signal);
       if (current.signal.aborted || !mounted.current || epoch !== sessionEpoch.current || response !== responseEpoch.current) return;
-      if (!next || !['nodes','groups','pools','listeners','subscriptions','activities','jobs'].every(key => Array.isArray(next[key as keyof Bootstrap])) || !next.runtime || !Array.isArray(next.runtime.listeners) || !next.settings || !isCoreInstallation(next.coreInstallation)) throw new Error('管理 API 数据格式不匹配，请检查前后端版本。');
+      if (!next || !['nodes','groups','pools','chains','listeners','subscriptions','activities','jobs'].every(key => Array.isArray(next[key as keyof Bootstrap])) || !next.runtime || !Array.isArray(next.runtime.listeners) || !next.settings || !isCoreInstallation(next.coreInstallation)) throw new Error('管理 API 数据格式不匹配，请检查前后端版本。');
       dataRef.current = next; setData(next); setUpdatedAt(new Date()); setConnectionError(''); setAuthRequired(false); setAuthError('');
     } catch (error) {
       if (current.signal.aborted || !mounted.current || epoch !== sessionEpoch.current || response !== responseEpoch.current) return;

@@ -17,7 +17,7 @@ assert(files.has('/index.html'),'Vite emits frontend index');
 console.log('PASS production Vite build (in memory, no output directory writes)');
 const now = '2026-01-01T00:00:00Z';
 let state = {
-  nodes:[], groups:[], pools:[], listeners:[], subscriptions:[], revision:0,
+  nodes:[], groups:[], pools:[], chains:[], listeners:[], subscriptions:[], revision:0,
   settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,outboundInterface:''},
   interfaces:[{name:'以太网',up:true,loopback:false,addresses:['192.0.2.10/24']},{name:'WLAN',up:true,loopback:false,addresses:[]},{name:'离线网卡',up:false,loopback:false,addresses:['198.51.100.7/24']},{name:'Loopback Pseudo-Interface 1',up:true,loopback:true,addresses:['127.0.0.1/8']}],
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'',startedAt:'',dirty:false,listeners:[]},
@@ -285,7 +285,7 @@ try {
   // Restore preview reveals counts, not secrets; cancel is non-mutating.
   await clickNav('运行与设置');
   await page.getByRole('button',{name:'备份与安全',exact:true}).click();
-  await page.getByLabel('选择完整配置备份',{exact:true}).setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({schemaVersion:1,state:{nodes:[],groups:[],pools:[],listeners:[],subscriptions:[],settings:state.settings,revision:1}}))});
+  await page.getByLabel('选择完整配置备份',{exact:true}).setInputFiles({name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({schemaVersion:1,state:{nodes:[],groups:[],pools:[],chains:[],listeners:[],subscriptions:[],settings:state.settings,revision:1}}))});
   await page.getByRole('button',{name:'恢复这份备份',exact:true}).click();
   await page.getByRole('dialog',{name:'覆盖当前全部配置？'}).waitFor();
   await page.getByRole('button',{name:'取消',exact:true}).click();

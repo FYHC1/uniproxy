@@ -24,6 +24,7 @@ type Core interface {
 	Apply(context.Context, model.State) error
 	Stop(context.Context) error
 	Check(context.Context, string, string, time.Duration) (model.CheckResult, error)
+	CheckChain(context.Context, string, string, time.Duration) (model.CheckResult, error)
 	Speed(context.Context, string, string, time.Duration, int64) (model.CheckResult, error)
 }
 type Options struct {
@@ -216,6 +217,14 @@ func poolIndex(s *model.State, id string) int {
 	}
 	return -1
 }
+func chainIndex(s *model.State, id string) int {
+	for i, c := range s.Chains {
+		if c.ID == id {
+			return i
+		}
+	}
+	return -1
+}
 func contains(xs []string, s string) bool {
 	for _, v := range xs {
 		if v == s {
@@ -265,8 +274,24 @@ func pruneNodes(s *model.State, ids []string) {
 		s.Pools[i].NodeIDs = without(s.Pools[i].NodeIDs, ids)
 		s.Pools[i].ExcludeNodeIDs = without(s.Pools[i].ExcludeNodeIDs, ids)
 	}
+	// A chain is an ordered identity: deleting a hop must never silently shorten
+	// it into a different route. Disable the whole chain and its dedicated entry.
+	brokenChains := map[string]bool{}
+	for i := range s.Chains {
+		for _, id := range ids {
+			if contains(s.Chains[i].NodeIDs, id) {
+				s.Chains[i].Enabled = false
+				s.Chains[i].UpdatedAt = model.Now()
+				brokenChains[s.Chains[i].ID] = true
+				break
+			}
+		}
+	}
 	for i := range s.Listeners {
 		if s.Listeners[i].Kind == "node" && contains(ids, s.Listeners[i].TargetID) {
+			s.Listeners[i].Enabled = false
+		}
+		if s.Listeners[i].Kind == "chain" && brokenChains[s.Listeners[i].TargetID] {
 			s.Listeners[i].Enabled = false
 		}
 	}

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { test as base, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type { Bootstrap, Group, ImportResult, Mutation, PoolCreateResult, PoolDraft, PoolListenerInput, ProxyListener, ProxyNode, ProxyPool } from '../../src/shared/types';
+import type { Bootstrap, ChainCreateResult, ChainDraft, Group, ImportResult, Mutation, PoolCreateResult, PoolDraft, PoolListenerInput, ProxyChain, ProxyListener, ProxyNode, ProxyPool } from '../../src/shared/types';
 
 export { expect };
 
@@ -84,6 +84,20 @@ export class BrowserFixtures {
     })).data;
   }
 
+  chainDraft(label: string, nodeIds: string[], overrides: Partial<ChainDraft> = {}): ChainDraft {
+    return { name: this.name(label), nodeIds, enabled: true, ...overrides };
+  }
+
+  async chain(label: string, nodeIds: string[], overrides: Partial<ChainDraft> = {}): Promise<ProxyChain> {
+    return (await this.mutation<ProxyChain>('/api/chains', this.chainDraft(label, nodeIds, overrides))).data;
+  }
+
+  async chainWithListener(label: string, nodeIds: string[], listener: PoolListenerInput = {}, overrides: Partial<ChainDraft> = {}): Promise<ChainCreateResult> {
+    return (await this.mutation<ChainCreateResult>('/api/chains/with-listener', {
+      chain: this.chainDraft(label, nodeIds, overrides), listener,
+    })).data;
+  }
+
   // For the old listener endpoint only: the absent core never binds this saved
   // configuration. Atomic-create tests obtain ports through its real allocator.
   async unusedConfiguredPort(): Promise<number> {
@@ -128,6 +142,10 @@ export class BrowserFixtures {
     const state = await this.bootstrap();
     const owned = (item: { name: string }) => item.name.startsWith(this.prefix + '-');
     for (const listener of state.listeners.filter(owned)) await this.deleteListener(listener.id);
+    for (const chain of state.chains.filter(owned)) {
+      const response = await this.request.delete('/api/chains/' + encodeURIComponent(chain.id));
+      expect(response.ok(), 'Remove this test-owned chain').toBe(true);
+    }
     for (const pool of state.pools.filter(owned)) {
       const response = await this.request.delete('/api/pools/' + encodeURIComponent(pool.id));
       expect(response.ok(), 'Remove this test-owned pool').toBe(true);

@@ -5,7 +5,7 @@ import { expect } from '@playwright/test';
 
 const installation = patch => ({state:'idle',stage:'',version:'1.19.32',os:'windows',arch:'amd64',path:'C:/fixture/core/mihomo.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:'',...patch});
 const initial = () => ({
-  nodes:[],groups:[],pools:[],listeners:[],subscriptions:[],revision:7,activities:[],jobs:[],
+  nodes:[],groups:[],pools:[],chains:[],listeners:[],subscriptions:[],revision:7,activities:[],jobs:[],
   settings:{testUrl:'https://example.com/check',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,outboundInterface:''},
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'fixture: core is missing',startedAt:'',dirty:true,listeners:[]},
   coreInstallation:installation(),

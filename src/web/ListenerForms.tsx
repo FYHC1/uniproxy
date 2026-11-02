@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Key, Plus, Trash } from '@phosphor-icons/react';
-import type { Credential, ProxyListener } from '../shared/types';
+import type { Credential, ProxyChain, ProxyListener } from '../shared/types';
 import { useAction, useApp } from './state';
 import { Button, ErrorBox, Field, FormFooter, IconButton, Modal, Note, Toggle } from './ui';
 import { isIP, isLoopback, poolMembers } from './utils';
@@ -29,11 +29,13 @@ export function CredentialsEditor({users,onChange,original = []}:{users:UserDraf
 export function ProtocolFields({protocol,udp,setProtocol,setUdp}:{protocol:ProxyListener['protocol'];udp:boolean;setProtocol:(value:ProxyListener['protocol'])=>void;setUdp:(value:boolean)=>void}) {
   return <div className="form-grid"><Field label="监听协议"><select value={protocol} onChange={event => { const value = event.target.value as ProxyListener['protocol']; setProtocol(value); if (value === 'http') setUdp(false); }}><option value="mixed">Mixed · HTTP + SOCKS5</option><option value="http">HTTP</option><option value="socks">SOCKS5</option></select></Field><Toggle label="UDP 转发" checked={udp} onChange={setUdp} disabled={protocol === 'http'} description={protocol === 'http' ? 'HTTP 监听不支持 UDP' : '需要 UDP 兼容目标，且只能绑定回环地址'} /></div>;
 }
-export function ListenerDialog({listener,onClose,initialNodeId,initialPoolId}:{listener?:ProxyListener;onClose:()=>void;initialNodeId?:string;initialPoolId?:string}) {
+export function ListenerDialog({listener,onClose,initialNodeId,initialPoolId,initialChainId}:{listener?:ProxyListener;onClose:()=>void;initialNodeId?:string;initialPoolId?:string;initialChainId?:string}) {
   const {data,mutate} = useApp(); const state = data!;
-  const [name,setName] = useState(listener?.name || (initialPoolId ? (state.pools.find(pool => pool.id === initialPoolId)?.name || '代理池') + ' · 共享入口' : ''));
-  const [kind,setKind] = useState<ProxyListener['kind']>(listener?.kind || (initialPoolId ? 'pool' : initialNodeId ? 'node' : state.pools.length ? 'pool' : 'node'));
-  const [targetId,setTargetId] = useState(listener?.targetId || initialPoolId || initialNodeId || '');
+  const initialKind:ProxyListener['kind']|undefined = listener?.kind || (initialChainId ? 'chain' : initialPoolId ? 'pool' : initialNodeId ? 'node' : undefined);
+  const initialStateName = initialChainId ? (state.chains.find(chain => chain.id === initialChainId)?.name || '代理链') + ' · 链路入口' : initialPoolId ? (state.pools.find(pool => pool.id === initialPoolId)?.name || '代理池') + ' · 共享入口' : '';
+  const [name,setName] = useState(listener?.name || initialStateName);
+  const [kind,setKind] = useState<ProxyListener['kind']>(initialKind || (state.pools.length ? 'pool' : 'node'));
+  const [targetId,setTargetId] = useState(listener?.targetId || initialChainId || initialPoolId || initialNodeId || '');
   const [protocol,setProtocol] = useState<ProxyListener['protocol']>(listener?.protocol || 'mixed');
   const [host,setHost] = useState(listener?.host || '127.0.0.1');
   const [port,setPort] = useState(listener?.port || state.settings.portRangeStart);
@@ -41,13 +43,17 @@ export function ListenerDialog({listener,onClose,initialNodeId,initialPoolId}:{l
   const [enabled,setEnabled] = useState(listener?.enabled ?? true);
   const [users,setUsers] = useState<UserDraft[]>(draftUsers(listener?.users || []));
   const action = useAction();
-  const targets = kind === 'node' ? state.nodes : state.pools;
+  const targets:(ProxyChain|import('../shared/types').ProxyPool|import('../shared/types').ProxyNode)[] = kind === 'node' ? state.nodes : kind === 'pool' ? state.pools : state.chains;
   const target = targets.find(item => item.id === targetId);
+  const targetNodes = kind === 'chain' && target ? (target as ProxyChain).nodeIds.map(id => state.nodes.find(node => node.id === id)) : [];
+  const targetUDP = kind === 'chain' ? Boolean(target && targetNodes.length && targetNodes.every(node => node?.udp)) : Boolean(target && 'udp' in target && target.udp);
   const emptyPool = kind === 'pool' && target && poolMembers(state.nodes,state.pools.find(p => p.id === target.id)!).length === 0;
+  const blockedChain = kind === 'chain' && target ? (() => {const chain = target as ProxyChain;if (chain.nodeIds.length < 2) return '代理链少于 2 跳';const nodes = chain.nodeIds.map(id => state.nodes.find(node => node.id === id));if (nodes.some(node => !node)) return '代理链包含已删除节点';if (nodes.some(node => !node!.enabled)) return '代理链包含已停用节点';if (nodes.some(node => node?.dialerId)) return '代理链包含已设置中转的节点';if (nodes.some(node => node?.dialerError)) return '代理链包含中转异常节点';return '';})() : '';
   async function save() { await action.execute(async () => {
     if (!name.trim()) throw new Error('请输入监听名称。');
     if (!target && (enabled || !targetId)) throw new Error('请选择有效目标；失效目标仅可保存为禁用状态。');
-    if (udp && target && !target.udp) throw new Error('当前目标不支持 UDP，请关闭 UDP 或更换目标。');
+    if (enabled && blockedChain && kind === 'chain') throw new Error('该代理链当前不可用：' + blockedChain + '。请先修复链路，或停用监听。');
+    if (udp && target && !targetUDP) throw new Error(kind === 'chain' ? '代理链中的每个节点都必须支持 UDP。' : '当前目标不支持 UDP，请关闭 UDP 或更换目标。');
     const credentials = serializedUsers(users,listener?.users || []);
     if (!isLoopback(host) && !credentials.length) throw new Error('非回环地址必须设置至少一组用户名和密码。');
     if (udp && !isLoopback(host)) throw new Error('Mihomo 原生 UDP 不受用户名密码保护，UDP 仅允许回环地址。');
@@ -57,7 +63,7 @@ export function ListenerDialog({listener,onClose,initialNodeId,initialPoolId}:{l
     await mutate('/api/listeners' + (listener ? '/' + encodeURIComponent(listener.id) : ''),listener ? 'PUT' : 'POST',{name:name.trim(),kind,targetId,protocol,host:host.trim(),port,udp,enabled,users:credentials},listener ? '监听配置已保存' : '监听配置已创建');
     onClose();
   }); }
-  return <Modal title={listener ? '编辑监听端口' : '新建监听端口'} description="将一个本地入口绑定到节点或代理池。保存后由内核验证并应用。" onClose={onClose} busy={action.running} wide><form onSubmit={event => {event.preventDefault();void save();}}><div className="dialog-body"><fieldset disabled={action.running} className="form-fields"><Field label="监听名称" required><input value={name} onChange={event => setName(event.target.value)} required maxLength={100} placeholder="例如：办公应用入口" autoFocus /></Field><div className="form-grid"><Field label="目标类型"><select value={kind} onChange={event => {setKind(event.target.value as ProxyListener['kind']);setTargetId('');}}><option value="pool">代理池</option><option value="node">独立节点</option></select></Field><Field label="绑定目标" required><select required value={targetId} onChange={event => setTargetId(event.target.value)}><option value="">选择{kind === 'pool' ? '代理池' : '节点'}</option>{targetId && !target && <option value={targetId}>目标已失效 · 请重新选择</option>}{targets.map(item => <option key={item.id} value={item.id}>{item.name}{!item.enabled ? '（已禁用）' : ''}{item.udp ? ' · UDP' : ''}</option>)}</select></Field></div>{target && !target.enabled && <Note tone="warning">目标当前已禁用。保存监听不会自动启用目标，流量将被拒绝。</Note>}{emptyPool && <Note tone="warning">该代理池当前没有可用成员，连接将被拒绝，不会自动直连。</Note>}<ProtocolFields protocol={protocol} udp={udp} setProtocol={setProtocol} setUdp={setUdp} /><div className="form-grid"><Field label="监听地址" required hint="填写 IPv4 / IPv6 地址，不支持域名。默认只允许本机连接。"><input value={host} onChange={event => setHost(event.target.value)} required spellCheck={false} className="mono" placeholder="127.0.0.1" /></Field><Field label="端口" required><input type="number" value={port} onChange={event => setPort(Number(event.target.value))} min={1024} max={65535} required /></Field></div>{!isLoopback(host) && <Note tone="warning">此地址可能允许其他设备访问。必须设置认证，并在主机防火墙限制来源；普通 HTTP / SOCKS 认证本身不提供链路加密。</Note>}{udp && <Note tone="warning">原生 UDP 不受用户名密码保护，仅允许回环地址；不支持按认证用户名哈希。</Note>}<CredentialsEditor users={users} onChange={setUsers} original={listener?.users} /><Toggle label="启用此监听" checked={enabled} onChange={setEnabled} description="配置启用不等于实际监听，请以运行状态为准。" /></fieldset><ErrorBox message={action.error} /></div><FormFooter onClose={onClose} busy={action.running} label={listener ? '保存监听' : '创建监听'} /></form></Modal>;
+  return <Modal title={listener ? '编辑监听端口' : '新建监听端口'} description="将一个本地入口绑定到节点、代理池或代理链。保存后由内核验证并应用。" onClose={onClose} busy={action.running} wide><form onSubmit={event => {event.preventDefault();void save();}}><div className="dialog-body"><fieldset disabled={action.running} className="form-fields"><Field label="监听名称" required><input value={name} onChange={event => setName(event.target.value)} required maxLength={100} placeholder="例如：办公应用入口" autoFocus /></Field><div className="form-grid"><Field label="目标类型"><select value={kind} onChange={event => {setKind(event.target.value as ProxyListener['kind']);setTargetId('');}}><option value="pool">代理池</option><option value="chain">代理链</option><option value="node">独立节点</option></select></Field><Field label="绑定目标" required><select required value={targetId} onChange={event => setTargetId(event.target.value)}><option value="">选择{kind === 'pool' ? '代理池' : kind === 'chain' ? '代理链' : '节点'}</option>{targetId && !target && <option value={targetId}>目标已失效 · 请重新选择</option>}{targets.map(item => <option key={item.id} value={item.id}>{item.name}{!item.enabled ? '（已禁用）' : ''}{item.id === targetId && kind === 'chain' ? ((target as ProxyChain).nodeIds.length + ' 跳') : ('udp' in item && item.udp ? ' · UDP' : '')}</option>)}</select></Field></div>{target && !target.enabled && <Note tone="warning">目标当前已禁用。保存监听不会自动启用目标，流量将被拒绝。</Note>}{blockedChain && <Note tone="warning">该代理链当前不可用：{blockedChain}。流量将被拒绝，不会回退直连。</Note>}{emptyPool && <Note tone="warning">该代理池当前没有可用成员，连接将被拒绝，不会自动直连。</Note>}<ProtocolFields protocol={protocol} udp={udp} setProtocol={setProtocol} setUdp={setUdp} /><div className="form-grid"><Field label="监听地址" required hint="填写 IPv4 / IPv6 地址，不支持域名。默认只允许本机连接。"><input value={host} onChange={event => setHost(event.target.value)} required spellCheck={false} className="mono" placeholder="127.0.0.1" /></Field><Field label="端口" required><input type="number" value={port} onChange={event => setPort(Number(event.target.value))} min={1024} max={65535} required /></Field></div>{!isLoopback(host) && <Note tone="warning">此地址可能允许其他设备访问。必须设置认证，并在主机防火墙限制来源；普通 HTTP / SOCKS 认证本身不提供链路加密。</Note>}{udp && <Note tone="warning">原生 UDP 不受用户名密码保护，仅允许回环地址；不支持按认证用户名哈希。</Note>}<CredentialsEditor users={users} onChange={setUsers} original={listener?.users} /><Toggle label="启用此监听" checked={enabled} onChange={setEnabled} description="配置启用不等于实际监听，请以运行状态为准。" /></fieldset><ErrorBox message={action.error} /></div><FormFooter onClose={onClose} busy={action.running} label={listener ? '保存监听' : '创建监听'} /></form></Modal>;
 }
 export function BatchListenerDialog({nodeIds,onClose}:{nodeIds:string[];onClose:()=>void}) {
   const {data,mutate} = useApp();

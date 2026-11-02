@@ -90,6 +90,18 @@ type Listener struct {
 	CreatedAt string       `json:"createdAt"`
 	UpdatedAt string       `json:"updatedAt"`
 }
+
+// Chain is an ordered outbound path. Each hop is an independently compiled
+// copy of an existing node; it is not a native proxy-group and never changes
+// the original node's own relay settings.
+type Chain struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	NodeIDs   []string `json:"nodeIds"`
+	Enabled   bool     `json:"enabled"`
+	CreatedAt string   `json:"createdAt"`
+	UpdatedAt string   `json:"updatedAt"`
+}
 type Subscription struct {
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
@@ -121,6 +133,7 @@ type State struct {
 	Nodes         []Node         `json:"nodes"`
 	Groups        []Group        `json:"groups"`
 	Pools         []Pool         `json:"pools"`
+	Chains        []Chain        `json:"chains"`
 	Listeners     []Listener     `json:"listeners"`
 	Subscriptions []Subscription `json:"subscriptions"`
 	Settings      Settings       `json:"settings"`
@@ -166,6 +179,7 @@ type ListenerRuntime struct {
 }
 type CheckResult struct {
 	NodeID    string   `json:"nodeId"`
+	ChainID   string   `json:"chainId,omitempty"`
 	OK        bool     `json:"ok"`
 	LatencyMS *int64   `json:"latencyMs"`
 	SpeedMbps *float64 `json:"speedMbps"`
@@ -201,7 +215,7 @@ type ImportResult struct {
 
 func Now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 func DefaultState() State {
-	return State{Nodes: []Node{}, Groups: []Group{}, Pools: []Pool{}, Listeners: []Listener{}, Subscriptions: []Subscription{}, Settings: Settings{TestURL: "https://www.gstatic.com/generate_204", SpeedTestURL: "https://speed.cloudflare.com/__down?bytes=10485760", TestTimeoutMS: 8000, TestConcurrency: 8, SpeedTestBytes: 10485760, HealthIntervalSeconds: 300, PortRangeStart: 20000, PortRangeEnd: 20999}}
+	return State{Nodes: []Node{}, Groups: []Group{}, Pools: []Pool{}, Chains: []Chain{}, Listeners: []Listener{}, Subscriptions: []Subscription{}, Settings: Settings{TestURL: "https://www.gstatic.com/generate_204", SpeedTestURL: "https://speed.cloudflare.com/__down?bytes=10485760", TestTimeoutMS: 8000, TestConcurrency: 8, SpeedTestBytes: 10485760, HealthIntervalSeconds: 300, PortRangeStart: 20000, PortRangeEnd: 20999}}
 }
 
 // PoolMembers resolves stable, ordered membership. Health remains a core decision, not a stale DB filter.

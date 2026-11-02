@@ -43,6 +43,8 @@ type compiledConfig struct {
 	data      []byte
 	revision  int64
 	nodes     map[string]struct{}
+	chainTags map[string]string
+	chainHops map[string][]string
 	listeners []model.Listener
 	probe     model.Listener
 	runtime   []model.ListenerRuntime
@@ -75,12 +77,14 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	if addressesOverlap(controllerHost, controllerPort, probeHost, probePort) {
 		return nil, errors.New("controller and probe addresses conflict")
 	}
-	cfg := &compiledConfig{revision: state.Revision, nodes: map[string]struct{}{}, listeners: []model.Listener{}, runtime: []model.ListenerRuntime{}}
+	cfg := &compiledConfig{revision: state.Revision, nodes: map[string]struct{}{}, chainTags: map[string]string{}, chainHops: map[string][]string{}, listeners: []model.Listener{}, runtime: []model.ListenerRuntime{}}
 	nodes := append([]model.Node(nil), state.Nodes...)
 	pools := append([]model.Pool(nil), state.Pools...)
+	chains := append([]model.Chain(nil), state.Chains...)
 	listeners := append([]model.Listener(nil), state.Listeners...)
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
 	sort.Slice(pools, func(i, j int) bool { return pools[i].ID < pools[j].ID })
+	sort.Slice(chains, func(i, j int) bool { return chains[i].ID < chains[j].ID })
 	sort.Slice(listeners, func(i, j int) bool { return listeners[i].ID < listeners[j].ID })
 	if err := model.ValidateRelayGraph(nodes); err != nil {
 		return nil, err
@@ -88,6 +92,7 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	blocked := model.RelayErrors(nodes)
 	nodeByID := map[string]model.Node{}
 	poolByID := map[string]model.Pool{}
+	chainByID := map[string]model.Chain{}
 	proxies := []map[string]any{}
 	groups := []map[string]any{}
 	inbounds := []map[string]any{}
@@ -120,6 +125,52 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 		username := nodeTag(node.ID)
 		probeUsers = append(probeUsers, map[string]string{"username": username, "password": probePassword(opts.ProbeSecret, node.ID)})
 		probeRules = append(probeRules, "IN-USER,"+username+","+nodeTag(node.ID))
+	}
+
+	for _, chain := range chains {
+		if !safeID.MatchString(chain.ID) {
+			return nil, errors.New("chain has an invalid stable ID")
+		}
+		if _, ok := chainByID[chain.ID]; ok {
+			return nil, errors.New("duplicate chain ID")
+		}
+		chainByID[chain.ID] = chain
+		if !chain.Enabled || len(chain.NodeIDs) < 2 || len(chain.NodeIDs) > 16 {
+			continue
+		}
+		tags := make([]string, 0, len(chain.NodeIDs))
+		chainProxies := make([]map[string]any, 0, len(chain.NodeIDs))
+		seen := make(map[string]struct{}, len(chain.NodeIDs))
+		valid := true
+		for index, id := range chain.NodeIDs {
+			n, ok := nodeByID[id]
+			if !ok || !n.Enabled || blocked[id] != "" || n.DialerID != "" {
+				valid = false
+				break
+			}
+			if _, duplicate := seen[id]; duplicate {
+				valid = false
+				break
+			}
+			seen[id] = struct{}{}
+			native, err := nativeProxy(n)
+			if err != nil {
+				valid = false
+				break
+			}
+			tag := chainHopTag(chain.ID, index+1)
+			native["name"] = tag
+			if index > 0 {
+				native["dialer-proxy"] = tags[index-1]
+			}
+			chainProxies = append(chainProxies, native)
+			tags = append(tags, tag)
+		}
+		if valid && len(tags) == len(chain.NodeIDs) {
+			proxies = append(proxies, chainProxies...)
+			cfg.chainTags[chain.ID] = tags[len(tags)-1]
+			cfg.chainHops[chain.ID] = append([]string(nil), tags...)
+		}
 	}
 
 	for _, pool := range pools {
@@ -251,8 +302,21 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 					runtime.Error = "pool has no eligible members; traffic is rejected"
 				}
 			}
+		case "chain":
+			if c, ok := chainByID[listener.TargetID]; ok && c.Enabled {
+				if tag, live := cfg.chainTags[c.ID]; live {
+					if listener.UDP {
+						for _, id := range c.NodeIDs {
+							if n, exists := nodeByID[id]; !exists || !n.UDP {
+								return nil, errors.New("UDP listener targets a chain with a TCP-only node")
+							}
+						}
+					}
+					target = tag
+				}
+			}
 		default:
-			return nil, errors.New("listener target kind must be node or pool")
+			return nil, errors.New("listener target kind must be node, pool or chain")
 		}
 		if target == "REJECT" {
 			runtime.Error = "target or relay dependency is absent or disabled; traffic is rejected"
@@ -299,9 +363,10 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	return cfg, nil
 }
 
-func nodeTag(id string) string     { return "n-" + id }
-func poolTag(id string) string     { return "p-" + id }
-func listenerTag(id string) string { return "l-" + id }
+func nodeTag(id string) string                { return "n-" + id }
+func poolTag(id string) string                { return "p-" + id }
+func chainHopTag(id string, index int) string { return "c-" + id + "-" + strconv.Itoa(index) }
+func listenerTag(id string) string            { return "l-" + id }
 func probePassword(secret, id string) string {
 	h := hmac.New(sha256.New, []byte(secret))
 	_, _ = h.Write([]byte("uniproxy-probe:" + id))

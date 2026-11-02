@@ -48,6 +48,14 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 - 真实出站（手工，未纳入 CI）：用 `core.Build` 生成配置改写端口后启动临时 Mihomo，比对 auto/以太网/WLAN/Meta 的 HTTP 结果，并用 `Get-NetTCPConnection -OwningProcess` 核对出站源地址随 `interface-name` 变化；不存在的网卡应表现为拨号失败而非直连回退。
 - 浏览器：[outbound-interface.spec.ts](<../tests/browser/outbound-interface.spec.ts>) 在隔离 19090 服务上断言下拉选项与 `GET /api/interfaces` 的启用非回环网卡逐项一致、只暴露 name/up/loopback/addresses、保存真实网卡后 bootstrap 持久化并可改回自动、不存在网卡 PATCH 返回 400 且不写库；用例自行清理 pin，不依赖其他 spec 的残留状态。[verify.mjs](<../src/web/tests/verify.mjs>) 的 fixture 覆盖网卡消失后的「当前不可用」标注与陈旧值不被静默改写。
 - 该设置只改变自有内核的出站源网卡，不是 TUN，不创建虚拟网卡，不改系统路由/DNS；浏览器用例只验证交互与持久化，不验证真实网卡出站效果，不能替代上述手工核对。
+
+## 代理链验证
+
+- 模型/API：[chain_api_test.go](<../internal/app/chain_api_test.go>)、[chain_delete_test.go](<../internal/app/chain_delete_test.go>) 与 [chain_test.go](<../internal/app/chain_test.go>) 覆盖 2–16 跳、重复/缺失/禁用/中转错误、原子创建链+监听、默认端口分配、非法/冲突入口、整链检测、编辑/删除、删除节点停用整链且保留原顺序，以及带 UDP 入口的删除事务与检测失败返回 HTTP 200 CheckResult；所有 API 响应不返回凭据。
+- 编译：[compiler_chain_test.go](<../internal/core/compiler_chain_test.go>) 断言 `c-<chainID>-<index>` 顺序、第二跳 `dialer-proxy`、原节点不变、监听末跳、无 partial 链、失败入口 REJECT 与 UDP 逐跳检查。
+- 真实内核：[chain_real_test.go](<../internal/core/chain_real_test.go>) 需 `UNIPROXY_TEST_CORE_PATH`，用两个回环 SOCKS 上游和本地 HTTP origin 验证 `CheckChain` 成功且两跳都收到真实连接；只证明本机链路，不证明公网节点可用性。
+- 前端/浏览器：[utils.test.mjs](<../src/web/tests/utils.test.mjs>) 覆盖链候选/顺序纯函数；[chain-workflow.spec.ts](<../tests/browser/chain-workflow.spec.ts>) 的 5 例覆盖有序链+原子监听、单跳拒绝、筛选外保留、复制停用副本、监听页 chain 目标、清空确认，以及停用监听保存失效链。fixture 的延迟必须来自真实检测请求，没有内核时显示未检测，不能伪造延迟。
+- 已知边界：链只支持自有内核的 TCP 入口；UDP 要求每一跳 UDP；真实公网远端链路、跨平台实跑、Docker、race 和容量未在本轮验证。
 ## 必测功能
 
 1. 各协议链接/Clash/sing-box 配置导入，非法参数及不支持变体明确拒绝，错误不泄漏密钥。

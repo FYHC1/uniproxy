@@ -1,8 +1,8 @@
 # UniProxy 开发计划与任务状态
 
-最后更新：2026-11-02 16:05（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
+最后更新：2026-11-02 19:05（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M24完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。**
+**当前结论：M0–M25完成。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，尚未提交、发布或部署。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -146,6 +146,18 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 验证：`go test -mod=readonly -p 1 ./... -count=1`（显式 `UNIPROXY_TEST_CORE_PATH=C:\CustomFiles\CodeProjects\Github\uniproxy\bin\mihomo.exe`）全通过（cmd0.120s、app9.121s、core8.805s、coreinstall0.482s、importer0.751s、integration4.069s 等）；`go vet ./...`、`gofmt -l internal cmd tests`、`FuzzParseNeverPanics` 15s/246481 execs 通过；`bin/mihomo.exe -t -f` 对 VLESS XHTTP+VMess KCP+VLESS ECH 合成配置报成功。
 - 发布：源码提交 `dba132cb379fe113b897b787fef3a94ab91b8bef`；main CI `41409672766`、tag CI `41409873967`、Release workflow `41409873947` 全部成功；`v0.2.6` 于 2026-11-02 16:00:55 +08 发布并设 Latest，四平台资产与 SHA256SUMS 已核验。
 - 边界：已随 v0.2.6 发布（不含部署）；用户运行实例未触碰；未做真实远端节点连通/吞吐测试；固定 Mihomo 无等价字段按错误处理。详见[现代协议验证](<modern-protocol-verification.md>)。
+
+## M25 — 链式代理（2026-11-02 完成，计划随 v0.2.7 发布，不含部署）
+
+- 用户批准的设计：独立「代理链」页；创建窗口左侧分组节点库、右侧有序代理链配置；打开时对可见可测节点自动测一次延迟，点击延迟可重测；入口监听可折叠并在同一事务创建。范围包含模型/存储/校验、编译器、检测、API、前端与测试，不改变节点协议、订阅解析、内核版本或系统网络。
+- 模型/API：新增 `Chain{ID,Name,NodeIDs,Enabled,CreatedAt,UpdatedAt}` 与 `State.Chains`；新增 `GET/POST /api/chains`、`PUT/DELETE /api/chains/{id}`、`POST /api/chains/with-listener`、`POST /api/chains/{id}/test`；监听 `kind` 增加 `chain`，目标为链 ID；入口复用池监听的协议/地址/端口/认证/UDP 校验和自动端口分配。
+- 编译/运行：每条链生成 `c-<chainID>-<index>` 合成 outbound 副本，第二跳起设置 `dialer-proxy` 指向前一跳，监听只绑定末跳；任一跳缺失/禁用/中转异常、跳数越界、重复 hop 或 nativeProxy 构造失败时整链不生成并让入口 REJECT，不缩短不回退直连。`compiledConfig.chainTags` 记录链→末跳 tag，`chainHops` 记录全部 hop tag；`verifyProxies` 逐一检查每一跳真实暴露；`Manager.CheckChain` 调用内核 delay 接口测试整链，不写节点健康。
+- 删除/校验：删除节点会停用包含该节点的整链及其 chain 监听，保留 NodeIDs 便于修复；启用链要求 2–16 跳、节点唯一且存在、每跳启用且无 DialerID/RelayErrors；UDP 入口要求每跳节点支持 UDP。
+- 前端：新增 [ChainsPage](<../src/web/ChainsPage.tsx>) 与 [ChainDialog](<../src/web/ChainDialog.tsx>)，独立导航「代理链」；双栏节点库/链路配置、分组筛选/状态筛选/排序/搜索/真实延迟、链路顺序上移/下移/移除、入口/出口标签、少于 2 跳提示、清空确认、创建/编辑/复制/启停/删除/整链测试；监听页目标类型增加代理链。
+- 测试：新增 `internal/app/chain_*_test.go`、`internal/core/compiler_chain_test.go`、`internal/core/chain_real_test.go`、`src/web/chainSelection.ts` 纯函数测试、`tests/browser/chain-workflow.spec.ts`（5 例）。真实内核测试用两个回环 SOCKS 上游与本地 HTTP origin，确认两跳都收到连接；独立审查后补上删除节点/UDP 事务、整链检测失败 HTTP 200、重复 hop fail-closed、停用监听保存失效链等回归；本机全量 Go、严格 TS、生产 Web 构建、UI 工具（42/42）、链浏览器 5/5 与全量浏览器 48/48 通过。
+- 本地预览构建（2026-11-02 19:56）：`bin/updates/chain-preview/uniproxy-windows-amd64.exe`，14,205,440 字节，SHA256 `5c8705f9451b9cceb1a7d62df738b3a3c04b96b1268d88c16a950cfced67e148`，身份 `0.2.6-chain-preview.1 · commit local-chain- · built 2026-11-02T11:56:52Z`；隔离 19091 启动/health/嵌入首页通过，针对该 exe 的 TestBuilt 集成测试全部 PASS（1.518s）；说明见 `bin/updates/chain-preview/使用说明.md`。仍为本地预览，不是发布资产。
+- 边界：代理链只支持本应用自有内核的 TCP 入口；UDP 要求每一跳节点支持；不承诺真实公网远端链路性能/可用性；未做多平台实跑、Docker、race 或容量测试。本版计划随 v0.2.7 发布，不部署，用户运行实例未触碰。
+- 运行排障（2026-11-02 20:52）：9router 代理池 20006 的 `JP-US` 链曾报 ECONNRESET；隔离进程验证为第一跳台湾节点无法承载到第二跳的嵌套 TLS/Reality（美国直连 735ms、日本→美国 1967ms 成功、台湾→美国 8s 超时，去掉 Vision 仍失败），非编译器问题。通过 API 将第一跳改为日本原生01 后，链测试 3/3 通过（1404/1882/1444ms），20006 HTTP/SOCKS 204，9router `JP-US1` 20:49:07 测试成功并 active。只改运行配置，未改源码/数据库。
 
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 

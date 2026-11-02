@@ -329,6 +329,13 @@ func (a *App) Handler() http.Handler {
 			return map[string]bool{"deleted": true}, nil
 		})
 	})
+	route("GET /api/chains", func(w http.ResponseWriter, r *http.Request) (any, error) { return chainList(a.store.Snapshot()), nil })
+	route("POST /api/chains/with-listener", a.createChainWithListener)
+	for _, method := range []string{"POST /api/chains", "PUT /api/chains/{id}"} {
+		route(method, a.putChain)
+	}
+	route("POST /api/chains/{id}/test", a.testChain)
+	route("DELETE /api/chains/{id}", a.deleteChain)
 	route("POST /api/pools/with-listener", a.createPoolWithListener)
 	route("DELETE /api/pools/{id}/members/{nodeId}", a.deletePoolMember)
 	for _, method := range []string{"POST /api/pools", "PUT /api/pools/{id}"} {
