@@ -43,7 +43,16 @@ const (
 // same document; normalized native Config never carries dialer-proxy.
 func Parse(content string) model.ParseResult {
 	result := model.ParseResult{Nodes: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
-	parseContent(content, 0, &result)
+	parseContent(content, 0, &result, false)
+	return result
+}
+
+// ParsePreview is the explicit lenient tier. It keeps every strict node in
+// Nodes, records lossy URI entries in Degraded, and never turns a degraded
+// entry into an applicable node. Structured documents remain strict.
+func ParsePreview(content string) model.ParseResult {
+	result := model.ParseResult{Nodes: []model.ParsedNode{}, Degraded: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
+	parseContent(content, 0, &result, true)
 	return result
 }
 
@@ -59,7 +68,7 @@ func issue(result *model.ParseResult, line int, message string) {
 	}
 }
 
-func parseContent(content string, depth int, result *model.ParseResult) {
+func parseContent(content string, depth int, result *model.ParseResult, preview bool) {
 	if len(content) > MaxContentBytes {
 		issue(result, 1, "import exceeds the 5 MiB limit")
 		return
@@ -86,42 +95,7 @@ func parseContent(content string, depth int, result *model.ParseResult) {
 		return
 	}
 	if isURILine(first) || looksLikeURIList(trimmed) {
-		scanner := bufio.NewScanner(strings.NewReader(content))
-		scanner.Buffer(make([]byte, 4096), MaxContentBytes+1)
-		line, attempts := 0, 0
-		statusSeen := false
-		for scanner.Scan() {
-			line++
-			text := strings.TrimSpace(scanner.Text())
-			if text == "" || strings.HasPrefix(text, "#") || strings.HasPrefix(text, "//") {
-				continue
-			}
-			// Some URI subscriptions prepend a STATUS= account-information line.
-			// It is presentation only, never a node or a request. Accept at most
-			// one bounded header before entries; unknown/late lines still fail.
-			if strings.HasPrefix(text, "STATUS=") && attempts == 0 && !statusSeen {
-				statusSeen = true
-				value := strings.TrimPrefix(text, "STATUS=")
-				if value == "" || len(value) > 1024 || containsControl(value) {
-					issue(result, line, "invalid subscription status header")
-				}
-				continue
-			}
-			attempts++
-			if attempts > MaxNodes {
-				issue(result, line, "import exceeds the 5000 node limit")
-				break
-			}
-			node, err := parseURI(text)
-			if err != nil {
-				issue(result, line, err.Error())
-			} else {
-				result.Nodes = append(result.Nodes, node)
-			}
-		}
-		if scanner.Err() != nil {
-			issue(result, line, "URI line exceeds the input limit")
-		}
+		parseURIList(content, result, preview)
 		return
 	}
 	if decoded, ok := decodeBase64(trimmed, true); ok {
@@ -129,10 +103,57 @@ func parseContent(content string, depth int, result *model.ParseResult) {
 			issue(result, 1, "base64 nesting exceeds the supported limit")
 			return
 		}
-		parseContent(decoded, depth+1, result)
+		parseContent(decoded, depth+1, result, preview)
 		return
 	}
 	parseDocument(content, result)
+}
+
+func parseURIList(content string, result *model.ParseResult, preview bool) {
+	scanner := bufio.NewScanner(strings.NewReader(content))
+	scanner.Buffer(make([]byte, 4096), MaxContentBytes+1)
+	line, attempts := 0, 0
+	statusSeen := false
+	for scanner.Scan() {
+		line++
+		text := strings.TrimSpace(scanner.Text())
+		if text == "" || strings.HasPrefix(text, "#") || strings.HasPrefix(text, "//") {
+			continue
+		}
+		// Some URI subscriptions prepend a STATUS= account-information line.
+		// It is presentation only, never a node or a request. Accept at most
+		// one bounded header before entries; unknown/late lines still fail.
+		if strings.HasPrefix(text, "STATUS=") && attempts == 0 && !statusSeen {
+			statusSeen = true
+			value := strings.TrimPrefix(text, "STATUS=")
+			if value == "" || len(value) > 1024 || containsControl(value) {
+				issue(result, line, "invalid subscription status header")
+			}
+			continue
+		}
+		attempts++
+		if attempts > MaxNodes {
+			issue(result, line, "import exceeds the 5000 node limit")
+			break
+		}
+		node, err := parseURI(text)
+		if err == nil {
+			result.Nodes = append(result.Nodes, node)
+			continue
+		}
+		if preview {
+			if degraded, reasons, ok := parseURIForPreview(text); ok {
+				degraded.Degraded = true
+				degraded.DegradedReasons = reasons
+				result.Degraded = append(result.Degraded, degraded)
+				continue
+			}
+		}
+		issue(result, line, err.Error())
+	}
+	if scanner.Err() != nil {
+		issue(result, line, "URI line exceeds the input limit")
+	}
 }
 
 func firstDataLine(s string) string {

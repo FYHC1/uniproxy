@@ -1,6 +1,7 @@
 # Offline importer
 
-`Parse(content string) model.ParseResult` returns JSON-compatible native Mihomo outbound maps without a user-controlled `name` or `dialer-proxy`. `Fingerprint(model.ParsedNode)` returns a SHA-256 identity that excludes display/reference names but includes credentials, endpoint, UDP setting, TLS, transport options, and the recursively resolved upstream identity. Direct-node hashes remain bit-for-bit compatible with the pre-relay encoding. Invalid caller-created maps, raw config delegation, malformed dependency fingerprints, and unresolved references return an empty fingerprint.
+`Parse(content string) model.ParseResult` returns JSON-compatible native Mihomo outbound maps without a user-controlled `name` or `dialer-proxy`. `ParsePreview(content string)` is the separate lenient preview tier: strict nodes remain in `Nodes`, lossy URI nodes are returned in `Degraded` with reasons, and those entries must never be passed to `addParsed` or applied to the core. `Fingerprint(model.ParsedNode)` returns a SHA-256 identity that excludes display/reference names but includes credentials, endpoint, UDP setting, TLS, transport options, and the recursively resolved upstream identity. Direct-node hashes remain bit-for-bit compatible with the pre-relay encoding. Invalid caller-created maps, raw config delegation, malformed dependency fingerprints, and unresolved references return an empty fingerprint.
+
 
 ## Accepted inputs
 
@@ -29,7 +30,7 @@ Only valid native targets in the current document are eligible. Missing/invalid 
 
 ## Safety and limits
 
-No resolver, HTTP client, filesystem access, subprocess, or network side effect exists in production parser code. Importing a URL parses a proxy definition; it never downloads a subscription. All unrecognized node/transport/TLS options are errors. Fields are copied only through consuming allowlists, not by forwarding source maps. Errors never echo submitted values.
+No resolver, HTTP client, filesystem access, subprocess, or network side effect exists in production parser code. Importing a URL parses a proxy definition; it never downloads a subscription. All unrecognized node/transport/TLS options are errors in strict `Parse`; only the explicit `ParsePreview` tier may drop or annotate them in `Degraded`, and those entries cannot be applied. Fields are copied only through consuming allowlists, not by forwarding source maps. Errors never echo submitted values.
 
 Limits: 5 MiB input, 5000 entries, 32 structural levels, 250000 YAML syntax values, four base64 layers, and 16 relay dependency edges. Each textual field is bounded; imported URI credentials must be valid UTF-8 and are percent-decoded once. Large single lines are not subject to the default 64 KiB scanner limit.
 

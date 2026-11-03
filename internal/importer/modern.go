@@ -45,7 +45,7 @@ func validVLESSEncryption(s string) bool {
 			continue
 		}
 		b, err := base64.RawURLEncoding.Strict().DecodeString(part)
-		if err != nil || len(b) != 32 && len(b) != 1088 {
+		if err != nil || len(b) != 32 && len(b) != 1088 && len(b) != 1184 {
 			return false
 		}
 		keys++

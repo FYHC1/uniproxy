@@ -11,7 +11,7 @@
 ## 功能
 
 - 导入 VLESS / VMess / Trojan / Shadowsocks / Hysteria / Hysteria2 / TUIC / SSH / SOCKS5 / HTTP(S) 节点。
-- 粘贴节点链接、Base64 订阅、批量订阅 URL、本地 Clash YAML/JSON 和 sing-box JSON。0.2.8 源码支持 Quantumult X、Surge/Surfboard、Loon 静态节点文本；只提取节点，不采用全局规则/脚本或远程provider。自定义多个分组，预览识别结果；不支持的参数明确报错，不悄悄降级。
+- 粘贴节点链接、Base64 订阅、批量订阅 URL、本地 Clash YAML/JSON 和 sing-box JSON。0.2.9 源码支持 Quantumult X、Surge/Surfboard、Loon 静态节点文本；只提取节点，不采用全局规则/脚本或远程provider。自定义多个分组，预览识别结果；不支持的参数明确报错，不悄悄降级。
 - 节点多分组、搜索筛选（包含任一/全部、排除分组、仅未分组）、批量启禁/删除/加减分组、连通性检测、限流下载测速、批量独享端口。点击分组可直接分页管理组内节点、添加已有节点、移出本组和全局启禁/检测。
 - 订阅下载支持严格Fake-IP DNS兼容与分类诊断：只对全Fake-IP域名做公共加密DNS复核，保留公网地址/TLS/重定向安全校验，不放行内网。
 - 本地导入支持点击选择和拖入单个文件；相同5MiB限制，拒绝文件夹/多文件，拖入后需预览确认。
@@ -27,7 +27,7 @@
 
 ## 下载发布版
 
-当前正式版本：[UniProxy v0.2.8](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.8>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
+当前正式版本：[UniProxy v0.2.9](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.9>)。提供Windows/Linux × amd64/arm64四个主程序和SHA256SUMS；启动后在WebUI安装Mihomo，无需独立安装器。仓库现为公开仓库，可从发布页下载。
 
 ## 快速开始（源码）
 

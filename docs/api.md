@@ -43,7 +43,7 @@ curl -H "Authorization: Bearer $UNIPROXY_ADMIN_TOKEN" http://127.0.0.1:9090/api/
 }
 ~~~
 
-订阅使用 mode:subscriptions，content 中每行一个HTTP(S) URL。文件上传或拖入由Web读取为文本后使用 mode:file，同样最大5MiB。Clash同文件dialer-proxy依赖自动保留；预览可显示dialerProxy。公开节点可含dialerId、dialerName、dialerError；后者表示中转缺失/禁用，不能直接转发。预览诊断totalErrors为完整数量，errorsTruncated表示详细错误被截断（最多128条），后续有效节点仍会处理。批量订阅不支持从URL查询参数自动推断组名，groupIds/groupNames明确控制分组。
+订阅使用 mode:subscriptions，content 中每行一个HTTP(S) URL。文件上传或拖入由Web读取为文本后使用 mode:file，同样最大5MiB。Clash同文件dialer-proxy依赖自动保留；预览可显示dialerProxy。公开节点可含dialerId、dialerName、dialerError；后者表示中转缺失/禁用，不能直接转发。预览诊断会额外返回 `degraded` 数组（仅预览节点，带固定原因文案，不进入导入）；`totalErrors` 为完整数量，`errorsTruncated` 表示详细错误被截断（最多128条），后续有效节点仍会处理。批量订阅不支持从URL查询参数自动推断组名，groupIds/groupNames明确控制分组。
 
 ## 订阅下载与排错
 

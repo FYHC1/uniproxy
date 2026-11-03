@@ -12,7 +12,7 @@ test('plaintext TLS template defaults preview and commit without exposing creden
   await expect(dialog.getByText(/未明确声明 UDP 时仅导入 TCP/)).toBeVisible();
   await dialog.getByLabel('节点内容', { exact: true }).fill(source);
   await dialog.getByRole('button', { name: '预览解析', exact: true }).click();
-  await expect(dialog.locator('.preview-section')).toContainText('1 个节点');
+  await expect(dialog.locator('.preview-section')).toContainText('1 个可导入');
   await expect(dialog.locator('.import-errors')).toHaveCount(0);
   expect(await dialog.locator('.preview-section').textContent()).not.toContain('11111111-1111-4111-8111-111111111111');
   expect((await fixtures.bootstrap()).revision).toBe(before.revision);
@@ -38,7 +38,7 @@ test('client static profile file previews nodes but never imports global policy'
   await expect(dialog.getByText(/未明确声明 UDP 时仅导入 TCP/)).toBeVisible();
   await dialog.getByLabel('选择节点配置文件', { exact: true }).setInputFiles({ name: 'synthetic-profile.conf', mimeType: 'text/plain', buffer: Buffer.from(content) });
   await dialog.getByRole('button', { name: '预览解析', exact: true }).click();
-  await expect(dialog.locator('.preview-section')).toContainText('1 个节点');
+  await expect(dialog.locator('.preview-section')).toContainText('1 个可导入');
   await expect(dialog.locator('.import-errors')).toHaveCount(0);
   expect(await dialog.locator('.preview-section').textContent()).not.toContain(credential);
   expect((await fixtures.bootstrap()).revision).toBe(before.revision);

@@ -1,6 +1,14 @@
 # UniProxy 变更记录
 
-日期按 Asia/Shanghai。v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
+日期按 Asia/Shanghai。v0.2.9 待发布；v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
+
+## 0.2.9 — 2026-11-03 · 协议适配三档（待发布）
+
+- 新增严格 native、宽松预览/degraded、真实可用性三档：`Parse` 保持严格，`ParsePreview` 只对 URI 列表做预览级归一，降级节点写入 `Degraded` 并附原因，永不进入可应用节点。
+- 严格修复 `security=false`、`packetEncoding=none`、`type=none`、`extra=null`、空 `fp`、`fp=ios`、WS `headerType=none`、TCP path/host 占位和 VLESS Encryption 1184 字节 key；Xray-only Reality/finalmask 字段仍不伪造支持。
+- 真实订阅 1064 条统计：严格 697、预览可展示 697+365=1062、2 条未恢复；导入弹窗区分“可导入/仅预览”，订阅提交仍 all-or-nothing。
+- 验证：`gofmt`、`go vet ./...`、`go test ./... -count=1`、`pnpm typecheck` 通过；新增 `internal/importer/preview_test.go`、`internal/app/preview_import_test.go`。
+- 仅本地实现，未提交、未发布、未部署；详见[协议适配三档验证](<docs/protocol-adaptation-tiers.md>)。
 
 ## 0.2.8 — 2026-11-03 · 界面刷新与代理池体验
 

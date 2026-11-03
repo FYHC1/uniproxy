@@ -77,7 +77,7 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 		return nil, bad("订阅更新间隔必须为 5–10080 分钟")
 	}
 	fetched := []fetchedImport{}
-	combined := model.ParseResult{Nodes: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
+	combined := model.ParseResult{Nodes: []model.ParsedNode{}, Degraded: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
 	if r.Mode == "subscriptions" {
 		urls := strings.Fields(r.Content)
 		if len(urls) > 50 {
@@ -94,20 +94,26 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 				combined.Errors = append(combined.Errors, model.ImportIssue{Line: i + 1, Message: e.Error()})
 				continue
 			}
-			pr := importer.Parse(body)
+			pr := importer.ParsePreview(body)
 			if len(pr.Errors) > 0 {
 				combined.Errors = append(combined.Errors, model.ImportIssue{Line: i + 1, Message: subscriptionParseError(pr, false)})
-				continue
+				// Preview may show a partially parsed source when it contains
+				// degraded nodes for diagnosis; commit remains all-or-nothing.
+				if !r.Preview || len(pr.Degraded) == 0 {
+					continue
+				}
 			}
-			if len(pr.Nodes) == 0 {
-				combined.Errors = append(combined.Errors, model.ImportIssue{Line: i + 1, Message: "订阅没有有效节点，未导入"})
+			if len(pr.Nodes) == 0 && len(pr.Degraded) == 0 {
+				message := "订阅没有有效节点，未导入"
+				combined.Errors = append(combined.Errors, model.ImportIssue{Line: i + 1, Message: message})
 				continue
 			}
 			fetched = append(fetched, fetchedImport{raw, pr})
 			combined.Nodes = append(combined.Nodes, pr.Nodes...)
+			combined.Degraded = append(combined.Degraded, pr.Degraded...)
 		}
 	} else {
-		combined = importer.Parse(r.Content)
+		combined = importer.ParsePreview(r.Content)
 		fetched = append(fetched, fetchedImport{Result: combined})
 	}
 	if combined.TotalErrors < len(combined.Errors) {
@@ -117,10 +123,16 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 		for i := range combined.Nodes {
 			combined.Nodes[i].Config = nil
 		}
+		for i := range combined.Degraded {
+			combined.Degraded[i].Config = nil
+		}
 		return combined, nil
 	}
 	if len(combined.Nodes) == 0 {
 		msg := "没有可导入的节点"
+		if len(combined.Degraded) > 0 {
+			msg = fmt.Sprintf("没有可导入的节点；识别到 %d 个仅预览节点", len(combined.Degraded))
+		}
 		if len(combined.Errors) > 0 {
 			msg += "：" + combined.Errors[0].Message
 		}
@@ -148,6 +160,7 @@ func (a *App) importNodes(ctx context.Context, r importRequest) (any, error) {
 		}
 		out := emptyImport()
 		out.Errors = combined.Errors
+		out.Degraded = len(combined.Degraded)
 		out.TotalErrors = combined.TotalErrors
 		out.ErrorsTruncated = combined.ErrorsTruncated
 		for _, f := range fetched {
@@ -285,6 +298,7 @@ func reconcile(s *model.State, subID string, pr model.ParseResult, force bool) (
 	if err := addParsed(s, pr.Nodes, sub.GroupIDs, subID, &out); err != nil {
 		return out, err
 	}
+	out.Degraded = len(pr.Degraded)
 	names := map[string]string{}
 	for _, p := range pr.Nodes {
 		names[importer.Fingerprint(p)] = p.Name
@@ -346,7 +360,7 @@ func (a *App) refresh(ctx context.Context, id string, force bool) (any, error) {
 	body, e := a.fetch(ctx, sub.URL)
 	var result any
 	if e == nil {
-		pr := importer.Parse(body)
+		pr := importer.ParsePreview(body)
 		if strings.TrimSpace(body) == "" {
 			pr = model.ParseResult{Nodes: []model.ParsedNode{}, Errors: []model.ImportIssue{}}
 		} // still requires explicit shrink confirmation

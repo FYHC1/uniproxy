@@ -28,7 +28,7 @@ export interface TestJob {id:string;kind:'latency'|'speed';status:'queued'|'runn
 export interface Activity {id:string;level:'info'|'warning'|'error';message:string;createdAt:string}
 export interface Bootstrap {nodes:ProxyNode[];groups:Group[];pools:ProxyPool[];chains:ProxyChain[];listeners:ProxyListener[];subscriptions:Subscription[];settings:Settings;revision:number;runtime:RuntimeStatus;coreInstallation:CoreInstallation;activities:Activity[];jobs:TestJob[]}
 export interface ImportIssue {line:number;message:string}
-export interface ImportResult {added:number;updated:number;removed:number;skipped:number;errors:ImportIssue[];totalErrors?:number;errorsTruncated?:boolean;subscriptionIds:string[]}
+export interface ImportResult {added:number;updated:number;removed:number;skipped:number;degraded?:number;errors:ImportIssue[];totalErrors?:number;errorsTruncated?:boolean;subscriptionIds:string[]}
 export interface ImportRequest {mode:'text'|'subscriptions'|'file';content:string;groupIds:string[];groupNames?:string[];name?:string;intervalMinutes?:number;preview?:boolean}
 export interface Mutation<T> {data:T;runtime:RuntimeStatus}
 export type PublicNode = ProxyNode;

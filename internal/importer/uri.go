@@ -300,12 +300,17 @@ func uriTLS(q *query, out map[string]any, protocol string, defaultTLS bool) {
 	enabled := defaultTLS
 	reality := false
 	if hasSecurity {
+		security = strings.ToLower(strings.TrimSpace(security))
 		switch security {
 		case "tls":
 			enabled = true
 		case "reality":
 			enabled = true
 			reality = true
+		case "false":
+			// Common exporter spelling for a plaintext node. Keep the native
+			// representation canonical so equivalent URIs share a fingerprint.
+			enabled = false
 		case "none", "":
 			enabled = false
 		default:
@@ -334,7 +339,15 @@ func uriTLS(q *query, out map[string]any, protocol string, defaultTLS bool) {
 		out[key] = value
 	}
 	q.flag(out, "skip-cert-verify", "allowInsecure", "allowinsecure", "insecure", "skip-cert-verify")
-	q.set(out, "client-fingerprint", "fp", "client-fingerprint")
+	if value, ok := q.take("fp", "client-fingerprint"); ok {
+		value = strings.TrimSpace(value)
+		if value != "" {
+			if strings.EqualFold(value, "ios") {
+				value = "iOS"
+			}
+			out["client-fingerprint"] = value
+		}
+	}
 	q.set(out, "fingerprint", "fingerprint", "pinSHA256", "pinSHA256Cert")
 	q.set(out, "name-cert-verify", "name-cert-verify")
 	q.set(out, "name-cert-verify", "vcn")
@@ -382,6 +395,9 @@ func uriTransport(q *query, out map[string]any, protocol string) {
 	if network == "mkcp" {
 		network = "kcp"
 	}
+	if network == "none" {
+		network = "tcp"
+	}
 	if network == "kcp" {
 		if protocol != "vmess" {
 			q.fail("KCP transport is unsupported for this protocol")
@@ -402,7 +418,7 @@ func uriTransport(q *query, out map[string]any, protocol string) {
 		if header, ok := q.take("headerType"); ok && header != "" && header != "none" {
 			q.fail("unsupported XHTTP header variant")
 		}
-		if extra, ok := q.take("extra"); ok {
+		if extra, ok := q.take("extra"); ok && strings.TrimSpace(extra) != "" && !strings.EqualFold(strings.TrimSpace(extra), "null") {
 			raw, err := parseXHTTPExtra(extra)
 			if err != nil {
 				q.fail("invalid XHTTP extra")
@@ -456,6 +472,9 @@ func uriTransport(q *query, out map[string]any, protocol string) {
 	out["network"] = network
 	switch network {
 	case "ws":
+		if header, ok := q.take("headerType"); ok && header != "" && header != "none" {
+			q.fail("unsupported transport header variant")
+		}
 		options := map[string]any{}
 		if path, ok := q.take("path"); ok {
 			options["path"] = path

@@ -320,3 +320,15 @@ TLS/证书校验、SSRF/文件访问、节点身份、固定内核版本和原�
 双列不能按视口宽度直接写死：同一页面既有并排两张池卡，也有单张池卡占满宽屏，成员区实际宽度差异很大。因此用 `container-type:inline-size` 对 `.pool-member-section` 做容器查询，成员区宽度大于 430px 时两列，≤430px 单列；节点列表固定 380px 高度内滚，桌面操作按钮 24×24，`pointer:coarse` 下恢复 44×44。分页仍每页 10 个，两列正好 5 行，避免卡片因节点增多无限变高。
 
 边界：只改前端组件、样式和浏览器测试，不改代理池/监听 API、模型、SQLite schema、Mihomo 或安全策略；浏览器验证使用隔离 fixture 和 headless Edge，不证明真实节点连通或跨浏览器表现。
+
+## D33 — 协议适配分三档：严格 native、宽松预览、真实可用性验证
+
+**状态：2026-11-03 按 R35 实现并验证；本地完成，待发布。见[验证](<protocol-adaptation-tiers.md>)、[计划](<development-plan.md>) M30。**
+
+严格 `Parse` 继续只接受固定 Mihomo 1.19.32 有可证明等价语义的字段；未知/无等价字段不能被静默降级为 TCP 或丢失 TLS/Reality 校验。为了评估社区导出器的真实兼容面，新增 `ParsePreview`：它只放宽 URI 列表，把可识别但会丢失语义的字段写入 `Degraded` 并附原因，严格节点仍在 `Nodes`。
+
+第三档“真实可用性”不混入解析结果：解析成功只证明字段被识别，节点能否连通、握手和吞吐必须由独立检测说明。`Degraded` 条目永不进入 `addParsed`、SQLite、编译器或运行配置；订阅提交仍要求 `TotalErrors == 0`。
+
+理由：社区订阅中确实存在 `security=false`、`packetEncoding=none`、`fp=ios` 等可安全归一化的写法，也存在 Xray-only Reality/finalmask 字段；前者可进入严格映射，后者只能预览展示，不能伪造支持。
+
+边界：预览不做网络请求，不证明节点可用；结构化 YAML/JSON 仍走严格解析；降级原因必须使用固定文案，不包含原始凭据。

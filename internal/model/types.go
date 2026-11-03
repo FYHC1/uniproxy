@@ -12,6 +12,10 @@ type ParsedNode struct {
 	// Parsed-only same-document dependency; never passed through in Config.
 	DialerProxy       string `json:"dialerProxy,omitempty"`
 	DialerFingerprint string `json:"-"`
+	// Degraded marks a preview-only entry accepted by ParsePreview. Such a node
+	// must never be passed to addParsed or applied to the core.
+	Degraded        bool     `json:"degraded,omitempty"`
+	DegradedReasons []string `json:"degradedReasons,omitempty"`
 }
 type ImportIssue struct {
 	Line    int    `json:"line"`
@@ -19,6 +23,7 @@ type ImportIssue struct {
 }
 type ParseResult struct {
 	Nodes           []ParsedNode  `json:"nodes"`
+	Degraded        []ParsedNode  `json:"degraded,omitempty"`
 	Errors          []ImportIssue `json:"errors"`
 	TotalErrors     int           `json:"totalErrors"`
 	ErrorsTruncated bool          `json:"errorsTruncated"`
@@ -207,6 +212,7 @@ type ImportResult struct {
 	Updated         int           `json:"updated"`
 	Removed         int           `json:"removed"`
 	Skipped         int           `json:"skipped"`
+	Degraded        int           `json:"degraded,omitempty"`
 	Errors          []ImportIssue `json:"errors"`
 	SubscriptionIDs []string      `json:"subscriptionIds"`
 	TotalErrors     int           `json:"totalErrors"`

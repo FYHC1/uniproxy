@@ -1,6 +1,15 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-03 10:35（Asia/Shanghai）。v0.2.8 已于 2026-11-03 10:28:28 +08 正式发布并设 Latest，源码提交 `76f3c59d0adf42bd54a9abb6e167c9328f876bb9`，annotated tag 对象 `c9567f228657d63601dbf5d89dc8e4b7e08faebf`。本版汇总 M26–M29 界面与代理池体验，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+**最后核对：2026-11-03 14:12（Asia/Shanghai）。v0.2.8 已于 2026-11-03 10:28:28 +08 正式发布并设 Latest，源码提交 `76f3c59d0adf42bd54a9abb6e167c9328f876bb9`，annotated tag 对象 `c9567f228657d63601dbf5d89dc8e4b7e08faebf`。本版汇总 M26–M29 界面与代理池体验，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+
+## 2026-11-03 14:12 — 协议适配三档（本地实现，未发布）
+
+- 用户要求按三档实现：严格 native 映射、宽松解析预览/degraded、真实可用性验证。
+- 严格 `Parse`：真实订阅 1064 条中 697 成功（65.5%），`TotalErrors` 367；严格修复 `security=false`、`packetEncoding=none`、`type=none`、`extra=null`、空/大小写 `fp`、WS `headerType=none`、TCP path/host 占位、VLESS Encryption 1184 字节 key。
+- 宽松 `ParsePreview`：697 严格 + 365 降级 = 1062 可展示（99.8%），2 条未恢复（1 条非法 UUID、1 条未知导出器组合）。降级节点只展示，永不进入 `addParsed`、SQLite、编译器或运行配置。
+- 改动：`internal/model/types.go`、`internal/importer/{parser,preview,uri,native,modern}.go`、`internal/app/imports.go`、`src/shared/types.ts`、`src/web/ImportDialog.tsx`；新增 `internal/importer/preview_test.go`、`internal/app/preview_import_test.go` 与 [协议适配三档验证](<protocol-adaptation-tiers.md>)。
+- 验证：`go test ./... -count=1`、`go vet ./...`、`pnpm typecheck` 通过；`pnpm test:ui` 42/42、`pnpm build:web`、`pnpm test:e2e` 52/52（1.2m）通过；真实订阅仅本机临时解析，验证后删除 `.local/vless-live.txt` 与 live 测试。
+- 未提交、未发布、未部署；运行中的用户实例未触碰。临时真实样本 `.local/vless-live.txt` 与 `live_*_tmp_test.go` 已删除。
 
 ## 30秒摘要
 

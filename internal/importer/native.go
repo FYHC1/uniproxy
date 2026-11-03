@@ -297,10 +297,10 @@ func normalizeNative(input map[string]any) (model.ParsedNode, error) {
 func readPacketEncoding(r *fields, out map[string]any) {
 	if r.has("packet-encoding") {
 		v := r.text("packet-encoding", false)
-		if !oneOf(v, "", "xudp", "packetaddr") {
+		if !oneOf(v, "", "none", "xudp", "packetaddr") {
 			r.fail("unsupported packet encoding")
 		}
-		if v != "" {
+		if v != "" && v != "none" {
 			out["packet-encoding"] = v
 		}
 	}
@@ -421,11 +421,16 @@ func readTLS(r *fields, out map[string]any, protocol string, implicit bool) {
 		if !oneOf(protocol, "vless", "vmess", "trojan") {
 			r.fail("uTLS is unsupported for this protocol")
 		}
-		value := r.text("client-fingerprint", true)
-		if !oneOf(value, "chrome", "firefox", "safari", "iOS", "android", "edge", "360", "qq", "random", "randomized") {
-			r.fail("unsupported TLS client fingerprint")
+		value := r.text("client-fingerprint", false)
+		if value != "" {
+			if strings.EqualFold(value, "ios") {
+				value = "iOS"
+			}
+			if !oneOf(value, "chrome", "firefox", "safari", "iOS", "android", "edge", "360", "qq", "random", "randomized") {
+				r.fail("unsupported TLS client fingerprint")
+			}
+			out["client-fingerprint"] = value
 		}
-		out["client-fingerprint"] = value
 	}
 	readECHOptions(r, out, protocol)
 	if r.has("reality-opts") {
