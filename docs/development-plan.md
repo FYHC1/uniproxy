@@ -1,8 +1,8 @@
 # UniProxy 开发计划与任务状态
 
-最后更新：2026-11-03 10:00（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
+最后更新：2026-11-03 10:35（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M29完成（M26已提交；M27/M28/M29本地完成、未提交）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布、未部署。**
+**当前结论：M0–M29完成，M26–M29 已随 v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功）；M27/M28/M29 随后完成并随 v0.2.8 发布。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -160,37 +160,37 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 运行排障（2026-11-02 20:52）：9router 代理池 20006 的 `JP-US` 链曾报 ECONNRESET；隔离进程验证为第一跳台湾节点无法承载到第二跳的嵌套 TLS/Reality（美国直连 735ms、日本→美国 1967ms 成功、台湾→美国 8s 超时，去掉 Vision 仍失败），非编译器问题。通过 API 将第一跳改为日本原生01 后，链测试 3/3 通过（1404/1882/1444ms），20006 HTTP/SOCKS 204，9router `JP-US1` 20:49:07 测试成功并 active。只改运行配置，未改源码/数据库。
 - 发布（2026-11-02 21:52:52 +08）：源码提交 `14cc9f570b44422b9dfc1deec94b3556749a1a05`，annotated tag `v0.2.7`（对象 `568f8639935eef3cbdd9090b19ff4d2b0dde53da`）；main CI `41456237334`、tag CI `41456604601`、Release `41456604526` 全部成功；四平台资产与 SHA256SUMS 已核验；正式 Windows 程序 `UniProxy 0.2.7 · commit 14cc9f570b44 · built 2026-11-02T13:51:54Z`，TestBuilt 4.385s 与真实控制台通过。发布不含部署，用户预览实例未触碰。
 
-## M26 — 新建代理链弹窗布局调整（2026-11-03 完成并提交，未发布/未部署）
+## M26 — 新建代理链弹窗布局调整（2026-11-03 完成，已随 v0.2.8 发布，不含部署）
 
 - 用户要求：把入口监听从原折叠区移到代理链名称下方、节点库上方；访问认证保留最下面；去掉不必要的二级标签和说明；端口留空自动分配，也可手工填写；节点库左侧至少显示三排三列节点并尽量多显示。
 - 实现：`src/web/ChainDialog.tsx` 删除 `automaticPort` 状态，端口改为字符串输入；保存时空白提交 `port: 0`，手工端口校验 1024–65535 并给出就近错误。入口监听改为单行五列（名称/协议/地址/端口/UDP），块头只保留“入口监听 + 创建”开关；`CredentialsEditor` 移到 `chain-layout` 之后、fieldset 末尾；删除节点库“点击卡片按顺序加入右侧链路”等冗余提示。
 - 样式：`src/web/chainStyles.css` 新增入口监听面板、五列网格和窄屏降级；`.chain-node-grid` 桌面固定三列，配合卡片/网格尺寸可在 1440×1000 弹窗内显示 3×3 共 9 个节点；弹窗头部、正文、字段间距进一步压缩，访问认证仍可见，底部 footer 保留。
 - 测试：`tests/browser/chain-workflow.spec.ts` 增加入口监听位于节点库上方、认证位于底部、9 节点 3×3、空白端口提交 0、手工端口透传、非法端口本地拦截等断言；原有 6 个链工作流用例全部保留。
 - 验证：`pnpm exec tsc --noEmit --noUnusedLocals --noUnusedParameters` 通过；`pnpm run build:web` 通过（Vite 7.3.7，4654 modules；最终 CSS 84.99kB/gzip17.13，JS 556.44kB/gzip162.16，仅有 chunk 体积提示）；`pnpm exec playwright test tests/browser/chain-workflow.spec.ts` 6/6 通过（12.8s）；临时视觉截图 `.local/chain-preview/chain-dialog-new.png` 与 `chain-dialog-new-390.png` 用于检查，临时 spec 交付前删除。
-- 边界：仅前端布局和交互，不改监听/代理链 API、模型、数据库 schema、Mihomo 版本或安全策略；已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布、未部署，用户运行实例未触碰。详见 [CHANGELOG](<../CHANGELOG.md>)、[需求 R31](<requirements.md>)、[决策 D29](<decisions.md>)。
+- 边界：仅前端布局和交互，不改监听/代理链 API、模型、数据库 schema、Mihomo 版本或安全策略；已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），用户运行实例未触碰，并已随 v0.2.8 发布（不含部署）。详见 [CHANGELOG](<../CHANGELOG.md>)、[需求 R31](<requirements.md>)、[决策 D29](<decisions.md>)。
 
-## M27 — 全局界面视觉刷新（2026-11-03 本地完成，未提交/未发布/未部署）
+## M27 — 全局界面视觉刷新（2026-11-03 完成，已随 v0.2.8 发布，不含部署）
 
 - 用户要求整体优化 UniProxy Web UI：避免不必要的二级标签和说明，让布局表达层级，界面更紧凑、简洁明了，亮色主题并提升完成度；参考外部项目截图但以 UniProxy 自身风格为主。范围为全部管理控制台页面、共享组件、弹窗、认证与通知，不改变业务 API/模型/数据库 schema/Mihomo 版本/代理安全策略。
 - 实现：新增 [theme.css](<../src/web/theme.css>)，在 [main.tsx](<../src/web/main.tsx>) 第 6–9 行最后加载；采用暖纸亮色画布、深森林墨文字、青绿/酸橙强调、serif 大标题与深色首张统计卡，统一侧栏、顶栏、页面标题、统计、表格、按钮、表单、表格、弹窗、池/链卡片、设置、空态、认证与通知。隐藏重复的 eyebrow、页面/区块 description、subtle-meta、footnote、分组提示、context banner、侧栏说明、面包屑和页脚辅助文案；保留安全提示、真实状态、空态和错误。
 - 密度与响应式：压缩表格行高、卡片/弹窗间距；活动列表 396px 内滚；390px 底部导航改为 62px 七列单行布局，页面无水平溢出；[App.tsx](<../src/web/App.tsx>) 的登录错误仅在用户尝试后显示，避免首次打开显示红色 401。
 - 验证：严格 TypeScript、生产 Web 构建（Vite 7.3.7，4655 modules；CSS 106.42kB/gzip22.24，JS 556.48kB/gzip162.18，仅 chunk 提示）、pnpm test:ui 42/42、pnpm test:e2e 49/49（1.2m）通过；视觉截图见 .local/ui-theme/（nodes/groups/listeners/subscriptions/pools/chains/settings/nodes-mobile/import/pool/chain/auth 等），本地 Windows 预览 bin/updates/ui-refresh/uniproxy-windows-amd64.exe（14,227,456 bytes，SHA256 54BFEBCD087DA9D05EF395785F4CC77BD54CF45AB0B2A4338D7BC36CFCFC38B8，0.2.8-ui-preview.1）。
-- 边界：仅前端样式和登录错误显示时机；未改 API/模型/schema/Mihomo/安全策略。截图与浏览器测试使用隔离 fixture 和 headless Edge 1440/390；未覆盖 Safari/Firefox、真实移动设备和全部缩放组合。未提交、未发布、未部署，用户运行实例未触碰。详见[验收](<ui-refresh-verification.md>)、[需求 R32](<requirements.md>)、[决策 D30](<decisions.md>)。
+- 边界：仅前端样式和登录错误显示时机；未改 API/模型/schema/Mihomo/安全策略。截图与浏览器测试使用隔离 fixture 和 headless Edge 1440/390；未覆盖 Safari/Firefox、真实移动设备和全部缩放组合。已随 v0.2.8 发布（不含部署），用户运行实例未触碰。详见[验收](<ui-refresh-verification.md>)、[需求 R32](<requirements.md>)、[决策 D30](<decisions.md>)。
 
-## M28 — 新建/编辑代理池布局与节点批量栏（2026-11-03 本地完成，未提交/未发布/未部署）
+## M28 — 新建/编辑代理池布局与节点批量栏（2026-11-03 完成，已随 v0.2.8 发布，不含部署）
 
 - 用户要求继续压缩新建/编辑代理池弹窗：监听区上移，包含分组固定约四行并可滚动，包含节点区域更宽更高，减少二级说明；节点管理批量操作栏保持可见。用户随后撤回“添加/移除暂存按钮”，最终交互维持即时勾选、状态筛选、名称/延迟/速度/更新时间排序与真实延迟检测。
 - 实现：只在新建设置中把监听面板放到名称/策略之后、成员选择之前，协议/地址/端口/自动分配/UDP 单行四列；成员区改为分组选择与匹配方式左右分栏、节点列表占满整行并显示协议/UDP/健康/地址。编辑模式保留原监听配置，不在弹窗内重复编辑。
 - 样式与组件：`src/web/poolStyles.css` 分组列表固定 177px 内滚（36px 行高、5px 间隔、16px 内边距正好四行），节点列表最高 420px，桌面弹窗 1060px，900/760/560px 逐级降级；`src/web/ui.tsx` 的 `ChoiceList` 增加受控 `columns` 与 `renderOption`；`src/web/styles.css` 增加通用 `.choice-list--columns`。节点管理批量栏保持常驻，未选择时按钮禁用。
 - 测试：13 组/9 节点覆盖新建与编辑弹窗、四整行分组滚动、监听区在成员区上方、节点区≥400px、390px 无溢出；新增 `tests/browser/nodes-batch.spec.ts` 锁定批量栏常驻/禁用/选中状态。`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.3m）、生产 Web 构建（Vite 7.3.7，4655 modules；CSS 110.00kB/gzip22.85，JS 556.35kB/gzip161.96，仅 chunk 提示）通过；聚焦 17/17（30.6s）。
-- 边界：仅前端布局、组件属性和浏览器测试；未改代理池/监听 API、模型、SQLite schema、Mihomo 或代理安全策略。浏览器使用隔离 fixture/headless Edge，未覆盖 Safari/Firefox、真实移动设备、全部缩放或真实节点连通；未提交、未发布、未部署。详见[验收](<pool-layout-verification.md>)、[需求 R33](<requirements.md>)、[决策 D31](<decisions.md>)。
+- 边界：仅前端布局、组件属性和浏览器测试；未改代理池/监听 API、模型、SQLite schema、Mihomo 或代理安全策略。浏览器使用隔离 fixture/headless Edge，未覆盖 Safari/Firefox、真实移动设备、全部缩放或真实节点连通；已随 v0.2.8 发布（不含部署）。详见[验收](<pool-layout-verification.md>)、[需求 R33](<requirements.md>)、[决策 D31](<decisions.md>)。
 
-## M29 — 代理池卡片紧凑化与出口节点双列（2026-11-03 本地完成，未提交/未发布/未部署）
+## M29 — 代理池卡片紧凑化与出口节点双列（2026-11-03 完成，已随 v0.2.8 发布，不含部署）
 
 - 用户要求代理池卡片 UI 布局优化、提高空间利用率：出口节点卡片设计更紧凑，桌面分两列展示，提高同屏节点数量；并按“避免不必要的二级标签和说明，让布局来传达说明”的原则精简节点卡。
 - 实现：`src/web/PoolCard.tsx:18` 每页 10 个节点；节点卡首行为健康、名称、延迟/状态、测延迟与移除，次行仅协议 Badge，地址/中转/最近检测/错误收进可展开详情，删除“连接信息”重复标签。`src/web/poolStyles.css:121-143` 使用 `container-type:inline-size` 的成员区容器查询，宽度>430px 两列、≤430px 单列；列表 380px 内滚，桌面操作按钮 24×24，`pointer:coarse` 恢复 44×44。`src/web/theme.css` 收紧池卡片内边距并统一列表高度。
 - 测试：`tests/browser/pool-compact.spec.ts` 覆盖每页 10、第二页 nodes[10]、两列/单列、首两卡同高、第三卡下移；`src/web/tests/pool-regressions.mjs` 同步 10+4 分页数据。生产 Web 构建（Vite7.3.7，4655 modules；CSS 110.64kB/gzip22.97，JS 556.38kB/gzip161.96）、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.4m）、聚焦 pool 17/17（29.3s）、pool-compact 2/2（6.5s）通过。
-- 边界：仅前端组件、样式和浏览器测试；未改代理池/监听 API、模型、SQLite schema、Mihomo 或安全策略。浏览器使用隔离 fixture/headless Edge，未覆盖 Safari/Firefox、真实移动设备、全部缩放或真实节点连通；未提交、未发布、未部署。详见[验收](<pool-card-verification.md>)、[需求 R34](<requirements.md>)、[决策 D32](<decisions.md>)。
+- 边界：仅前端组件、样式和浏览器测试；未改代理池/监听 API、模型、SQLite schema、Mihomo 或安全策略。浏览器使用隔离 fixture/headless Edge，未覆盖 Safari/Firefox、真实移动设备、全部缩放或真实节点连通；已随 v0.2.8 发布（不含部署）。详见[验收](<pool-card-verification.md>)、[需求 R34](<requirements.md>)、[决策 D32](<decisions.md>)。
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 
 - 用户文件 `work/cainiao-pc/cainiao-pc-clash-25nodes.yaml` 导入后 25 节点全部 unhealthy；导出字段与源文件一致，TLS/WS 参数未被丢弃。

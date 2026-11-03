@@ -1,7 +1,7 @@
 # UniProxy v0.2.8 发布验收
 
 更新日期：2026-11-03
-发布阶段状态：**发布流程准备中；本记录在正式发布后回填 CI、Release 与资产结论。发布不等于部署。**
+发布阶段状态：**2026-11-03 10:28:28 +08 已正式发布并设 Latest；CI、四平台资产与正式 Windows 程序验收已回填。发布不等于部署。**
 
 ## 1. 范围
 
@@ -99,8 +99,44 @@ go test -mod=readonly -p 1 ./... -count=1
 
 ## 3. CI 与正式资产
 
-待正式发布后回填：源码提交、main CI、annotated tag、tag CI、Release workflow、四平台资产大小与 SHA256、正式 Windows 程序验收。
+### 3.1 源码与 CI
+
+- 源码提交：`76f3c59d0adf42bd54a9abb6e167c9328f876bb9`（`feat: refresh UI and compact proxy pool for v0.2.8`，31 文件，1172 新增 / 120 删除）。
+- main CI [41565978602](<https://github.com/FYHC1/uniproxy/actions/runs/41565978602>)：success（Ubuntu 42s、Windows 1m38s）。
+- annotated tag `v0.2.8`，tag 对象 `c9567f228657d63601dbf5d89dc8e4b7e08faebf`，解引用为 `76f3c59d0adf42bd54a9abb6e167c9328f876bb9`。
+- 标签 CI [41566227166](<https://github.com/FYHC1/uniproxy/actions/runs/41566227166>)：success（Ubuntu 38s、Windows 1m39s）。
+- Release workflow [41566227152](<https://github.com/FYHC1/uniproxy/actions/runs/41566227152>)：success，四平台 build 均通过，release job 8s。
+
+### 3.2 正式发布
+
+- 发布时间：**2026-11-03 10:28:28 +08（UTC 2026-11-03T02:28:28Z）**；非 draft、非 prerelease，已设 Latest。
+- Release：[v0.2.8](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.8>)；中文说明与本地 [docs/releases/v0.2.8.md](<releases/v0.2.8.md>) 逐字一致（1911 字符）。
+- 正式资产（GitHub API 与下载副本核验一致）：
+
+| 文件 | 字节 | SHA256 |
+|---|---:|---|
+| uniproxy-windows-amd64.exe | 13,355,008 | `faff52411584a2aa44092775aa4282b22e8b28efcc889163822bbd52eb63a190` |
+| uniproxy-windows-arm64.exe | 12,439,040 | `6a729707e0034dc5cbf50f5f85a870cfb44ed0f0bcaec82acaa7fabf2fe09fe0` |
+| uniproxy-linux-amd64 | 12,996,792 | `4445a859aabe425f47061ca1ebd873f7596e33a48d2a9ce2b91d5359621ccc9e` |
+| uniproxy-linux-arm64 | 12,386,488 | `20b956356edacd0f0adb0146a841f95dc440a1ca3a64b399e8209d070b3e106b` |
+| SHA256SUMS.txt | 360 | `88f7e9276434c57aac65afa42c7fae8afbdcfcdf0d6e1f362bc116de34389c1d` |
+
+- 下载副本位于 `bin/releases/v0.2.8/`（gitignored），五文件大小与 SHA256 和 `SHA256SUMS.txt` 及 GitHub digest 全部匹配。
+
+### 3.3 正式 Windows 程序验收
+
+- `-version`：`UniProxy 0.2.8 · commit 76f3c59d0adf · built 2026-11-03T02:27:52Z`。
+- `UNIPROXY_TEST_APP_PATH=<正式 Windows amd64> UNIPROXY_TEST_CORE_PATH=bin/mihomo.exe go test ./tests/integration -run '^TestBuilt' -count=1 -v`：全部 PASS，包级 `ok ... 4.253s`（CLI/公开绑定保护、嵌入 UI、3 轮强杀重启与内核随退、启动失败诊断、healthcheck 不堆日志、订阅兼容）。
+- 真实 Windows 控制台：
+
+```json
+{"case":"actual-console-WM_CLOSE","round":1,"exit":0,"running_before_close":true}
+{"case":"actual-console-WM_CLOSE","round":2,"exit":0,"running_before_close":true}
+{"case":"standalone-error-console-retained","exit_after_close":1,"report_saved":true}
+```
+
+- 历史 v0.2.7 标签仍为 `14cc9f570b44422b9dfc1deec94b3556749a1a05`，Release 5 个资产未变；v0.2.6 及更早标签与资产未触碰。
 
 ## 4. 部署边界
 
-本版**不部署**。发布只创建 GitHub Release 与附件，不停止、不替换、不启动任何运行实例。操作前应重新核对当时的用户服务 PID 与端口；本记录不把历史 PID 观察当作当前状态。用户如要升级，需先正常退出旧实例并确认内核退出，再替换主程序、沿用原数据目录与匹配主密钥；禁止在运行中复制或覆盖 SQLite 数据库。不得把测试候选当作正式发布资产。
+本版**不部署**。发布时（2026-11-03 10:33 +08）复核用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 和 `20006`，19090 无监听；本轮未停止、替换、读取或修改该实例与数据目录。发布只创建 GitHub Release 与附件，不停止、不替换、不启动任何运行实例。操作前应重新核对当时的用户服务 PID 与端口；本记录不把历史 PID 观察当作当前状态。用户如要升级，需先正常退出旧实例并确认内核退出，再替换主程序、沿用原数据目录与匹配主密钥；禁止在运行中复制或覆盖 SQLite 数据库。不得把测试候选当作正式发布资产。
