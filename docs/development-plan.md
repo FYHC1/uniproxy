@@ -2,7 +2,7 @@
 
 最后更新：2026-11-03 10:35（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M30完成，M30 协议适配三档已在本地实现并验证，待随 v0.2.9 发布（不含部署）；M26–M29 已随 v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功）；M27/M28/M29 随后完成并随 v0.2.8 发布。**
+**当前结论：M0–M30完成，M30 协议适配三档已随 v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；M26–M29 已随 v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功）；M27/M28/M29 随后完成并随 v0.2.8 发布。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -192,7 +192,7 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 测试：`tests/browser/pool-compact.spec.ts` 覆盖每页 10、第二页 nodes[10]、两列/单列、首两卡同高、第三卡下移；`src/web/tests/pool-regressions.mjs` 同步 10+4 分页数据。生产 Web 构建（Vite7.3.7，4655 modules；CSS 110.64kB/gzip22.97，JS 556.38kB/gzip161.96）、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.4m）、聚焦 pool 17/17（29.3s）、pool-compact 2/2（6.5s）通过。
 - 边界：仅前端组件、样式和浏览器测试；未改代理池/监听 API、模型、SQLite schema、Mihomo 或安全策略。浏览器使用隔离 fixture/headless Edge，未覆盖 Safari/Firefox、真实移动设备、全部缩放或真实节点连通；已随 v0.2.8 发布（不含部署）。详见[验收](<pool-card-verification.md>)、[需求 R34](<requirements.md>)、[决策 D32](<decisions.md>)。
 
-## M30 — 协议适配三档（2026-11-03 本地完成，未发布/未部署）
+## M30 — 协议适配三档（2026-11-03 完成，已随 v0.2.9 发布，不含部署）
 
 - 用户要求：按严格 native 映射、宽松解析预览/degraded、真实可用性验证三档实现协议适配。
 - 实现：`internal/model/types.go` 增加 `ParsedNode.Degraded/DegradedReasons`、`ParseResult.Degraded`、`ImportResult.Degraded`；`internal/importer/parser.go` 新增 `ParsePreview`，严格 `Parse` 不变；新增 `internal/importer/preview.go` 做 URI 级预览归一；`internal/app/imports.go` 使用 `ParsePreview` 并分离预览/提交；`src/shared/types.ts`、`src/web/ImportDialog.tsx` 增加“可导入/仅预览”分区和降级原因表。
@@ -200,6 +200,7 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 真实订阅：1064 条；严格 697（65.5%）；宽松预览 697+365=1062（99.8%），2 条未恢复（1 invalid UUID、1 unknown exporter combination）；预览错误仍如实显示，不强行吞掉。
 - 验证：`gofmt`、`go vet ./...`、`go test ./... -count=1`、`pnpm typecheck`、`pnpm test:ui` 42/42、`pnpm build:web`、`pnpm test:e2e` 52/52（1.2m）通过；新增 `internal/importer/preview_test.go`、`internal/app/preview_import_test.go`。
 - 边界：预览不等于可应用；`Degraded` 永不进入 `addParsed`/SQLite/编译器；订阅提交仍 `TotalErrors == 0`；真实节点连通性/吞吐/握手未验证。详见[验证](<protocol-adaptation-tiers.md>)、[需求 R35](<requirements.md>)、[决策 D33](<decisions.md>)。
+- 发布（2026-11-03 16:22:39 +08）：提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag `v0.2.9` 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`；main CI `41602628999`、tag CI `41602671353`、Release `41602671127` 均成功；四平台资产与正式 Windows 程序验收完成；只发布，不含部署。
 
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 

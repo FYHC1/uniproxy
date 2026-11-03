@@ -43,13 +43,13 @@
 | [v0.2.6发布验收](<release-0.2.6-verification.md>) | M24 现代 VLESS/VMess 兼容正式发布、四平台资产与 Windows 程序核验 | 2026-11-02 16:00:55已发布并设Latest；CI/资产已回填；不含部署 |
 | [v0.2.7发布验收](<release-0.2.7-verification.md>) | M25 代理链正式发布、四平台资产与 Windows 程序核验 | 2026-11-02 21:52:52已发布并设Latest；CI/资产已回填；不含部署 |
 | [v0.2.8发布验收](<release-0.2.8-verification.md>) | M26–M29 界面刷新与代理池体验正式发布、四平台资产与 Windows 程序核验 | 2026-11-03 10:28:28已发布并设Latest；CI/资产已回填；不含部署 |
-| [v0.2.9发布验收](<release-0.2.9-verification.md>) | M30 协议适配三档正式发布、四平台资产与 Windows 程序核验 | 本地验证完成，待发布 |
+| [v0.2.9发布验收](<release-0.2.9-verification.md>) | M30 协议适配三档正式发布、四平台资产与 Windows 程序核验 | 2026-11-03 16:22:39已发布并设Latest（不含部署） |
 | [链式代理验收](<chain-verification.md>) | R30：有序链编译、整链检测、链/入口 API、编辑器交互、真实回环链路 | 2026-11-02 已随 v0.2.7 发布（不含部署） |
 | [全局界面视觉刷新验收](<ui-refresh-verification.md>) | M27：theme.css 最后加载、亮色主题、布局表达层级、全部页面/弹窗/认证、42/42 UI 与 49/49 浏览器验证、本地预览 | 2026-11-03 已随 v0.2.8 发布（不含部署） |
 | [代理池布局与节点批量栏验收](<pool-layout-verification.md>) | M28：监听区上移、分组固定四行滚动、节点区加宽加高、批量栏常驻、42/42 UI 与 52/52 浏览器验证 | 2026-11-03 已随 v0.2.8 发布（不含部署） |
 | [代理池卡片紧凑化与双列验收](<pool-card-verification.md>) | M29：每页 10 节点、节点卡两层结构、容器查询双列/单列、触控按钮 44px、42/42 UI 与 52/52 浏览器验证 | 2026-11-03 已随 v0.2.8 发布（不含部署） |
 | [现代VLESS/VMess协议验证](<modern-protocol-verification.md>) | M24：v2rayN/Mihomo 源码对照、XHTTP/HTTPUpgrade/VMess KCP/ECH/VLESS Encryption 映射、拒绝边界与本地测试 | 2026-11-02 已随 v0.2.6 发布（不含部署） |
-| [协议适配三档验证](<protocol-adaptation-tiers.md>) | M30：严格 native、宽松预览 degraded、真实可用性三档；真实订阅 1064 条统计、修复项、测试与边界 | 2026-11-03 本地实现与验证，未发布/未部署 |
+| [协议适配三档验证](<protocol-adaptation-tiers.md>) | M30：严格 native、宽松预览 degraded、真实可用性三档；真实订阅 1064 条统计、修复项、测试与边界 | 2026-11-03 已随 v0.2.9 发布（不含部署） |
 | [WSL实机运行与Linux修复验收](<wsl-runtime-verification.md>) | Linux amd64 WSL2 真实启动、固定内核、回环HTTP/SOCKS、持久化重启、认证与异常终止观察，以及探针重试/Pdeathsig 修复复验 | M21实机证据与M22修复；修复随v0.2.5发布；不替代裸机/ARM64/Docker/容量与真实远端节点 |
 | [归档协作备注](<coordination.md>) | 早期并行划分和结束状态 | 归档，不用于判断剩余工作 |
 | [CHANGELOG](<../CHANGELOG.md>) | 用户可见变化和交付节点 | 每个变更完成时追加；不等于已发布 |

@@ -1,7 +1,7 @@
 # UniProxy v0.2.9 发布验收
 
 更新日期：2026-11-03
-发布阶段状态：**本地验证完成；CI、标签、四平台资产与正式 Windows 程序验收待回填。**
+发布阶段状态：**已发布（非 draft、非 prerelease、Latest）；CI、标签、四平台资产与正式 Windows 程序验收均完成；只发布，未部署。**
 
 ## 1. 范围
 
@@ -23,13 +23,9 @@
 
 ### 2.2 Go 全量测试
 
-命令：
+命令：`UNIPROXY_TEST_CORE_PATH=bin/mihomo.exe go test -mod=readonly -p 1 ./... -count=1`。
 
-```powershell
-go test ./... -count=1
-```
-
-结果：全部通过（importer 4.046s、app 13.922s）。
+结果：全部通过（core 12.533s、app 11.499s、integration 6.813s）。并行运行 `go test ./...` 曾因本机资源竞争超时，串行复跑通过；不把超时当作测试失败，也不把并行结果写成通过。
 
 ### 2.3 前端与浏览器
 
@@ -50,22 +46,30 @@ go test ./... -count=1
 
 ### 3.1 源码与 CI
 
-- 源码提交：待回填。
-- main CI：待回填。
-- annotated tag `v0.2.9`：待回填。
-- 标签 CI / Release workflow：待回填。
+- 源码提交：`6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`（29 files，841 insertions / 85 deletions）。
+- main CI：`41602628999` 成功（Ubuntu 42s、Windows 1m35s）。
+- annotated tag `v0.2.9`：对象 `4d05181f557445f5f6325bd57e3821d138c981a5`，解引用 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`。
+- 标签 CI / Release workflow：`41602671353` / `41602671127`，均成功。
 
 ### 3.2 正式发布
 
-- 发布时间：待回填。
-- Release：待回填。
-- 正式资产与 SHA256：待回填。
+- 发布时间：`2026-11-03T08:22:39Z`（2026-11-03 16:22:39 +08），非 draft、非 prerelease、Latest。
+- Release：[v0.2.9](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.9>)。
+- 正式资产与 SHA256（下载副本 `bin/releases/v0.2.9`，与 `SHA256SUMS.txt` 逐项一致）：
+
+| 资产 | 字节 | SHA256 |
+|---|---:|---|
+| uniproxy-windows-amd64.exe | 13,387,776 | `e778e15a4c833fa11da51b95e91700b033b967deac2876e57b09af7c40832982` |
+| uniproxy-windows-arm64.exe | 12,464,128 | `b906721d3a217a883524534d36b5b0ed1af536624cd561faa1d8c327eba09e78` |
+| uniproxy-linux-amd64 | 13,029,560 | `801c275b1cb30f0f7199963a6ea2e1364ad04a4d59b42c2dede39e6c01f0162b` |
+| uniproxy-linux-arm64 | 12,386,488 | `f57b9ab949e2ad51b1a21aba0bdaab27b502694fcc38f9c40f85ff6a4019eec7` |
+| SHA256SUMS.txt | 360 | `e6400560719980178e37c93cf851f8f7c62275d6e5bfbb3ea8543313fe3c7505` |
 
 ### 3.3 正式 Windows 程序验收
 
-- `-version`：待回填。
-- `TestBuilt`：待回填。
-- 真实 Windows 控制台：待回填。
+- `-version`：`UniProxy 0.2.9 · commit 6ff15a8c2a0f · built 2026-11-03T08:21:55Z`。
+- `TestBuilt`：全部 PASS（3.275s）。
+- 真实 Windows 控制台：两轮 WM_CLOSE exit 0；standalone error exit 1 且 report saved。
 
 ## 4. 部署边界
 

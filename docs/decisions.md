@@ -323,7 +323,7 @@ TLS/证书校验、SSRF/文件访问、节点身份、固定内核版本和原�
 
 ## D33 — 协议适配分三档：严格 native、宽松预览、真实可用性验证
 
-**状态：2026-11-03 按 R35 实现并验证；本地完成，待发布。见[验证](<protocol-adaptation-tiers.md>)、[计划](<development-plan.md>) M30。**
+**状态：2026-11-03 按 R35 实现并验证；已随 v0.2.9 发布（不含部署）。见[验证](<protocol-adaptation-tiers.md>)、[发布验收](<release-0.2.9-verification.md>)、[计划](<development-plan.md>) M30。**
 
 严格 `Parse` 继续只接受固定 Mihomo 1.19.32 有可证明等价语义的字段；未知/无等价字段不能被静默降级为 TCP 或丢失 TLS/Reality 校验。为了评估社区导出器的真实兼容面，新增 `ParsePreview`：它只放宽 URI 列表，把可识别但会丢失语义的字段写入 `Degraded` 并附原因，严格节点仍在 `Nodes`。
 
