@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import type { PoolCreateRequest, PoolCreateResult, PoolDraft, ProxyListener, ProxyPool, TestJob } from '../shared/types';
+import type { PoolCreateRequest, PoolCreateResult, PoolDraft, ProxyListener, ProxyPool, ProxyNode, TestJob } from '../shared/types';
 import { useAction, useApp } from './state';
 import { Button, ChoiceList, ErrorBox, Field, FormFooter, GroupPicker, Modal, Note, Toggle } from './ui';
 import { CredentialsEditor, serializedUsers, type UserDraft } from './ListenerForms';
 import { address, checkHttpUrl, isIP, isLoopback, poolMembers, strategyLabels } from './utils';
 import { changePoolSelection, constrainPoolSelection, excludedByLegacyGroup, matchesPoolNodeStatus, poolSelectionScope, selectedPoolNodes, sortPoolNodes, withoutDeletedPoolNodes, type PoolNodeSort, type PoolNodeStatusFilter } from './poolSelection';
 
-const strategyHelp:Record<ProxyPool['strategy'],string> = {
-  'url-test':'根据代理探测选择较低延迟的节点，并用容差减少频繁切换。',
-  'round-robin':'按轮询顺序分配新连接，分散出口负载。',
-  'consistent-hashing':'以哈希键稳定分配连接，相同键尽量使用同一出口。',
-  'sticky-sessions':'为同一会话维持相对稳定的出口；原生缓存不是永久绑定。',
-};
+function poolNodeHealth(node:ProxyNode) {
+  if (!node.enabled) return {label:'已禁用',tone:'muted'};
+  if (node.dialerError) return {label:'中转不可用',tone:'danger'};
+  if (node.status === 'unhealthy') return {label:'检测失败',tone:'danger'};
+  if (node.latencyMs !== null) return {label:node.latencyMs + ' ms',tone:'healthy'};
+  if (node.status === 'healthy') return {label:'检测健康',tone:'healthy'};
+  return {label:'未检测',tone:'muted'};
+}
 
 export function PoolDialog({pool,onClose}:{pool?:ProxyPool;onClose:()=>void}) {
   const {data,mutate,request,refresh,notify} = useApp(); const state = data!; const action = useAction();
@@ -48,11 +50,10 @@ export function PoolDialog({pool,onClose}:{pool?:ProxyPool;onClose:()=>void}) {
   const nodeById = new Map(scope.map(node => [node.id,node]));
   const nodes = sortPoolNodes(scope,nodeSort).map(node => {
     const legacy = excludedByLegacyGroup(node,draft);
-    const health = !node.enabled ? '' : node.status === 'unhealthy' ? ' · 检测失败' : node.latencyMs !== null ? ' · ' + node.latencyMs + ' ms' : node.status === 'healthy' ? ' · 检测健康' : ' · 尚未检测';
-    return {id:node.id,name:node.name,disabled:legacy,detail:
-      node.protocol.toUpperCase() + ' · ' + address(node.server,node.port)
-      + (!node.enabled ? ' · 已禁用' : '') + (node.dialerError ? ' · 中转不可用' : '') + health
-      + (node.udp ? ' · UDP' : '') + (legacy ? ' · 受旧分组排除规则限制' : '')};
+    return {id:node.id,name:node.name,disabled:legacy,detail:[
+      node.protocol.toUpperCase(),address(node.server,node.port),poolNodeHealth(node).label,
+      node.udp ? 'UDP' : '',legacy ? '受旧分组排除规则限制' : '',
+    ].filter(Boolean).join(' · ')};
   });
   function update<K extends keyof PoolDraft>(key:K,value:PoolDraft[K]) {setDraft(previous => ({...previous,[key]:value}));}
   function updateScope(patch:Partial<Pick<PoolDraft,'groupIds'|'groupMode'|'udp'>>) {
@@ -85,39 +86,43 @@ export function PoolDialog({pool,onClose}:{pool?:ProxyPool;onClose:()=>void}) {
     }
     onClose();
   }
-  return <Modal title={pool ? '编辑代理池' : '新建代理池'} description={pool ? '调整成员和策略。移除节点只影响此池，关联监听保持原配置。' : '选择出口节点并分配共享监听，一次校验后统一保存与应用。'} onClose={onClose} busy={action.running} wide>
+  return <Modal title={pool ? '编辑代理池' : '新建代理池'} description={pool ? '调整成员和策略。移除节点只影响此池，关联监听保持原配置。' : ''} onClose={onClose} busy={action.running} wide contentClassName="pool-dialog-modal">
     <form onSubmit={event => {event.preventDefault();void action.execute(save);}}><div className="dialog-body pool-dialog"><fieldset className="form-fields" disabled={action.running}>
-      <div className="form-grid"><Field label="代理池名称" required><input autoFocus required maxLength={100} value={draft.name} onChange={event => update('name',event.target.value)} placeholder="例如：日常出口" /></Field>
-        <Field label="调度策略"><select value={draft.strategy} onChange={event => {const strategy = event.target.value as ProxyPool['strategy'];setDraft(previous => ({...previous,strategy,hashKey:strategy === 'url-test' || strategy === 'round-robin' ? '' : previous.hashKey}));}}>{Object.entries(strategyLabels).map(([key,label]) => <option key={key} value={key}>{label} · {key}</option>)}</select></Field></div>
-      <p className="field-hint">{strategyHelp[draft.strategy]}</p>
-      {canHash && <Field label="哈希键" hint="按用户名哈希需要监听配置认证账号；UDP 不支持此模式。"><select value={draft.hashKey} onChange={event => {const value=event.target.value as ''|'in-user';update('hashKey',value);if(value==='in-user')setListenerUdp(false);}}><option value="">内核默认</option><option value="in-user">认证用户名 · in-user</option></select></Field>}
-      <div className="form-section-heading"><span>01</span><h3>选择成员</h3></div>
-      <div className="form-grid"><div className="pool-group-field"><GroupPicker groups={state.groups} value={draft.groupIds} onChange={value => updateScope({groupIds:value})} label="包含分组" bulk /></div>
-        <div className="form-fields"><Field label="分组匹配关系"><select value={draft.groupMode} onChange={event => updateScope({groupMode:event.target.value as 'any'|'all'})}><option value="any">任意一个分组（并集）</option><option value="all">全部所选分组（交集）</option></select></Field><Toggle label="仅选择 UDP 兼容节点" checked={draft.udp} onChange={value => updateScope({udp:value})} description="仅表示配置兼容，不代表已经验证 UDP 连通。" /></div></div>
-      <p className="field-hint pool-selection-hint">{draft.groupIds.length ? '仅显示所选分组' + (draft.groupMode === 'all' ? '交集' : '并集') + '内的节点。分组成员默认勾选，取消勾选会从本池排除；订阅新增的组内节点仍会自动纳入。' : '未选择分组时可从所有节点中手动勾选。选择分组后，下方列表将限定在分组范围内。'}</p>
+      <div className={'form-grid' + (canHash ? ' form-grid--three' : '')}><Field label="代理池名称" required><input autoFocus required maxLength={100} value={draft.name} onChange={event => update('name',event.target.value)} placeholder="例如：日常出口" /></Field>
+        <Field label="调度策略"><select value={draft.strategy} onChange={event => {const strategy = event.target.value as ProxyPool['strategy'];setDraft(previous => ({...previous,strategy,hashKey:strategy === 'url-test' || strategy === 'round-robin' ? '' : previous.hashKey}));}}>{Object.entries(strategyLabels).map(([key,label]) => <option key={key} value={key}>{label} · {key}</option>)}</select></Field>
+        {canHash && <Field label="哈希键" hint="按用户名哈希需要认证账号；UDP 不支持此模式。"><select value={draft.hashKey} onChange={event => {const value=event.target.value as ''|'in-user';update('hashKey',value);if(value==='in-user')setListenerUdp(false);}}><option value="">内核默认</option><option value="in-user">认证用户名 · in-user</option></select></Field>}</div>
+      {!pool && <section className="pool-listener-panel" aria-label="监听端口">
+        <div className="pool-listener-grid">
+          <Field label="监听协议"><select value={protocol} onChange={event => {const value=event.target.value as ProxyListener['protocol'];setProtocol(value);if(value==='http')setListenerUdp(false);}}><option value="mixed">Mixed · HTTP + SOCKS5</option><option value="http">HTTP</option><option value="socks">SOCKS5</option></select></Field>
+          <Field label="监听地址" required><input required value={host} onChange={event => setHost(event.target.value)} className="mono" spellCheck={false} /></Field>
+          <Field label="监听端口" required={!automaticPort}>{automaticPort ? <input type="text" value="自动" readOnly aria-label="自动分配端口" /> : <input type="number" required min={1024} max={65535} value={port} onChange={event => setPort(Number(event.target.value))} />}</Field>
+          <div className="pool-listener-toggles">
+            <Toggle label="自动分配空闲端口" checked={automaticPort} onChange={setAutomaticPort} />
+            <Toggle label="UDP 转发" checked={listenerUdp} onChange={setListenerUdp} disabled={protocol==='http' || !draft.udp || draft.hashKey==='in-user'} description={protocol==='http' ? 'HTTP 监听不支持 UDP' : draft.hashKey==='in-user' ? '按用户名哈希不能启用 UDP' : !draft.udp ? '需先开启“仅选择 UDP 兼容节点”' : '仅限回环地址，且不受账号保护'} />
+          </div>
+        </div>
+        {!isLoopback(host) && <Note tone="warning">非回环监听可能允许其他设备访问；请在下方“访问认证”设置账号，并在主机防火墙限制来源。</Note>}
+        {listenerUdp && <Note tone="warning">原生 UDP 数据包不执行用户名密码认证，仅允许回环地址；同机其他进程仍可发送 UDP。</Note>}
+      </section>}
+      <section className="pool-member-panel" aria-label="成员选择">
+        <div className="pool-scope-grid"><div className="pool-group-field"><GroupPicker groups={state.groups} value={draft.groupIds} onChange={value => updateScope({groupIds:value})} label="包含分组" bulk columns={3} /></div>
+          <div className="pool-scope-options"><Field label="分组匹配关系"><select value={draft.groupMode} onChange={event => updateScope({groupMode:event.target.value as 'any'|'all'})}><option value="any">任意一个分组（并集）</option><option value="all">全部所选分组（交集）</option></select></Field><Toggle label="仅选择 UDP 兼容节点" checked={draft.udp} onChange={value => updateScope({udp:value})} description="仅表示配置兼容，不代表已经验证 UDP 连通。" /></div></div>
+        {draft.groupIds.length > 0 && <p className="field-hint pool-selection-hint">组内节点自动纳入；取消勾选会从本池排除。</p>}
       {scopeNotice && <p className="scope-notice" role="status">{scopeNotice}</p>}
       {deletedReferenceCount > 0 && <Note>有 {deletedReferenceCount} 个引用的节点已被删除，保存时会清理失效引用；仍存在的范围外节点不受影响。</Note>}
       {outside.length > 0 && <Note tone="warning">有 {outside.length} 个旧手动节点在当前范围外，单纯修改其他设置会保留。修改分组或兼容范围时会清理这些选择。<Button small onClick={() => updateScope({})}>仅保留当前范围</Button></Note>}
       {draft.excludeGroupIds.length > 0 && <Note tone="warning"><strong>旧分组排除规则仍生效</strong><p>{draft.excludeGroupIds.map(id => state.groups.find(group => group.id === id)?.name || '已删除分组').join('、')}。为避免编辑后意外扩大出口范围，旧规则会保留；新建代理池不再设置排除分组。</p><Button small onClick={() => update('excludeGroupIds',[])}>清除旧规则（保存后生效）</Button></Note>}
       <div className="pool-node-field"><ChoiceList label="包含节点" options={nodes} value={selected} onChange={ids => setDraft(previous => changePoolSelection(previous,scope,ids))} empty={state.nodes.length ? '当前分组或 UDP 条件下没有节点，请调整条件。' : '暂无节点，请先导入。'} searchable bulk
+        renderOption={option => {const node = nodeById.get(option.id);if (!node) return option.name;const health = poolNodeHealth(node);const legacy = excludedByLegacyGroup(node,draft);return <span className="pool-node-option"><span className="pool-node-option-main"><span className="pool-node-option-title"><span className="pool-node-option-name">{node.name}</span><span className="pool-node-pill">{node.protocol.toUpperCase()}</span>{node.udp && <span className="pool-node-pill pool-node-pill--udp">UDP</span>}{node.dialerError && <span className="pool-node-pill pool-node-pill--danger">中转不可用</span>}{legacy && <span className="pool-node-pill pool-node-pill--muted">旧规则排除</span>}</span><span className="pool-node-option-address mono">{address(node.server,node.port)}</span></span><span className={'pool-node-health pool-node-health--' + health.tone}>{health.label}</span></span>;}}
         filter={option => {const node = nodeById.get(option.id);return node ? matchesPoolNodeStatus(node,nodeStatus) : false;}}
         controls={<div className="pool-node-controls">
           <select aria-label="按节点状态筛选" value={nodeStatus} onChange={event => setNodeStatus(event.target.value as PoolNodeStatusFilter)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已禁用</option><option value="healthy">检测健康</option><option value="unhealthy">检测异常</option><option value="unknown">尚未检测</option></select>
           <select aria-label="节点排序" value={nodeSort} onChange={event => setNodeSort(event.target.value as PoolNodeSort)}><option value="name">按名称</option><option value="latency">按延迟</option><option value="speed">按速度</option><option value="updated">按最近更新</option></select>
           <Button small onClick={() => void action.execute(testSelectedNodes)} disabled={!testable.length || !runtimeReady || action.running} title={testTitle}>测延迟</Button>
         </div>} /></div>
-      <p className="field-hint">勾选后立即改变本池成员；状态筛选和排序只影响当前显示，不会清除已选节点。禁用、中转异常及 UDP 不兼容节点不会转发，取消勾选不会删除总节点。{draft.excludeNodeIds.length > 0 && ' 本池保留 ' + draft.excludeNodeIds.length + ' 个节点排除记录，重新勾选可恢复。'}</p>
-      <div className="member-preview" aria-live="polite"><div><strong>{members.length}</strong><span>个当前可转发成员</span></div><p>{members.length ? members.slice(0,5).map(node => node.name).join('、') + (members.length > 5 ? ' 等' : '') : '当前没有可转发成员；连接将被拒绝，不会自动直连。'}</p></div>
-      {!pool && <><div className="form-section-heading"><span>02</span><h3>分配监听端口</h3></div>
-        <Note>监听与代理池一并创建，校验失败不会留下半成品。默认仅供本机使用；未启用 UDP 时只监听 TCP。</Note>
-        <div className="form-grid"><Field label="监听协议"><select value={protocol} onChange={event => {const value=event.target.value as ProxyListener['protocol'];setProtocol(value);if(value==='http')setListenerUdp(false);}}><option value="mixed">Mixed · HTTP + SOCKS5</option><option value="http">HTTP</option><option value="socks">SOCKS5</option></select></Field><Toggle label="UDP 转发" checked={listenerUdp} onChange={setListenerUdp} disabled={protocol==='http' || !draft.udp || draft.hashKey==='in-user'} description={protocol==='http' ? 'HTTP 监听不支持 UDP' : draft.hashKey==='in-user' ? '按用户名哈希不能启用 UDP' : !draft.udp ? '请先开启“仅选择 UDP 兼容节点”' : '仅允许回环地址，不受用户名密码保护'} /></div>
-        <Field label="监听地址" required hint="IPv4 / IPv6 地址。默认回环地址，不会向局域网或公网开放。"><input required value={host} onChange={event => setHost(event.target.value)} className="mono" spellCheck={false} /></Field>
-        <Toggle label="自动分配空闲端口" checked={automaticPort} onChange={setAutomaticPort} description={'在 ' + state.settings.portRangeStart + '–' + state.settings.portRangeEnd + ' 范围内选择，跳过已有监听和占用端口。'} />
-        {!automaticPort && <Field label="监听端口" required><input type="number" required min={1024} max={65535} value={port} onChange={event => setPort(Number(event.target.value))} /></Field>}
-        {!isLoopback(host) && <Note tone="warning">非回环监听可能允许其他设备访问，必须设置认证并在主机防火墙限制来源。普通代理认证不提供链路加密。</Note>}
-        {listenerUdp && <Note tone="warning">原生 UDP 数据包不执行用户名密码认证，仅允许回环地址；同机其他进程仍可发送 UDP。</Note>}
-        <CredentialsEditor users={users} onChange={setUsers} />
-      </>}
+      <div className="member-preview pool-member-preview" aria-live="polite"><div><strong>{members.length}</strong><span>个当前可转发成员</span></div><p>{members.length ? members.slice(0,5).map(node => node.name).join('、') + (members.length > 5 ? ' 等' : '') : '当前没有可转发成员；连接将被拒绝，不会自动直连。'}</p></div>
+      </section>
+      {!pool && <div className="pool-credentials"><CredentialsEditor users={users} onChange={setUsers} /></div>}
       <details className="pool-advanced"><summary>健康检查与运行设置</summary><div className="form-fields">
         <Field label="检查 URL" required><input type="url" value={draft.testUrl} onChange={event => update('testUrl',event.target.value)} required className="mono" /></Field>
         <div className="form-grid form-grid--three"><Field label="间隔（秒）"><input type="number" min={10} max={86400} required value={draft.intervalSeconds} onChange={event => update('intervalSeconds',Number(event.target.value))} /></Field><Field label="超时（毫秒）"><input type="number" min={500} max={30000} required value={draft.timeoutMs} onChange={event => update('timeoutMs',Number(event.target.value))} /></Field><Field label="切换容差（毫秒）" hint="主要用于最低延迟策略。"><input type="number" min={0} max={10000} required value={draft.toleranceMs} onChange={event => update('toleranceMs',Number(event.target.value))} /></Field></div>

@@ -56,6 +56,28 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 - 真实内核：[chain_real_test.go](<../internal/core/chain_real_test.go>) 需 `UNIPROXY_TEST_CORE_PATH`，用两个回环 SOCKS 上游和本地 HTTP origin 验证 `CheckChain` 成功且两跳都收到真实连接；只证明本机链路，不证明公网节点可用性。
 - 前端/浏览器：[utils.test.mjs](<../src/web/tests/utils.test.mjs>) 覆盖链候选/顺序纯函数；[chain-workflow.spec.ts](<../tests/browser/chain-workflow.spec.ts>) 的 5 例覆盖有序链+原子监听、单跳拒绝、筛选外保留、复制停用副本、监听页 chain 目标、清空确认，以及停用监听保存失效链。fixture 的延迟必须来自真实检测请求，没有内核时显示未检测，不能伪造延迟。
 - 已知边界：链只支持自有内核的 TCP 入口；UDP 要求每一跳 UDP；真实公网远端链路、跨平台实跑、Docker、race 和容量未在本轮验证。
+## 全局界面视觉刷新（M27）
+
+- 视觉实现：[theme.css](<../src/web/theme.css>) 在 [main.tsx](<../src/web/main.tsx>) 最后加载，覆盖原有视觉变量与组件样式；[App.tsx](<../src/web/App.tsx>) 的登录错误仅在用户提交或尝试本机免令牌后显示。不改业务 API、模型、schema、Mihomo 或安全策略。
+- 构建与静态检查：`pnpm run build:web`（Vite 7.3.7，4655 modules；CSS 106.42kB/gzip22.24，JS 556.48kB/gzip162.18，仅 500kB chunk 提示）、严格 `tsc --noEmit --noUnusedLocals --noUnusedParameters` 通过。
+- 交互与响应式：`pnpm test:ui` 42/42（认证、空态、真实状态、375/768/1024 等 fixture）；`pnpm test:e2e` 49/49（1.2m，覆盖全部页面、弹窗、链/池/分组/订阅/设置/导入/监听与 390px 流程）。
+- 视觉检查：headless Microsoft Edge 1440×1000 与 390×844 截图，包含 nodes/groups/listeners/subscriptions/pools/chains/settings-runtime/settings-detection/settings-backup/nodes-mobile/nodes-selected/import-dialog/pool-dialog/chain-dialog/chain-dialog-mobile/auth；检查依据为布局层级、信息密度、对比度、无水平溢出和关键操作可见性，不替代真实代理连通测试。
+- 本地预览程序：`bin/updates/ui-refresh/uniproxy-windows-amd64.exe`，14,227,456 bytes，SHA256 `54BFEBCD087DA9D05EF395785F4CC77BD54CF45AB0B2A4338D7BC36CFCFC38B8`，身份 `0.2.8-ui-preview.1`；隔离 19091 启动后 `/api/health` 返回 `{"ok":true,"version":"0.2.8-ui-preview.1"}`。
+- 边界：未覆盖 Safari/Firefox、真实移动设备和全部缩放组合；截图与 fixture 使用隔离数据/内核不可用服务，不证明代理连通或性能；未提交/发布/部署。详见[验收](<ui-refresh-verification.md>)。
+
+## 代理池布局与节点批量栏（M28）
+
+- 布局回归：[pool-selection.spec.ts](<../tests/browser/pool-selection.spec.ts>) 以 13 个分组断言桌面三列、滚动区可见约四整行、第五行需滚动、滚动后末项可见；[pool-workflow.spec.ts](<../tests/browser/pool-workflow.spec.ts>) 覆盖新建和编辑弹窗的监听区位于成员区上方、弹窗≥1000px、分组≥3列、节点列表≥400px、编辑说明可见。
+- 批量栏：[nodes-batch.spec.ts](<../tests/browser/nodes-batch.spec.ts>) 断言未选择时整行可见且按钮禁用、全选 2 个节点后显示“已选 2 项”且操作可用、390px 无页面水平溢出。
+- 执行：`pnpm run build:web`（Vite 7.3.7，4655 modules；CSS 110.00kB/gzip22.85，JS 556.35kB/gzip161.96，仅 chunk 提示）、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.3m）、聚焦弹窗 17/17（30.6s）通过。
+- 边界：仅前端布局和浏览器回归，不改代理池/监听 API、模型、schema、Mihomo 或安全策略；headless Edge 与隔离 fixture 不证明真实节点连通、跨浏览器或全部缩放；未提交/发布/部署。详见[验收](<pool-layout-verification.md>)。
+
+## 代理池卡片紧凑化与出口节点双列（M29）
+
+- [pool-compact.spec.ts](<../tests/browser/pool-compact.spec.ts>) 断言每页 10 个节点、第二页从 nodes[10] 开始、首两卡同高/第三卡下移/卡片高度<75px，并在 525px 两列、390px 单列；[pool-regressions.mjs](<../src/web/tests/pool-regressions.mjs>) 同步搜索 10+4 分页数据。
+- 执行：`pnpm run build:web`（Vite 7.3.7，4655 modules；CSS 110.64kB/gzip22.97，JS 556.38kB/gzip161.96，仅 chunk 提示）、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.4m）、聚焦 pool 17/17（29.3s）、pool-compact 2/2（6.5s）通过。
+- 边界：只改前端组件、样式与浏览器测试；headless Edge 与隔离 fixture 不证明真实节点连通、跨浏览器或全部缩放；未提交/发布/部署。详见[验收](<pool-card-verification.md>)。
+
 ## 必测功能
 
 1. 各协议链接/Clash/sing-box 配置导入，非法参数及不支持变体明确拒绝，错误不泄漏密钥。

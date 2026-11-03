@@ -6,6 +6,7 @@ import { AppProvider } from './state';
 import './styles.css';
 import './poolStyles.css';
 import './chainStyles.css';
+import './theme.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('UniProxy root element is missing');

@@ -11,6 +11,55 @@ async function expectNoHorizontalOverflow(page: Page, container: Locator): Promi
   expect(bounds.right).toBeLessThanOrEqual(dimensions.view + 1);
 }
 
+test('new pool dialog places a compact listener block above a wide member picker', async ({ page, fixtures }) => {
+  const groups = [];
+  for (let index = 0; index < 5; index++) groups.push(await fixtures.group('layout-group-' + String(index)));
+  await fixtures.importNodes(Array.from({ length: 9 }, (_, index) => fixtures.proxy('layout-node-' + String(index))), { groupIds: [groups[0].id] });
+  const dialog = await newPoolDialog(page);
+  const listener = dialog.getByRole('region', { name: '监听端口', exact: true });
+  const member = dialog.getByRole('region', { name: '成员选择', exact: true });
+  const [listenerBox, memberBox, dialogBox] = await Promise.all([
+    listener.boundingBox(), member.boundingBox(), dialog.boundingBox(),
+  ]);
+  expect(listenerBox).not.toBeNull();
+  expect(memberBox).not.toBeNull();
+  expect(dialogBox).not.toBeNull();
+  expect(listenerBox!.y + listenerBox!.height).toBeLessThanOrEqual(memberBox!.y + 1);
+  expect(dialogBox!.width).toBeGreaterThanOrEqual(1000);
+  const groupColumns = await dialog.getByRole('group', { name: /^包含分组/ }).locator('.choice-list').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+  expect(groupColumns).toBeGreaterThanOrEqual(3);
+  const nodeHeight = await nodeChoices(dialog).locator('.choice-list').evaluate(element => parseFloat(getComputedStyle(element).maxHeight));
+  expect(nodeHeight).toBeGreaterThanOrEqual(400);
+});
+
+test('edit pool dialog keeps four group rows and a wide node picker', async ({ page, fixtures }) => {
+  const groups = [];
+  for (let index = 0; index < 13; index++) groups.push(await fixtures.group('edit-layout-group-' + String(index).padStart(2, '0')));
+  const nodes = await fixtures.importNodes(Array.from({ length: 9 }, (_, index) => fixtures.proxy('edit-layout-node-' + String(index))), { groupIds: groups.map(group => group.id) });
+  const pool = await fixtures.pool('edit-layout', { groupIds: groups.map(group => group.id), nodeIds: nodes.map(node => node.id) });
+  await gotoWorkspace(page, '/#/pools');
+  const dialog = await editPoolDialog(page, pool.name);
+  const groupList = dialog.getByRole('group', { name: /^包含分组/ }).locator('.choice-list');
+  await expect(groupList.locator('.choice-item')).toHaveCount(13);
+  const groupMetrics = await groupList.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      rowGap: parseFloat(style.rowGap),
+      verticalPadding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+    };
+  });
+  expect(groupMetrics.scrollHeight).toBeGreaterThan(groupMetrics.clientHeight);
+  const rowHeight = await groupList.locator('.choice-item').first().evaluate(element => element.getBoundingClientRect().height);
+  const visibleRows = (groupMetrics.clientHeight - groupMetrics.verticalPadding + groupMetrics.rowGap) / (rowHeight + groupMetrics.rowGap);
+  expect(visibleRows).toBeGreaterThanOrEqual(3.8);
+  expect(visibleRows).toBeLessThan(4.2);
+  const nodeHeight = await nodeChoices(dialog).locator('.choice-list').evaluate(element => parseFloat(getComputedStyle(element).maxHeight));
+  expect(nodeHeight).toBeGreaterThanOrEqual(400);
+  await expect(dialog.getByText('调整成员和策略。移除节点只影响此池，关联监听保持原配置。', { exact: true })).toBeVisible();
+});
+
 test('invalid pool-listener creation keeps both collections and revision unchanged', async ({ page, fixtures }) => {
   const [node] = await fixtures.importNodes([fixtures.proxy('validation-node')]);
   const occupied = await fixtures.poolWithListener('occupied-port', { nodeIds: [node.id] });

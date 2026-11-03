@@ -1,6 +1,6 @@
 # UniProxy 开发指南
 
-更新：2026-11-01。先读[接续快照](<session-handoff.md>)和[需求基线](<requirements.md>)；本指南是工程操作说明，不授权改变运行中用户服务。
+更新：2026-11-03。先读[接续快照](<session-handoff.md>)和[需求基线](<requirements.md>)；本指南是工程操作说明，不授权改变运行中用户服务。
 
 ## 1. 工具链与源码定位
 
@@ -26,6 +26,7 @@
 | 控制与探测 | [controller.go](<../internal/core/controller.go>)、[checks.go](<../internal/core/checks.go>) | 私有认证API、入口验证、实际延迟与下载 |
 | 嵌入前端 | [webui.go](<../internal/webui/webui.go>)、[Vite配置](<../vite.config.ts>) | 静态构建嵌入Go、CSP、缺少构建时503 |
 | 前端状态/API | [state.tsx](<../src/web/state.tsx>)、[api.ts](<../src/web/api.ts>)、[共享类型](<../src/shared/types.ts>) | 会话Token、轮询、错误/dirty、旧响应保护 |
+| 视觉主题 | [theme.css](<../src/web/theme.css>)、[main.tsx](<../src/web/main.tsx>) | 最后加载的亮色覆盖层；统一页面/表格/弹窗/认证样式与响应式；不改业务结构 |
 | 导入/筛选UI | [ImportDialog.tsx](<../src/web/ImportDialog.tsx>)、[importUtils.ts](<../src/web/importUtils.ts>)、[nodeFilters.ts](<../src/web/nodeFilters.ts>) | 文件读取版本、拖放安全、包含/排除/未分组语义 |
 | 代理池工作流 | [pools.go](<../internal/app/pools.go>)、[ports.go](<../internal/app/ports.go>) | 池+监听单次事务、自动/手动空闲端口、原子池内移除 |
 | 代理池UI | [PoolDialog.tsx](<../src/web/PoolDialog.tsx>)、[PoolCard.tsx](<../src/web/PoolCard.tsx>)、[poolSelection.ts](<../src/web/poolSelection.ts>) | 分组范围/勾选映射、全选、旧排除兼容、紧凑监听/真实检测卡片和6条分页 |
@@ -73,7 +74,7 @@ Docker 通过 `UNIPROXY_DATA_DIR=/data` 指向唯一挂载卷。
 
 ### 版本与发布
 
-[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.7 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
+[internal/version](<../internal/version/version.go>) 是唯一版本来源；发布构建用 `-ldflags -X` 注入 `Version/Commit/Date`，当前源码未注入构建报告 0.2.8 且省略提交/时间；未发布暂存应显式注入开发标识，不能只凭版本字符串认定发布身份。`-version` 与 `/api/health` 报告同一值。
 
 [发布工作流](<../.github/workflows/release.yml>)在推送 `v*.*.*` 标签或手动触发时，构建 linux/windows × amd64/arm64 四个 UniProxy 二进制（在线安装内置，不再构建独立安装器），生成 `SHA256SUMS.txt` 并创建 Release。**只有真实推送的标签才算发布**，不要手写版本号冒充。
 
@@ -144,7 +145,7 @@ pnpm test:ui
 
 - E2E用[隔离测试服务器](<../cmd/testserver/main.go>)19090及临时数据库；不会使用真实节点。Windows默认Edge。[配置](<../playwright.config.ts>)不复用已存在服务器。
 - UI fixture脚本内存构建、拦截测试域名，无产品假数据；它不能替代真实Go/内核验证。
-- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为37个E2E、36个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
+- 两种浏览器验证不要复制启动，不共享活动测试端口。当前源码为52个E2E、36个工具测试；本次是否实际通过以[接续记录](<session-handoff.md>)和带日期验收为准。
 
 ### 私有文件离线验证
 

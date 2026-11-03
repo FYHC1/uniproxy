@@ -290,22 +290,34 @@ test('the latency action submits only enabled selected nodes once the applied ru
   await expect(dialog.getByRole('alert')).toContainText('代理内核未运行');
 });
 
-test('the group picker keeps four rows visible and scrolls any extra groups', async ({ page, fixtures }) => {
+test('the group picker flows horizontally and shows four complete rows before scrolling', async ({ page, fixtures }) => {
   const groups = [];
-  for (let index = 0; index < 10; index++) groups.push(await fixtures.group('scroll-group-' + String(index).padStart(2, '0')));
+  for (let index = 0; index < 13; index++) groups.push(await fixtures.group('scroll-group-' + String(index).padStart(2, '0')));
   await fixtures.importNodes([fixtures.proxy('scroll-node')], { groupIds: [groups[0].id] });
   const dialog = await newPoolDialog(page);
   const list = groupChoices(dialog).locator('.choice-list');
-  await expect(list.locator('.choice-item')).toHaveCount(10);
-  const metrics = await list.evaluate(element => ({ clientHeight: element.clientHeight, scrollHeight: element.scrollHeight, overflowY: getComputedStyle(element).overflowY }));
+  await expect(list.locator('.choice-item')).toHaveCount(13);
+  const metrics = await list.evaluate(element => {
+    const style = getComputedStyle(element);
+    return {
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+      overflowY: style.overflowY,
+      columns: style.gridTemplateColumns.split(' ').length,
+      rowGap: parseFloat(style.rowGap),
+      verticalPadding: parseFloat(style.paddingTop) + parseFloat(style.paddingBottom),
+    };
+  });
   expect(metrics.overflowY).toBe('auto');
+  expect(metrics.columns).toBeGreaterThanOrEqual(3);
   expect(metrics.scrollHeight).toBeGreaterThan(metrics.clientHeight);
   const rowHeight = await list.locator('.choice-item').first().evaluate(element => element.getBoundingClientRect().height);
   expect(rowHeight).toBeGreaterThan(30);
-  expect(rowHeight).toBeLessThan(38);
-  // Four rows fit; a fifth one does not, so the box never grows past its fixed window.
-  expect(metrics.clientHeight).toBeGreaterThanOrEqual(rowHeight * 4);
-  expect(metrics.clientHeight).toBeLessThan(rowHeight * 5);
+  expect(rowHeight).toBeLessThan(40);
+  // Thirteen groups occupy five rows in three columns; the fixed window shows four complete rows and scrolls to the fifth.
+  const visibleRows = (metrics.clientHeight - metrics.verticalPadding + metrics.rowGap) / (rowHeight + metrics.rowGap);
+  expect(visibleRows).toBeGreaterThanOrEqual(3.8);
+  expect(visibleRows).toBeLessThan(4.2);
   const lastRowVisibleAfterScroll = await list.evaluate(element => {
     element.scrollTop = element.scrollHeight;
     const box = element.getBoundingClientRect();

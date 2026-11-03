@@ -7,14 +7,23 @@ test('single pool fills the workspace width and large membership stays paginated
  await page.getByRole('searchbox',{name:'搜索代理池',exact:true}).fill(created.pool.name);
  const card=poolCard(page,created.pool.name);
  await expect(card).toContainText('150 个已选节点');
- await expect(card.getByRole('listitem')).toHaveCount(6);
+ await expect(card.getByRole('listitem')).toHaveCount(10);
+ const nodeGrid=card.locator('.pool-node-list');
+ const grid=await nodeGrid.evaluate(e=>{
+  const items=Array.from(e.querySelectorAll('.pool-node')).slice(0,3).map(item=>item.getBoundingClientRect());
+  return {columns:getComputedStyle(e).gridTemplateColumns.split(' ').filter(Boolean).length,firstY:items[0].y,secondY:items[1].y,thirdY:items[2].y,firstHeight:items[0].height};
+ });
+ expect(grid.columns).toBe(2);
+ expect(Math.abs(grid.firstY-grid.secondY)).toBeLessThan(2);
+ expect(grid.thirdY).toBeGreaterThan(grid.firstY);
+ expect(grid.firstHeight).toBeLessThan(75);
  const list=page.getByRole('region',{name:'代理池列表',exact:true});
  const dimensions=await card.evaluate(e=>({width:e.getBoundingClientRect().width,height:e.getBoundingClientRect().height}));
  const available=await list.evaluate(e=>e.clientWidth);
  expect(dimensions.width).toBeGreaterThan(available*.9);
  expect(dimensions.height).toBeLessThan(750);
  await card.getByRole('button',{name:'下一页',exact:true}).click();
- await expect(card.getByRole('listitem',{name:'池内节点 '+nodes[6].name,exact:true})).toBeVisible();
+ await expect(card.getByRole('listitem',{name:'池内节点 '+nodes[10].name,exact:true})).toBeVisible();
  await card.getByRole('searchbox',{name:'搜索 '+created.pool.name+' 池内节点',exact:true}).fill(nodes[149].name);
  await expect(card.getByRole('listitem')).toHaveCount(1);
  const last=card.getByRole('listitem',{name:'池内节点 '+nodes[149].name,exact:true});
@@ -37,6 +46,9 @@ test('many pool listeners collapse explicitly and remain accessible without grow
  await card.getByRole('button',{name:'查看全部 3 个监听',exact:true}).click();
  await expect(card.getByText(third.name,{exact:true})).toBeVisible();await expect(card.getByText(second.name,{exact:true})).toBeVisible();
  await card.getByRole('button',{name:'收起监听',exact:true}).click();await expect(card.getByText(third.name,{exact:true})).toHaveCount(0);
+ await page.setViewportSize({width:525,height:879});await expect(card).toBeVisible();
+ await expect.poll(()=>card.locator('.pool-node-list').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').filter(Boolean).length)).toBe(2);
  await page.setViewportSize({width:390,height:844});await expect(card).toBeVisible();
+ await expect.poll(()=>card.locator('.pool-node-list').evaluate(e=>getComputedStyle(e).gridTemplateColumns.split(' ').filter(Boolean).length)).toBe(1);
  await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1)).toBe(true);
 });

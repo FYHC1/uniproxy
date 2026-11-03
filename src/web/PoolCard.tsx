@@ -15,7 +15,7 @@ export function PoolCard({pool,onEdit,onListener}:{pool:ProxyPool;onEdit:()=>voi
   const [nodeQuery,setNodeQuery] = useState('');
   const [page,setPage] = useState(1);
   const [endpointsExpanded,setEndpointsExpanded] = useState(false);
-  const pageSize = 6;
+  const pageSize = 10;
   const endpointRegionId = useId();
   const [testJob,setTestJob] = useState<TestJob|null>(null);
   const [jobNotice,setJobNotice] = useState('');
@@ -81,9 +81,13 @@ export function PoolCard({pool,onEdit,onListener}:{pool:ProxyPool;onEdit:()=>voi
         const blocked = !node.enabled ? '节点已禁用' : node.dialerError ? '中转不可用' : pool.udp && !node.udp ? 'UDP 不兼容' : !pool.enabled ? '代理池已禁用' : '';
         const testing = jobRunning && testingIds.includes(node.id) && !job?.results.some(result => result.nodeId === node.id);
         return <li className={'pool-node' + (!eligibleIds.has(node.id) ? ' pool-node--inactive' : '')} key={node.id} aria-label={'池内节点 ' + node.name}>
-          <div className="pool-node-main"><div className="pool-node-title"><span className={'pool-health pool-health--' + node.status} aria-hidden="true" /><strong title={node.name}>{node.name}</strong></div><details className="pool-node-details"><summary><Badge>{node.protocol.toUpperCase()}</Badge><span>{blocked || '连接信息'}</span></summary><div><span className="pool-node-address mono">{address(node.server,node.port)}</span>{node.dialerId && <span className="pool-node-relay">中转：{node.dialerName || '依赖节点'}</span>}<span>最近检测：{formatDate(node.lastCheckedAt,true)}</span>{(node.lastError || node.dialerError) && <p className="text-danger">{node.lastError || node.dialerError}</p>}</div></details></div>
-          <span className={'pool-node-latency ' + (node.status === 'unhealthy' ? 'text-danger' : node.status === 'healthy' ? 'text-teal' : 'muted')} title={'最近检测：' + formatDate(node.lastCheckedAt,true)}>{testing ? '检测中…' : nodeLatencyText(node)}</span>
-          <div className="pool-node-actions"><IconButton label={'测延迟 ' + node.name} title={testHint} disabled={!canTest || !node.enabled || !!node.dialerError} onClick={() => void action.execute(() => test([node.id]))}><Gauge size={16} /></IconButton><IconButton label={'从池移除 ' + node.name} className="danger-text" disabled={action.running || jobRunning} onClick={() => remove(node)}><Trash size={16} /></IconButton></div>
+          <div className="pool-node-head">
+            <span className={'pool-health pool-health--' + node.status} aria-hidden="true" />
+            <strong className="pool-node-name" title={node.name}>{node.name}</strong>
+            <span className={'pool-node-latency ' + (node.status === 'unhealthy' ? 'text-danger' : node.status === 'healthy' ? 'text-teal' : 'muted')} title={'最近检测：' + formatDate(node.lastCheckedAt,true)}>{testing ? '检测中…' : nodeLatencyText(node)}</span>
+            <div className="pool-node-actions"><IconButton label={'测延迟 ' + node.name} title={testHint} disabled={!canTest || !node.enabled || !!node.dialerError} onClick={() => void action.execute(() => test([node.id]))}><Gauge size={15} /></IconButton><IconButton label={'从池移除 ' + node.name} className="danger-text" disabled={action.running || jobRunning} onClick={() => remove(node)}><Trash size={14} /></IconButton></div>
+          </div>
+          <details className="pool-node-details"><summary aria-label={'查看节点 ' + node.name + ' 连接详情' + (blocked ? '，' + blocked : '')}><Badge>{node.protocol.toUpperCase()}</Badge>{blocked && <span>{blocked}</span>}</summary><div><span className="pool-node-address mono">{address(node.server,node.port)}</span>{node.dialerId && <span className="pool-node-relay">中转：{node.dialerName || '依赖节点'}</span>}<span>最近检测：{formatDate(node.lastCheckedAt,true)}</span>{(node.lastError || node.dialerError) && <p className="text-danger">{node.lastError || node.dialerError}</p>}</div></details>
         </li>;
       })}</ul> : <p className="pool-inline-empty">{members.length ? '没有匹配搜索的节点。' : '尚无已选节点。空池拒绝新连接，不会自动直连。'}</p>}
       {filtered.length>pageSize && <Pagination total={filtered.length} page={currentPage} pageSize={pageSize} onPage={setPage} />}

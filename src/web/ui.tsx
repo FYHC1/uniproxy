@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type ReactElement, type ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CheckCircle, CircleNotch, MagnifyingGlass, WarningCircle, X, Tray } from '@phosphor-icons/react';
 import { useAction } from './state';
@@ -49,7 +49,7 @@ export function GroupTags({ groups, ids }: {groups:Group[]; ids:string[]}) {
 }
 export function safeColor(color?:string) { return color && /^#[0-9a-f]{6}$/i.test(color) ? color : '#718096'; }
 export interface ChoiceOption {id:string;name:string;detail?:string;disabled?:boolean}
-export function ChoiceList({ label, options, value, onChange, empty = '暂无可选项目', searchable = false, bulk = false, filter, controls }: {label:string; options:ChoiceOption[]; value:string[]; onChange:(ids:string[])=>void; empty?:string; searchable?:boolean; bulk?:boolean; filter?:(option:ChoiceOption)=>boolean; controls?:ReactNode}) {
+export function ChoiceList({ label, options, value, onChange, empty = '暂无可选项目', searchable = false, bulk = false, filter, controls, renderOption, columns }: {label:string; options:ChoiceOption[]; value:string[]; onChange:(ids:string[])=>void; empty?:string; searchable?:boolean; bulk?:boolean; filter?:(option:ChoiceOption)=>boolean; controls?:ReactNode; renderOption?:(option:ChoiceOption)=>ReactNode; columns?:number}) {
   const [query, setQuery] = useState('');
   const [visibleCount, setVisibleCount] = useState(100);
   // A display filter narrows what can be selected through this view, but must not prune options:
@@ -64,12 +64,12 @@ export function ChoiceList({ label, options, value, onChange, empty = '暂无可
     <legend>{label}<span className="selection-count">{value.length} 已选</span></legend>
     {(searchable || controls) && <div className="choice-search-row">{searchable && <SearchInput value={query} onChange={next => {setQuery(next);setVisibleCount(100);}} label={'搜索' + label} placeholder="输入名称或地址筛选…" />}{controls}</div>}
     {bulk && <div className="choice-toolbar"><label className="choice-select-all"><Check checked={allSelected} indeterminate={!allSelected && someSelected} disabled={!selectable.length} label={'全选' + label + '当前结果'} onChange={checked => onChange(selectScope(value,selectable,checked))} /><span>全选当前结果 <strong>{selectable.length}</strong></span></label><span className="field-hint">覆盖当前筛选结果，不限显示项</span></div>}
-    <div className="choice-list">{filtered.length ? filtered.slice(0,visibleCount).map(option => <label key={option.id} className={'choice-item' + (option.disabled ? ' choice-item--disabled' : '')}><Check checked={selected.has(option.id)} disabled={option.disabled} label={option.name} onChange={checked => onChange(selectScope(value,[option.id],checked))} /><span>{option.name}{option.detail && <small>{option.detail}</small>}</span></label>) : <p className="choice-empty">{options.length && (query.trim() || filter) ? (query.trim() ? '没有匹配当前搜索的项目。' : '没有符合当前筛选的项目。') : empty}</p>}</div>
+    <div className={'choice-list' + (columns ? ' choice-list--columns' : '')} style={columns ? ({'--choice-columns':String(columns)} as CSSProperties) : undefined}>{filtered.length ? filtered.slice(0,visibleCount).map(option => <label key={option.id} className={'choice-item' + (option.disabled ? ' choice-item--disabled' : '')}><Check checked={selected.has(option.id)} disabled={option.disabled} label={option.name} onChange={checked => onChange(selectScope(value,[option.id],checked))} /><span className={renderOption ? 'choice-copy' : undefined}>{renderOption ? renderOption(option) : <>{option.name}{option.detail && <small>{option.detail}</small>}</>}</span></label>) : <p className="choice-empty">{options.length && (query.trim() || filter) ? (query.trim() ? '没有匹配当前搜索的项目。' : '没有符合当前筛选的项目。') : empty}</p>}</div>
     {filtered.length > visibleCount && <Button small onClick={() => setVisibleCount(count => count + 100)}>再显示 100 项（共 {filtered.length} 项）</Button>}
     {value.some(id => !options.some(option => option.id === id)) && <p className="field-hint">部分已选项目不在当前可选范围。<button type="button" className="text-button" onClick={() => onChange(value.filter(id => options.some(o => o.id === id)))}>清理范围外选择</button></p>}
   </fieldset>;
 }
-export function GroupPicker({ groups, value, onChange, label = '所属分组', bulk = false }: {groups:Group[]; value:string[]; onChange:(ids:string[])=>void; label?:string; bulk?:boolean}) { return <ChoiceList label={label} options={groups} value={value} onChange={onChange} bulk={bulk} empty="尚无分组，可在分组管理中创建。" />; }
+export function GroupPicker({ groups, value, onChange, label = '所属分组', bulk = false, columns }: {groups:Group[]; value:string[]; onChange:(ids:string[])=>void; label?:string; bulk?:boolean; columns?:number}) { return <ChoiceList label={label} options={groups} value={value} onChange={onChange} bulk={bulk} columns={columns} empty="尚无分组，可在分组管理中创建。" />; }
 export function TableRegion({ children, label }: {children:ReactNode; label:string}) { return <div className="table-region" role="region" aria-label={label} tabIndex={0}>{children}</div>; }
 export function Pagination({ total, page, pageSize, onPage }: {total:number; page:number; pageSize:number; onPage:(page:number)=>void}) {
   const pages = Math.max(1, Math.ceil(total / pageSize));

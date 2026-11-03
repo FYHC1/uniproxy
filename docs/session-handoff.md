@@ -1,11 +1,14 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-03 01:09（Asia/Shanghai）。v0.2.7 已正式发布并设 Latest（未部署）；M25 代理链已随 v0.2.7 发布。M26「新建代理链弹窗布局调整」已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），包含入口监听移至代理链名称下方、节点库上方，访问认证在底部，节点库 3×3，端口空白自动/手工可填；严格 TS、生产 Web 构建、链浏览器 6/6 通过；未发布、未部署。2026-11-03 00:36 实测未发现 UniProxy 主程序或其内核在运行，9090/19090/20006 无监听；此前记录的用户预览 PID24580+内核 PID14272 已不在运行，本轮未停止、替换或读取用户数据库。操作前仍须重新核对当前进程。**
+**最后核对：2026-11-03 10:00（Asia/Shanghai）。v0.2.7 已正式发布并设 Latest（未部署）；M25 代理链已随 v0.2.7 发布。M26「新建代理链弹窗布局调整」已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），包含入口监听移至代理链名称下方、节点库上方，访问认证在底部，节点库 3×3，端口空白自动/手工可填；严格 TS、生产 Web 构建、链浏览器 6/6 通过；未发布、未部署。M27「全局界面视觉刷新」已在本地完成：theme.css 亮色覆盖层、布局表达层级、42/42 UI 与 49/49 浏览器验证、0.2.8-ui-preview.1 本地预览；未提交、未发布、未部署。M28「新建/编辑代理池布局与节点批量栏」已在本地完成：监听区上移、分组固定四行内滚、节点区加宽加高、批量栏常驻，42/42 UI 与 52/52 浏览器验证通过；未提交、未发布、未部署。M29「代理池卡片紧凑化与出口节点双列」已在本地完成：每页 10 个节点、节点卡两层结构、容器查询双列/单列、触控按钮 44px，42/42 UI 与 52/52 浏览器验证通过；未提交、未发布、未部署。2026-11-03 10:00 复核：uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动）正在运行，监听 127.0.0.1:9090 与 20006；本轮未启动、停止或替换该实例，操作前仍须重新核对；M27 预览 PID3976 已在 19091 验收后停止，临时数据已清理。**
 
 ## 30秒摘要
 
 - 正式发布：[UniProxy v0.2.7](<https://github.com/FYHC1/uniproxy/releases/tag/v0.2.7>)，四平台程序与 SHA256SUMS；[中文说明](<releases/v0.2.7.md>)已同步到 Release body（2019 字符，GitHub API 实测逐字一致）。
 - M26 已提交：M26「新建代理链弹窗布局调整」已完成入口监听上移、访问认证置底、节点库 3×3、端口空白自动/手工填写；严格 TS、生产 Web 构建、链浏览器 6/6 通过，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布/部署。见[计划 M26](<development-plan.md>)与[需求 R31](<requirements.md>)。
+- M27 本地完成：全局界面视觉刷新新增 `src/web/theme.css` 最后加载，统一暖纸亮色主题、紧凑布局、隐藏重复说明和 390px 底部导航；严格 TS、生产 Web 构建、`pnpm test:ui` 42/42、`pnpm test:e2e` 49/49 通过；本地 Windows 预览 `0.2.8-ui-preview.1`，未提交/发布/部署。见[验收](<ui-refresh-verification.md>)、[计划 M27](<development-plan.md>)、[需求 R32](<requirements.md>)、[决策 D30](<decisions.md>)。
+- M28 本地完成：新建/编辑代理池弹窗监听区上移、分组固定四行内滚、节点区加宽加高；节点管理批量栏常驻且未选择时操作禁用。严格 TS、生产 Web 构建、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52 通过；未提交/发布/部署。见[验收](<pool-layout-verification.md>)、[计划 M28](<development-plan.md>)、[需求 R33](<requirements.md>)、[决策 D31](<decisions.md>)。
+- M29 本地完成：代理池卡片每页 10 个节点，节点卡压成健康/名称/延迟/操作首行与协议徽章次行，地址/中转/检测/错误收进展开区；成员区容器查询在 >430px 两列、≤430px 单列，列表 380px 内滚，触控按钮 44px。`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.4m）、聚焦 pool 17/17、pool-compact 2/2 通过；未提交/发布/部署。见[验收](<pool-card-verification.md>)、[计划 M29](<development-plan.md>)、[需求 R34](<requirements.md>)、[决策 D32](<decisions.md>)。
 - M25 代理链已随 v0.2.7 发布：独立「代理链」页面、双栏节点选择器、2–16 跳合成出站串接、chain 监听、整链检测与原子创建；发布前 Go 全量、42/42 UI 工具、48/48 隔离浏览器、真实两跳回环链路与 Windows 候选程序验收均通过；v0.2.7 不部署。详见[代理链验收](<chain-verification.md>)与[v0.2.7 发布验收](<release-0.2.7-verification.md>)。
 - 发布源码 [14cc9f570b44422b9dfc1deec94b3556749a1a05](<https://github.com/FYHC1/uniproxy/commit/14cc9f570b44422b9dfc1deec94b3556749a1a05>)（M25 代理链，49 文件），annotated tag 对象 `568f8639935eef3cbdd9090b19ff4d2b0dde53da`，解引用为该提交。
 - main CI [41456237334](<https://github.com/FYHC1/uniproxy/actions/runs/41456237334>)、标签 CI [41456604601](<https://github.com/FYHC1/uniproxy/actions/runs/41456604601>)、Release [41456604526](<https://github.com/FYHC1/uniproxy/actions/runs/41456604526>) 全部成功；2026-11-02 21:52:52 +08 发布并设 Latest。
@@ -16,7 +19,7 @@
 
 ## 当前运行服务
 
-- 2026-11-03 00:36 实测：未发现 UniProxy 主程序或 UniProxy 自有内核进程；`127.0.0.1:9090`、19090、20006 均无监听。此前记录的用户自行启动预览 PID24580 + 内核 PID14272 已不在运行，原因未由本轮操作造成。本轮未停止、替换、读取或修改用户数据库。
+- 2026-11-03 10:00 实测：uniproxy PID18324（`C:\Users\h2147\AppData\Local\Temp\go-build2592475721\b001\exe\uniproxy.exe`，09:30:08 启动）与内核 mihomo PID24836（`C:\ProgramData\UniProxy\core\mihomo.exe`，09:30:09 启动）正在运行，监听 `127.0.0.1:9090` 与 20006；来源未被本轮确认，保留不动。此前 00:36 记录的无实例状态已过期。本轮未停止、替换、读取或修改用户数据库。
 - v0.2.7 未部署；发布只创建 GitHub Release 与附件。M26 仅为 UI 改动，已提交并推送 main，未生成发布资产。
 - 部署前置条件（若后续获授权）：确认无实例与子内核在运行，或先让其正常退出并确认内核退出 → 需要备份时停机后复制 → 替换主程序并沿用原数据目录/启动参数 → health 与 /api/core/inspect 复核；禁止在运行中复制或覆盖 SQLite 数据库，禁止混用不同库的 WAL/SHM。
 
@@ -27,6 +30,33 @@
 - 样式：`src/web/chainStyles.css` 新增 `.chain-entry` 面板和响应式五列/两列；`.chain-node-grid` 桌面固定三列，配合紧凑卡片与弹窗间距可在 1440×1000 内容纳 3×3 共 9 个节点，访问认证与 footer 仍可见；窄屏两列/单列。
 - 测试：`tests/browser/chain-workflow.spec.ts` 新增入口监听/认证位置、9 节点 3×3、空白端口提交 0、手工端口透传、非法端口本地拦截断言；`pnpm exec playwright test tests/browser/chain-workflow.spec.ts` 6/6 通过（12.8s）。`pnpm exec tsc --noEmit --noUnusedLocals --noUnusedParameters` 与 `pnpm run build:web` 通过（最终 CSS 84.99kB/gzip17.13，JS 556.44kB/gzip162.16，仅有 Vite chunk 体积提示）。
 - 视觉：`.local/chain-preview/chain-dialog-new.png`（1440×1000，3×3 九节点）与 `chain-dialog-new-390.png`（390×844，无水平溢出）已检查；临时视觉 spec 交付前删除。未改动 API/模型/schema/Mihomo/安全策略，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功），未发布、未部署。见[计划 M26](<development-plan.md>)、[需求 R31](<requirements.md>)、[决策 D29](<decisions.md>)。
+
+## 全局界面视觉刷新（M27，2026-11-03 本地完成，未提交/未发布/未部署）
+
+- 用户要求整体优化 Web UI：避免不必要二级标签和说明，用布局表达层级，界面紧凑、简洁明了、亮色主题并提升完成度；范围是全部管理控制台页面、共享组件、弹窗、认证与通知，不改业务 API/模型/schema/Mihomo/安全策略。
+- 实现：`src/web/theme.css` 在 `src/web/main.tsx` 第 6–9 行最后加载，覆盖原有视觉变量与组件：暖纸亮色画布、深森林墨文字、青绿/酸橙强调、serif 大标题、深色首张统计卡；统一侧栏/顶栏/页面标题/统计/表格/按钮/表单/弹窗/池与链卡片/设置/空态/认证/通知。隐藏重复 eyebrow、页面与区块 description、subtle-meta、footnote、分组提示、context banner、侧栏说明、面包屑和页脚辅助文案；保留安全提示、真实状态、空态与错误。
+- 密度与响应式：压缩表格行高、卡片/弹窗间距；活动列表 396px 内滚；390px 底部导航改为 62px 七列单行，页面无水平溢出。`src/web/App.tsx` 登录错误仅在用户提交或点击本机免令牌后显示，避免初始 401 红色错误噪声。
+- 验证：严格 TS、`pnpm run build:web`（Vite 7.3.7，4655 modules；CSS 106.42kB/gzip22.24，JS 556.48kB/gzip162.18，仅 chunk 提示）、`pnpm test:ui` 42/42、`pnpm test:e2e` 49/49（1.2m）通过；视觉截图在 `.local/ui-theme/`（nodes/groups/listeners/subscriptions/pools/chains/settings/nodes-mobile/nodes-selected/import/pool/chain/auth）。
+- 本地预览：`bin/updates/ui-refresh/uniproxy-windows-amd64.exe`，14,227,456 bytes，SHA256 `54BFEBCD087DA9D05EF395785F4CC77BD54CF45AB0B2A4338D7BC36CFCFC38B8`，身份 `0.2.8-ui-preview.1 · commit local-ui-ref · built 2026-11-02T18:36:12Z`；隔离 19091 启动与 `/api/health` 通过。
+- 边界：仅前端样式和登录错误显示时机；截图/浏览器测试使用隔离 fixture 与 headless Edge 1440/390，未覆盖 Safari/Firefox、真实移动设备和全部缩放组合；未提交、未发布、未部署。详见[验收](<ui-refresh-verification.md>)。
+
+## 新建/编辑代理池布局与节点批量栏（M28，2026-11-03 本地完成，未提交/未发布/未部署）
+
+- 用户要求继续压缩新建/编辑代理池弹窗：监听区上移，包含分组固定约四行并可滚动，包含节点区域更宽更高，减少二级说明；节点管理批量栏保持可见。用户随后撤回“添加/移除暂存按钮”，即时勾选、筛选、排序和真实延迟检测保持不变。
+- 实现：新建时将监听面板放在名称/策略之后、成员选择之前，协议/地址/端口/自动分配/UDP 单行四列；成员区上方左侧分组选择、右侧匹配方式/仅 UDP 兼容节点，下方节点列表全宽，卡片显示协议/UDP/健康/地址。编辑模式不重复编辑监听。
+- 样式：`src/web/poolStyles.css` 分组列表 `min-height:78px; max-height:177px`（36px 行高、5px 间隔、16px 内边距正好四整行），节点列表最高 420px；桌面弹窗 1060px，900/760/560px 逐级降级。`src/web/ui.tsx` 的 `ChoiceList` 增加 `columns`/`renderOption`，`src/web/styles.css` 增加通用 `.choice-list--columns`；`src/web/PoolDialog.tsx` 第 89 行新建说明为空、第 94–124 行为监听/成员两区。
+- 节点批量栏：`src/web/NodesPage.tsx` 第 45 行保持常驻，未选择时显示“选择节点以批量操作”并禁用动作；新增 `tests/browser/nodes-batch.spec.ts` 锁定可见性、选择 2 个节点后的“已选 2 项”和 390px 无水平溢出。
+- 测试：`tests/browser/pool-selection.spec.ts` 第 293 行 13 组断言三列、四整行、滚动；`tests/browser/pool-workflow.spec.ts` 第 14/35 行覆盖新建与编辑弹窗监听区位置、弹窗≥1000px、节点区≥400px、四行分组与编辑说明。`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.3m）、聚焦 17/17（30.6s）通过。
+- 构建：`pnpm run build:web` Vite7.3.7，4655 modules；CSS `index-D2d1U0qR.css` 110.00kB/gzip22.85，JS `index-bdmjANDs.js` 556.35kB/gzip161.96，仅 chunk 提示。视觉截图 `.local/ui-theme/pool-dialog-four-groups-desktop.png`（1060×1040）与 `pool-dialog-four-groups-mobile.png`（370×1013）已检查，临时 spec 已删除。
+- 边界：仅前端布局、组件属性与浏览器测试；未改代理池/监听 API、模型、schema、Mihomo 或安全策略；未覆盖真实节点连通、Safari/Firefox、真实移动设备或全部缩放。详见[验收](<pool-layout-verification.md>)、[需求 R33](<requirements.md>)、[决策 D31](<decisions.md>)。
+
+## 代理池卡片紧凑化与出口节点双列（M29，2026-11-03 本地完成，未提交/未发布/未部署）
+
+- 用户要求代理池卡片 UI 布局优化、提高空间利用率：出口节点卡片设计更紧凑、桌面两列展示，提高同屏节点数量；并按“避免不必要的二级标签和说明，让布局来传达说明”的原则精简节点卡。
+- 实现：`src/web/PoolCard.tsx:18` 每页 10 个节点；节点卡首行为健康/名称/延迟/测延迟/移除，次行仅协议 Badge，地址、中转依赖、最近检测和错误收进 `details` 展开区，删除重复“连接信息”。`src/web/poolStyles.css:121-143` 用 `container-type:inline-size` 容器查询，成员区 >430px 两列、≤430px 单列；列表 380px 内滚，桌面按钮 24×24，`pointer:coarse` 恢复 44×44。`src/web/theme.css` 收紧池卡片内边距并统一列表高度。
+- 测试：`tests/browser/pool-compact.spec.ts` 覆盖每页 10、第二页 nodes[10]、两列/单列、首两卡同高与第三卡下移；`src/web/tests/pool-regressions.mjs` 同步 10+4 分页数据。生产 Web 构建（Vite7.3.7，4655 modules；CSS 110.64kB/gzip22.97，JS 556.38kB/gzip161.96）、`pnpm test:ui` 42/42、`pnpm test:e2e` 52/52（1.4m）、聚焦 pool 17/17（29.3s）、pool-compact 2/2（6.5s）通过。
+- 视觉：`.local/pool-preview/pool-page-525.png` 两列、`pool-page-390.png` 单列；`src/web/tests/artifacts/pools-desktop.png`、`pools-compact-single.png`、`pools-mobile.png` 已检查。
+- 边界：仅前端组件、样式和浏览器测试；未改代理池/监听 API、模型、schema、Mihomo 或安全策略；未覆盖真实节点连通、Safari/Firefox、真实移动设备或全部缩放。详见[验收](<pool-card-verification.md>)、[需求 R34](<requirements.md>)、[决策 D32](<decisions.md>)。
 
 ## 代理链（M25，已随 v0.2.7 发布，不含部署）
 
@@ -113,8 +143,8 @@
 ## 结束状态与下一步
 
 - v0.2.7 已发布并设 Latest，**未部署**；本轮未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。
-- 当前工作树 HEAD=origin/main=`14cc9f570b44422b9dfc1deec94b3556749a1a05`，工作树干净；M25 已随 v0.2.7 发布，不部署。
-- 当前用户自行启动的本地预览 0.2.6-chain-preview.1（PID24580 + 内核 PID14272）仍在运行，`127.0.0.1:9090` 归主程序、20006 链监听归内核，19090 未监听；这是用户既有实例，不是本轮启动或测试残留。9router 主进程 PID30460/子进程 4448 监听 20128，`JP-US1` 池已 active。
+- 当前工作树 HEAD=`f2f462c`（M26 文档提交），M27/M28/M29 改动未提交：19 个已修改文件 + 5 个未跟踪文件（`src/web/theme.css`、`docs/ui-refresh-verification.md`、`tests/browser/nodes-batch.spec.ts`、`docs/pool-layout-verification.md`、`docs/pool-card-verification.md`）；M25/M26 已发布/提交，M27/M28/M29 不部署。
+- M27 本地预览 `0.2.8-ui-preview.1`（PID3976）曾在 `127.0.0.1:19091` 用临时数据 `.local/ui-preview-data` 验收；验收后已停止并删除临时数据。2026-11-03 10:00 复核时 9090/20006 由 PID18324/PID24836 监听，19090/19091 无监听；该实例未触碰。9router 相关观察不在本轮修改范围。
 - v0.2.7 发布流程已完成：main CI、tag CI、Release 四平台构建均成功，正式资产与 Windows 程序已核验；发布不等于部署。若后续获部署授权：先确认没有任何 UniProxy 实例运行，或先让其正常退出并确认内核退出；再替换可执行文件并沿用原数据目录与启动参数；禁止在运行中复制或覆盖数据库，禁止混用不同库的 WAL/SHM。
 - 用户侧真实节点连通/日常使用需另行观察；发布与程序验收不等于节点可用或吞吐达标。不要因会话恢复自动启动/停止服务。
 - Linux amd64 已在 WSL2/Fedora 44 用 0.2.5 候选复验（M22 修复）；v0.2.6 的 Linux 资产仅构建与摘要核对，未实机运行；Linux arm64 仅构建与摘要核对。Docker、race、容量/吞吐与真实远端连通未在本轮验证。
