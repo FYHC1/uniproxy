@@ -45,22 +45,37 @@ func recomputeFingerprints(s *model.State) error {
 		if n.Config == nil {
 			return bad("备份缺少节点配置")
 		}
-		raw := map[string]any{}
-		for k, v := range n.Config {
-			raw[k] = v
+		if n.EngineName() != model.EngineMihomo {
+			// The outer Node.Engine wins JSON decoding while ParsedNode.Engine stays
+			// empty until normalization; restore it before fingerprinting so a
+			// backup round trip cannot change a sidecar node's identity.
+			n.ParsedNode.Engine = n.EngineName()
 		}
-		raw["name"] = n.Name
-		b, e := json.Marshal(map[string]any{"proxies": []any{raw}})
-		if e != nil {
-			return bad("备份节点配置无效")
+		if n.EngineName() == model.EngineXray {
+			if n.Protocol == "" || n.Server == "" || n.Port < 1 || n.Port > 65535 || n.DialerProxy != "" {
+				return bad("备份包含不安全或无效的节点配置")
+			}
+			n.ParsedNode.DialerProxy = ""
+			n.DialerName = ""
+			n.DialerError = ""
+		} else {
+			raw := map[string]any{}
+			for k, v := range n.Config {
+				raw[k] = v
+			}
+			raw["name"] = n.Name
+			b, e := json.Marshal(map[string]any{"proxies": []any{raw}})
+			if e != nil {
+				return bad("备份节点配置无效")
+			}
+			pr := importer.Parse(string(b))
+			if len(pr.Errors) > 0 || len(pr.Nodes) != 1 || pr.Nodes[0].DialerProxy != "" {
+				return bad("备份包含不安全或无效的节点配置")
+			}
+			n.ParsedNode = pr.Nodes[0]
+			n.DialerName = ""
+			n.DialerError = ""
 		}
-		pr := importer.Parse(string(b))
-		if len(pr.Errors) > 0 || len(pr.Nodes) != 1 || pr.Nodes[0].DialerProxy != "" {
-			return bad("备份包含不安全或无效的节点配置")
-		}
-		n.ParsedNode = pr.Nodes[0]
-		n.DialerName = ""
-		n.DialerError = ""
 	}
 	done := map[string]bool{}
 	var visit func(string, int) (string, error)
@@ -112,19 +127,48 @@ func recomputeFingerprints(s *model.State) error {
 // Export names use stable IDs to disambiguate same-named nodes and preserve
 // references across edit/import cycles. Native policy and controller are omitted.
 func exportNativeNodes(s model.State) []map[string]any {
+	// Xray sidecar nodes cannot be represented as Mihomo outbounds on another
+	// host: their endpoint is local to this machine. Full-state backup is the
+	// portability path for them. Native nodes that depend on a sidecar node are
+	// omitted too; exporting a dangling dialer-proxy would produce an invalid
+	// Mihomo profile.
+	excluded := map[string]bool{}
+	for _, n := range s.Nodes {
+		if n.EngineName() != model.EngineMihomo {
+			excluded[n.ID] = true
+		}
+	}
+	for changed := true; changed; {
+		changed = false
+		for _, n := range s.Nodes {
+			if excluded[n.ID] {
+				continue
+			}
+			if n.DialerID != "" && excluded[n.DialerID] {
+				excluded[n.ID] = true
+				changed = true
+			}
+		}
+	}
+	nodes := make([]model.Node, 0, len(s.Nodes))
+	for _, n := range s.Nodes {
+		if !excluded[n.ID] {
+			nodes = append(nodes, n)
+		}
+	}
 	names := map[string]string{}
 	counts := map[string]int{}
 	used := map[string]bool{}
-	for _, n := range s.Nodes {
+	for _, n := range nodes {
 		counts[n.Name]++
 	}
-	for _, n := range s.Nodes {
+	for _, n := range nodes {
 		if counts[n.Name] == 1 && !reservedExportName(n.Name) && !used[n.Name] {
 			names[n.ID] = n.Name
 			used[n.Name] = true
 		}
 	}
-	for _, n := range s.Nodes {
+	for _, n := range nodes {
 		if names[n.ID] == "" {
 			candidate := "n-" + n.ID
 			for used[candidate] {
@@ -135,7 +179,7 @@ func exportNativeNodes(s model.State) []map[string]any {
 		}
 	}
 	missingNames := map[string]string{}
-	for _, n := range s.Nodes {
+	for _, n := range nodes {
 		if n.DialerID != "" && names[n.DialerID] == "" && missingNames[n.DialerID] == "" {
 			candidate := "missing-" + n.DialerID
 			for used[candidate] {
@@ -146,7 +190,7 @@ func exportNativeNodes(s model.State) []map[string]any {
 		}
 	}
 	ps := []map[string]any{}
-	for _, n := range s.Nodes {
+	for _, n := range nodes {
 		m := map[string]any{}
 		for k, v := range n.Config {
 			m[k] = v

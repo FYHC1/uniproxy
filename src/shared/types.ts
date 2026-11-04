@@ -1,5 +1,8 @@
 export type Protocol = 'vless'|'vmess'|'trojan'|'ss'|'hysteria'|'hysteria2'|'tuic'|'ssh'|'socks5'|'http';
-export interface ProxyNode { id:string; name:string; dialerId?:string; dialerName?:string; dialerError?:string; protocol:Protocol; server:string; port:number; udp:boolean; enabled:boolean; manual:boolean; customName:boolean; groupIds:string[]; sourceIds:string[]; status:'unknown'|'healthy'|'unhealthy'; latencyMs:number|null; speedMbps:number|null; lastCheckedAt:string; lastError:string; createdAt:string; updatedAt:string; }
+export interface SidecarEndpoint { host:string; port:number; username?:string; password?:string; }
+export interface SidecarStatus { engine:string; version?:string; running:boolean; error?:string; }
+export interface SidecarInfo { enabled:boolean; status:SidecarStatus; nodeCount:number; portRangeStart:number; portRangeEnd:number; maxNodes:number; installation?:CoreInstallation; }
+export interface ProxyNode { id:string; name:string; dialerId?:string; dialerName?:string; dialerError?:string; protocol:Protocol; server:string; port:number; udp:boolean; enabled:boolean; manual:boolean; customName:boolean; groupIds:string[]; sourceIds:string[]; status:'unknown'|'healthy'|'unhealthy'; latencyMs:number|null; speedMbps:number|null; lastCheckedAt:string; lastError:string; createdAt:string; updatedAt:string; engine?:'mihomo'|'xray'|'sing-box'; sidecarEndpoint?:SidecarEndpoint; sidecarStatus?:SidecarStatus; }
 export interface Group {id:string; name:string; color:string; createdAt:string}
 export interface ProxyPool {id:string;name:string;strategy:'url-test'|'round-robin'|'consistent-hashing'|'sticky-sessions';hashKey:''|'in-user';nodeIds:string[];groupIds:string[];groupMode:'any'|'all';excludeNodeIds:string[];excludeGroupIds:string[];enabled:boolean;udp:boolean;testUrl:string;intervalSeconds:number;timeoutMs:number;toleranceMs:number;createdAt:string;updatedAt:string}
 export interface Credential {username:string;password?:string;hasPassword?:boolean}
@@ -14,7 +17,7 @@ export interface ChainCreateRequest {chain:ChainDraft;listener?:PoolListenerInpu
 export interface ChainCreateResult {chain:ProxyChain;listener:ProxyListener|null}
 export interface Subscription {id:string;name:string;url:string;groupIds:string[];enabled:boolean;intervalMinutes:number;lastFetchedAt:string;lastError:string;nodeCount:number;createdAt:string;updatedAt:string}
 export interface NetworkInterface {name:string;up:boolean;loopback:boolean;addresses:string[]}
-export interface Settings {testUrl:string;speedTestUrl:string;testTimeoutMs:number;testConcurrency:number;speedTestBytes:number;healthIntervalSeconds:number;portRangeStart:number;portRangeEnd:number;outboundInterface:string}
+export interface Settings {testUrl:string;speedTestUrl:string;testTimeoutMs:number;testConcurrency:number;speedTestBytes:number;healthIntervalSeconds:number;portRangeStart:number;portRangeEnd:number;sidecarPortRangeStart:number;sidecarPortRangeEnd:number;outboundInterface:string;enableSidecar:boolean}
 export interface RuntimeStatus {available:boolean;running:boolean;applying:boolean;version:string;appliedRevision:number;lastError:string;startedAt:string;dirty:boolean;listeners:{id:string;listening:boolean;error:string}[]}
 export interface CoreInstallation {
   state:'idle'|'installing'|'succeeded'|'failed';

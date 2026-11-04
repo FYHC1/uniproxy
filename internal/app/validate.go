@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/uniproxy/uniproxy/internal/model"
+	"github.com/uniproxy/uniproxy/internal/sidecar"
 	"net"
 	"net/url"
 	"regexp"
@@ -69,6 +70,10 @@ func validURL(v string) bool {
 	u, e := url.Parse(v)
 	return e == nil && (u.Scheme == "https" || u.Scheme == "http") && u.Hostname() != "" && u.User == nil && u.Fragment == ""
 }
+func rangesOverlap(aStart, aEnd, bStart, bEnd int) bool {
+	return aStart <= bEnd && bStart <= aEnd
+}
+
 func ValidateState(s model.State, adminPort int) error {
 	encoded, err := json.Marshal(s)
 	if err != nil || len(encoded) > 32*1024*1024 {
@@ -118,6 +123,7 @@ func ValidateState(s model.State, adminPort int) error {
 		return bad(err.Error())
 	}
 	nodes := map[string]model.Node{}
+	sidecarPorts := map[int]string{}
 	for _, n := range s.Nodes {
 		if e := checkID(n.ID); e != nil {
 			return e
@@ -130,6 +136,42 @@ func ValidateState(s model.State, adminPort int) error {
 		}
 		if !contains([]string{"vless", "vmess", "trojan", "ss", "hysteria", "hysteria2", "tuic", "ssh", "socks5", "http"}, n.Protocol) {
 			return bad("不支持的节点协议")
+		}
+		switch n.EngineName() {
+		case model.EngineMihomo:
+		case model.EngineXray:
+			if !contains([]string{"vless", "vmess", "trojan", "ss", "socks5", "http"}, n.Protocol) {
+				return bad("Xray sidecar 不支持该节点协议")
+			}
+			if n.DialerID != "" {
+				return bad("sidecar 节点不能同时设置中转")
+			}
+			if n.Enabled && !s.Settings.EnableSidecar {
+				return bad("Xray sidecar 功能未启用")
+			}
+			if n.Enabled && n.SidecarEndpoint == nil {
+				return bad("Xray sidecar 节点缺少本地端点")
+			}
+		default:
+			return bad("不支持的节点引擎")
+		}
+		if n.SidecarEndpoint != nil {
+			if n.EngineName() != model.EngineXray {
+				return bad("原生节点不能设置 sidecar 端点")
+			}
+			ep := n.SidecarEndpoint
+			if ep.Host != "127.0.0.1" || ep.Port < 1024 || ep.Port > 65535 {
+				return bad("sidecar 端点必须是 127.0.0.1 上的有效端口")
+			}
+			if ep.Username == "" || len(ep.Username) > 255 || strings.ContainsAny(ep.Username, ":\r\n\x00") || ep.Password == "" || len(ep.Password) > 255 || strings.ContainsAny(ep.Password, "\r\n\x00") {
+				return bad("sidecar 端点认证信息无效")
+			}
+			if n.Enabled {
+				if previous, exists := sidecarPorts[ep.Port]; exists {
+					return bad(fmt.Sprintf("sidecar 端点端口 %d 被多个节点使用（%s 与 %s）", ep.Port, previous, n.ID))
+				}
+				sidecarPorts[ep.Port] = n.ID
+			}
 		}
 		if n.DialerIdentity != "" && (!validRelayIdentity(n.DialerIdentity) || n.DialerID == "") {
 			return bad("中转身份指纹无效")
@@ -228,6 +270,9 @@ func ValidateState(s model.State, adminPort int) error {
 					return bad("代理链包含中转依赖异常的节点")
 				}
 			}
+		}
+		if err := model.ValidateSidecarChainPlacement(s.Nodes, c.NodeIDs); err != nil {
+			return bad(err.Error())
 		}
 		chains[c.ID] = c
 	}
@@ -355,6 +400,9 @@ func ValidateState(s model.State, adminPort int) error {
 	if !validURL(v.TestURL) || !validURL(v.SpeedTestURL) || v.TestTimeoutMS < 500 || v.TestTimeoutMS > 30000 || v.TestConcurrency < 1 || v.TestConcurrency > 32 || v.SpeedTestBytes < 1024 || v.SpeedTestBytes > 100*1024*1024 || v.HealthIntervalSeconds < 30 || v.HealthIntervalSeconds > 86400 || v.PortRangeStart < 1024 || v.PortRangeEnd > 65535 || v.PortRangeEnd < v.PortRangeStart {
 		return bad("检测设置或端口分配范围无效")
 	}
+	if v.SidecarPortRangeStart < 1024 || v.SidecarPortRangeEnd > 65535 || v.SidecarPortRangeEnd < v.SidecarPortRangeStart {
+		return bad("Sidecar 端口分配范围无效")
+	}
 	if name := strings.TrimSpace(v.OutboundInterface); name != "" {
 		if name != v.OutboundInterface {
 			return bad("全局出站网卡名称不能包含首尾空白")
@@ -370,6 +418,33 @@ func ValidateState(s model.State, adminPort int) error {
 		}
 		if iface.Flags&net.FlagLoopback != 0 {
 			return bad("全局出站网卡不能是回环接口：" + name)
+		}
+	}
+	if v.EnableSidecar {
+		if rangesOverlap(v.PortRangeStart, v.PortRangeEnd, v.SidecarPortRangeStart, v.SidecarPortRangeEnd) {
+			return bad("Sidecar 端口范围不能与独立监听端口范围重叠")
+		}
+		if adminPort >= v.SidecarPortRangeStart && adminPort <= v.SidecarPortRangeEnd {
+			return bad("Sidecar 端口范围不能包含管理端口")
+		}
+		for _, l := range s.Listeners {
+			if l.Port >= v.SidecarPortRangeStart && l.Port <= v.SidecarPortRangeEnd {
+				return bad(fmt.Sprintf("监听端口 %d 落在 Sidecar 端口范围内", l.Port))
+			}
+		}
+		enabled := make([]model.Node, 0)
+		for _, n := range s.Nodes {
+			if n.Enabled && n.EngineName() == model.EngineXray {
+				enabled = append(enabled, n)
+			}
+		}
+		if len(enabled) > sidecar.MaxSidecarNodes {
+			return bad(fmt.Sprintf("Xray sidecar 单进程最多支持 %d 个节点（当前 %d 个），请拆分或仅启用 Xray-only 节点", sidecar.MaxSidecarNodes, len(enabled)))
+		}
+		if len(enabled) > 0 {
+			if _, err := sidecar.BuildXrayConfig(enabled); err != nil {
+				return bad("Xray sidecar 配置无效：" + err.Error())
+			}
 		}
 	}
 	return nil

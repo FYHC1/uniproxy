@@ -36,6 +36,9 @@ func parseVMessJSON(text string) (model.ParsedNode, error) {
 	if !ok {
 		return model.ParsedNode{}, errors.New("VMess URI requires a JSON object")
 	}
+	if xrayVMessJSON(obj) {
+		return parseXrayVMessJSON(obj, fragment)
+	}
 	r := newFields(obj)
 	if v, ok := r.get("v"); ok && decimalString(v) != "2" {
 		r.fail("unsupported VMess URI version")

@@ -2,6 +2,38 @@
 
 日期按 Asia/Shanghai。v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
 
+## 未发布 — 多引擎 sidecar 第一批、app/API、UI、端口产品化、真实流程、真实订阅、Xray 在线安装器与 kr-vps 远端 E2E（开发分支）
+
+- 新增 `Node.Engine`、`Node.SidecarEndpoint`、`SidecarStatus`；旧 state 中空 Engine 归一为 mihomo。
+- 新增 `ParsedNode.Engine` 与 `internal/importer/xray_uri.go`、`internal/importer/xray_vmess.go`：识别 VLESS Encryption、VLESS/VMess XHTTP、Reality spiderX/mldsa65Verify、FinalMask、TLS cipher suites、flow=xtls-rprx-vision-udp443，保留真实 Xray 配置；合法字段保留，坏 fm/cs 严格失败或预览降级，VLESS 明文公网 IP 回退 Mihomo 预览。
+- 真实订阅验收：1394 条 VLESS 中可显示 1383 个节点（77 个 Xray），77 个 Xray 节点配置全部通过 Xray 26.10.31 `xray -test`，合并配置 `Configuration OK`；真实远端 SOCKS5 验证当前 38/77 可达，结果为单次快照。
+- 新增 `internal/sidecar`：127.0.0.1 端口分配、每节点一个 SOCKS inbound 的 Xray 配置生成、`xray run -test -c`、单 Xray 进程启动/停止与 SOCKS 健康检查（单进程最多 200 节点、随机本地凭据）。
+- `internal/core/compiler.go` 将 sidecar 节点编译为 `x-<NodeID>` 的 Mihomo `socks5` 出站，真实远端地址只留在 Xray 配置和 `Node.Server`/`Node.Port`。
+- sidecar 节点只允许单独出站或链首；链中间/链尾保存和编译均报“sidecar 节点只允许位于链首”。
+- Phase 0 POC 通过：Xray 26.10.31 下 VLESS Encryption（ML-KEM-768）、VMess XHTTP、Reality（mldsa65Seed/Verify + 大证书目标）三套配置经本地 SOCKS 实际转发 `phase0-ok`。
+- 新增 `Settings.EnableSidecar`（默认 false）；`GET /api/sidecars` 返回开关、实时 sidecar 状态和启用节点数；`PATCH /api/settings` 接受 `enableSidecar`。
+- app 可选注入 sidecar 生命周期：保存前为缺失端点的启用 Xray 节点分配 127.0.0.1 随机端口/凭据并持久化；应用时先启动 sidecar 并等待 SOCKS 就绪，再应用 Mihomo；停止时先停 Mihomo；sidecar 失败不直连回退。
+- 公开 bootstrap 不返回 sidecar 用户名/密码，只保留 host/port 和实时状态；EngineXray 节点备份恢复跳过 Mihomo importer 解析但仍重算指纹。
+- `GET /api/export/nodes` 只导出 Mihomo 原生节点；Xray sidecar 节点通过完整备份迁移，避免生成无效 Mihomo 出口配置。
+- UI 接入：设置页新增 04 多引擎 Sidecar（开关默认关闭、实际状态/版本/节点数、错误和关闭前警告），节点页新增引擎徽章与 sidecar 状态，导入预览显示引擎徽章；新增 engine/sidecar 辅助函数单测及 375/768/1024 设置页布局回归。
+- 新增 `Settings.SidecarPortRangeStart/SidecarPortRangeEnd`（默认 30000–30999，旧 state 自动补默认）；设置页可编辑起止端口并显示“启用节点 N / 200”上限。
+- sidecar 管理器支持 `ConfigurePortRange` 热替换分配器、`Preflight` 对 127.0.0.1 TCP/UDP bind 预检；保存/应用前拒绝与独立监听范围重叠、包含管理端口/已有监听端口或超过 200 个启用 Xray 节点；日志与 `xray -test` 输出同时脱敏用户名和密码。
+- `GET /api/sidecars` 增加 `portRangeStart/portRangeEnd/maxNodes`；`PATCH /api/settings` 接受两个 sidecar 端口字段。
+- 新增 `internal/e2e/real_process_test.go`：真实 `uniproxy` 子进程 + 真实 Mihomo/Xray 二进制，验证 VLESS Encryption、VMess XHTTP、Reality 三协议经 Mihomo → sidecar SOCKS5 → 本地 Xray 的端到端链路、`/api/sidecars`/`/api/runtime` 状态、stop、同 dataDir 重启恢复及强杀后 4 个端口全部释放。
+- 新增 `internal/sidecarinstall`：固定 Xray 26.10.31，四平台官方资产名与内置 SHA256，GitHub API/官方 release 资产域名与 digest 双重校验；下载/单项/总量限额；ZIP 平坦白名单安全解压（Windows 必含 xray.exe/geoip.dat/geosite.dat/wintun.dll，Linux 必含 xray/geoip.dat/geosite.dat），拒绝路径穿越、符号链接、加密项和大小写重复；目标已存在拒绝，逐文件硬链接无覆盖发布，失败清理。
+- `internal/sidecar` 支持自动发现显式 `BinaryPath` → 固定安装目录 → PATH；新增安装状态 idle/installing/succeeded/failed、`PrepareInstall` 并发预留、`RunInstall` 进度回写与 `xray.exe version` 固定版本校验；安装中 Start/Apply 返回明确中文错误。
+- `GET /api/sidecars` 增加 `installation`；新增 `POST /api/sidecars/install`（空对象、202）；安装期间 runtime/apply/stop 与内核安装返回 409；安装完成只保存配置，需手动重新应用，失败原因写入 `applyError`。
+- 设置页新增 Xray 可执行文件安装面板：固定版本/平台/目标路径、在线安装/重试、下载与解压进度、成功/失败状态；安装中每 5 秒刷新侧车状态。
+- 工作树复审修复 4 项真实缺陷：VMess JSON `security=none` 被误当 transport security、Xray 安装版本探测失败后目录残留导致无法重试、备份恢复后外层/嵌入 engine 不同步导致 Xray 指纹漂移、导出原生节点留下指向已过滤 Xray sidecar 的悬空 `dialer-proxy`；对应新增回归测试。
+- 新增 `internal/e2e/real_remote_test.go` 的 `TestRealRemoteSubscription`：`UNIPROXY_E2E_REMOTE_SUB` 启用，支持 `UNIPROXY_E2E_REMOTE_TARGET`、`UNIPROXY_E2E_REMOTE_NODES`、`UNIPROXY_E2E_REMOTE_NAMES`，覆盖真实 HTTP 订阅导入、EngineXray 节点和 sidecar 状态、mixed listener、远端目标读取、强制刷新及 app 重启后复验。
+- kr-vps 真实远端验收（2026-11-04 16:40–16:41）：Alpine Linux 3.24.2 容器 210.109.205.7:21443，Xray 26.10.31 linux/amd64；VLESS Encryption PASS 10.23s、VMess XHTTP PASS 6.12s、Reality PASS 5.66s，每协议首次导入/强制刷新/应用重启三次均返回 `remote-e2e-ok`。远端只映射 21443，三协议为顺序切换；VLESS Encryption ticket 约 600 秒过期，需重新生成；当前保留 Reality fixture。
+- 真实 GitHub 资产下载验证（2026-11-04）：官方 `Xray-windows-64.zip` 16,623,726 bytes，SHA256 `2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a` 与内置 windows-amd64 pin 一致；`gh release download` 内容与 `xray.exe version` 26.10.31 a4a3dff 均核对。临时 `TestLiveGitHubInstall` 以 `gh api` 真实 metadata 仅注入 `api.github.com` 响应，资产字节从真实 GitHub CDN 下载，生产 `install(...)` 路径 PASS 4.60s（下载 16,623,726 bytes、3.784s）；未认证 GitHub API 在本机返回 403（Remaining=0，Reset 17:57:56），安装器仍保持 API digest 校验。临时测试已删除。
+- 验证（2026-11-04 17:03）：删除临时 GitHub 下载测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.143s、core 6.822s、sidecar 0.874s、sidecarinstall 0.204s、importer 0.830s、store 0.361s）。
+- 验证（2026-11-04 14:51）：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归，含安装面板断言）、`pnpm build:web`、`pnpm test:e2e` 52/52（1.4m）通过；删除临时安装测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 12.020s、core 6.778s、sidecar 0.861s、sidecarinstall 0.235s）。真实安装级验证用本地官方 `Xray-windows-64.zip`（16623726 bytes，SHA256 与内置 windows-amd64 pin 一致）模拟 GitHub metadata/asset，`TestLiveInstallLocalOfficialArchive` PASS 2.10s；版本输出 `Xray 26.10.31 (Xray, Penetrates Everything.) a4a3dff (go1.27.3 windows/amd64)`。
+- 验证（2026-11-04 11:38）：变更 Go 文件 `gofmt` 检查无输出、`go vet ./...`、`go test ./... -count=1 -p 1` 全通过；`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52 通过；真实 Xray 26.10.31 的 Phase 0 POC 三样本与 `BuildXrayConfigAcceptedByXray` 沿用 08:45 PASS 记录；真实进程 E2E 在 Windows 11 PASS 2.74s、WSL2 Fedora 44 PASS 2.12s，Phase 0 POC 两平台 PASS，Windows 与 WSL 全量 `go test ./... -count=1 -p 1` 均通过。
+- 验证（2026-11-04 16:43）：删除临时 debug 测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.412s、core 6.753s、sidecar 0.938s、sidecarinstall 0.235s、importer 0.909s、store 0.364s）。前端于 16:49 完整重跑 `pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52（1.3m）通过。
+- 仅开发分支本地实现，未提交、未发布、未部署；安装器代码与 Windows 本地官方 ZIP 安装级验证完成，真实 GitHub 资产下载与生产安装路径已验证，kr-vps 真实远端订阅三协议已通过；匿名 GitHub API 配额耗尽时仍会 403，Linux 实机安装和非 WSL 裸机仍未验证。
+
 ## 0.2.9 — 2026-11-03 · 协议适配三档
 
 - 新增严格 native、宽松预览/degraded、真实可用性三档：`Parse` 保持严格，`ParsePreview` 只对 URI 列表做预览级归一，降级节点写入 `Degraded` 并附原因，永不进入可应用节点。

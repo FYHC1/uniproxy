@@ -279,6 +279,49 @@ func TestRelayPublicResponsesOmitInternalIdentity(t *testing.T) {
 	}
 }
 
+func TestExportNativeNodesOmitsXraySidecarNodes(t *testing.T) {
+	s := model.DefaultState()
+	s.Nodes = []model.Node{
+		{ID: "native", ParsedNode: model.ParsedNode{Name: "native", Config: map[string]any{"type": "socks5", "server": "native.example.com", "port": 1080}}},
+		{ID: "xray", Engine: model.EngineXray, ParsedNode: model.ParsedNode{Name: "xray", Config: map[string]any{"xray": map[string]any{"protocol": "vless"}}}},
+		{ID: "leaf", DialerID: "xray", ParsedNode: model.ParsedNode{Name: "leaf", Config: map[string]any{"type": "socks5", "server": "leaf.example.com", "port": 1080}}},
+		{ID: "chain-leaf", DialerID: "leaf", ParsedNode: model.ParsedNode{Name: "chain-leaf", Config: map[string]any{"type": "socks5", "server": "chain.example.com", "port": 1080}}},
+	}
+	got := exportNativeNodes(s)
+	if len(got) != 1 || got[0]["name"] != "native" {
+		t.Fatalf("sidecar-dependent node leaked into native export: %#v", got)
+	}
+	if got[0]["dialer-proxy"] != nil {
+		t.Fatalf("native export kept a dangling dialer-proxy: %#v", got[0])
+	}
+	if _, ok := got[0]["xray"]; ok {
+		t.Fatal("sidecar config leaked into native export")
+	}
+}
+
+func TestBackupRestoreKeepsXrayFingerprint(t *testing.T) {
+	a, _ := fixture(t, true)
+	node := model.Node{
+		ID: "xray", Enabled: false, Engine: model.EngineXray,
+		ParsedNode: model.ParsedNode{
+			Name: "xray", Engine: model.EngineXray, Protocol: "vless", Server: "203.0.113.10", Port: 443,
+			Config: map[string]any{"xray": map[string]any{"protocol": "vless"}},
+		},
+	}
+	want := importer.Fingerprint(node.ParsedNode)
+	state := model.DefaultState()
+	state.Nodes = []model.Node{node}
+	state.Revision = 1
+	code, out := request(t, a, "POST", "/api/import/backup", map[string]any{"schemaVersion": 1, "state": state})
+	if code != 200 {
+		t.Fatal(out)
+	}
+	saved := a.store.Snapshot()
+	if len(saved.Nodes) != 1 || saved.Nodes[0].Fingerprint != want {
+		t.Fatalf("xray fingerprint changed across backup: got %q want %q", saved.Nodes[0].Fingerprint, want)
+	}
+}
+
 func TestRelayBackupDoesNotTrustSuppliedNodeFingerprint(t *testing.T) {
 	a, _ := fixture(t, true)
 	_, out := request(t, a, "POST", "/api/import", map[string]any{"mode": "file", "content": relayFixture})

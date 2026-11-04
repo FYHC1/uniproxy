@@ -6,6 +6,8 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/uniproxy/uniproxy/internal/model"
 )
 
 func requireConfig(t *testing.T, node map[string]any, key string, want any) {
@@ -62,18 +64,21 @@ func TestModernVLESSURI(t *testing.T) {
 		}
 	})
 	t.Run("vision-with-encryption", func(t *testing.T) {
+		encryption := "mlkem768x25519plus.native.0rtt.100-111-1111.75-0-111.50-0-3333.ptjHQxBQxTJ9MWr2cd5qWIflBSACHOevTauCQwa_71U"
 		q := url.Values{}
 		q.Set("security", "none")
 		q.Set("type", "ws")
 		q.Set("path", "/ws")
 		q.Set("flow", "xtls-rprx-vision")
-		q.Set("encryption", "mlkem768x25519plus.native.0rtt.100-111-1111.75-0-111.50-0-3333.ptjHQxBQxTJ9MWr2cd5qWIflBSACHOevTauCQwa_71U")
+		q.Set("encryption", encryption)
 		n := parseOne(t, "vless://"+testUUID+"@example.com:443?"+q.Encode())
-		requireConfig(t, n.Config, "flow", "xtls-rprx-vision")
-		requireConfig(t, n.Config, "network", "ws")
-		requireConfig(t, n.Config, "tls", false)
-		if n.Config["encryption"] == "" {
-			t.Fatalf("VLESS encryption was not preserved: %#v", n.Config)
+		user := xrayVLESSUser(t, n)
+		if user["flow"] != "xtls-rprx-vision" || user["encryption"] != encryption {
+			t.Fatalf("Xray VLESS user lost flow or encryption: %#v", user)
+		}
+		stream := xrayStream(t, n)
+		if stream["network"] != "ws" || stream["security"] != "none" {
+			t.Fatalf("unexpected Xray stream: %#v", stream)
 		}
 	})
 	t.Run("vision-without-tls-or-encryption-rejected", func(t *testing.T) {
@@ -130,7 +135,9 @@ func TestModernVLESSURI(t *testing.T) {
 		q.Set("security", "tls")
 		q.Set("encryption", value)
 		n := parseOne(t, "vless://"+testUUID+"@example.com:443?"+q.Encode())
-		requireConfig(t, n.Config, "encryption", value)
+		if user := xrayVLESSUser(t, n); user["encryption"] != value {
+			t.Fatalf("VLESS encryption was not preserved: %#v", user)
+		}
 	})
 	t.Run("vless-encryption-invalid", func(t *testing.T) {
 		for _, value := range []string{
@@ -261,10 +268,13 @@ func TestModernVMessURI(t *testing.T) {
 			t.Fatalf("VMess httpupgrade mapping wrong: %#v", ws)
 		}
 	})
-	t.Run("xhttp-rejected", func(t *testing.T) {
+	t.Run("xhttp-xray", func(t *testing.T) {
 		obj := vmessBase()
 		obj["net"] = "xhttp"
-		requireInvalid(t, vmessLink(obj))
+		n := parseOne(t, vmessLink(obj))
+		if n.Engine != model.EngineXray {
+			t.Fatalf("engine = %q, want xray", n.Engine)
+		}
 	})
 }
 

@@ -43,6 +43,7 @@ type compiledConfig struct {
 	data      []byte
 	revision  int64
 	nodes     map[string]struct{}
+	nodeTags  map[string]string
 	chainTags map[string]string
 	chainHops map[string][]string
 	listeners []model.Listener
@@ -77,7 +78,7 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	if addressesOverlap(controllerHost, controllerPort, probeHost, probePort) {
 		return nil, errors.New("controller and probe addresses conflict")
 	}
-	cfg := &compiledConfig{revision: state.Revision, nodes: map[string]struct{}{}, chainTags: map[string]string{}, chainHops: map[string][]string{}, listeners: []model.Listener{}, runtime: []model.ListenerRuntime{}}
+	cfg := &compiledConfig{revision: state.Revision, nodes: map[string]struct{}{}, nodeTags: map[string]string{}, chainTags: map[string]string{}, chainHops: map[string][]string{}, listeners: []model.Listener{}, runtime: []model.ListenerRuntime{}}
 	nodes := append([]model.Node(nil), state.Nodes...)
 	pools := append([]model.Pool(nil), state.Pools...)
 	chains := append([]model.Chain(nil), state.Chains...)
@@ -110,7 +111,10 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 		if !node.Enabled || blocked[node.ID] != "" {
 			continue
 		}
-		native, err := nativeProxy(node)
+		if node.IsSidecar() && node.DialerID != "" {
+			return nil, errors.New("sidecar 节点不能同时设置中转")
+		}
+		proxy, err := outboundProxy(node)
 		if err != nil {
 			return nil, fmt.Errorf("node %s: %w", node.ID, err)
 		}
@@ -118,13 +122,14 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 			if !safeID.MatchString(node.DialerID) {
 				return nil, errors.New("invalid stable relay ID")
 			}
-			native["dialer-proxy"] = nodeTag(node.DialerID)
+			proxy["dialer-proxy"] = nodeTag(node.DialerID)
 		}
-		proxies = append(proxies, native)
+		proxies = append(proxies, proxy)
 		cfg.nodes[node.ID] = struct{}{}
+		cfg.nodeTags[node.ID] = proxyTag(node)
 		username := nodeTag(node.ID)
 		probeUsers = append(probeUsers, map[string]string{"username": username, "password": probePassword(opts.ProbeSecret, node.ID)})
-		probeRules = append(probeRules, "IN-USER,"+username+","+nodeTag(node.ID))
+		probeRules = append(probeRules, "IN-USER,"+username+","+proxyTag(node))
 	}
 
 	for _, chain := range chains {
@@ -153,17 +158,20 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 				break
 			}
 			seen[id] = struct{}{}
-			native, err := nativeProxy(n)
+			if index > 0 && n.IsSidecar() {
+				return nil, model.ErrSidecarMustBeChainHead
+			}
+			proxy, err := outboundProxy(n)
 			if err != nil {
 				valid = false
 				break
 			}
 			tag := chainHopTag(chain.ID, index+1)
-			native["name"] = tag
+			proxy["name"] = tag
 			if index > 0 {
-				native["dialer-proxy"] = tags[index-1]
+				proxy["dialer-proxy"] = tags[index-1]
 			}
-			chainProxies = append(chainProxies, native)
+			chainProxies = append(chainProxies, proxy)
 			tags = append(tags, tag)
 		}
 		if valid && len(tags) == len(chain.NodeIDs) {
@@ -196,7 +204,7 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 		sort.Slice(members, func(i, j int) bool { return members[i].ID < members[j].ID })
 		tags := make([]string, 0, len(members))
 		for _, n := range members {
-			tags = append(tags, nodeTag(n.ID))
+			tags = append(tags, proxyTag(n))
 		}
 		if len(tags) == 0 {
 			tags = append(tags, "REJECT")
@@ -284,7 +292,7 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 				if listener.UDP && !n.UDP {
 					return nil, errors.New("UDP listener targets a TCP-only node")
 				}
-				target = nodeTag(n.ID)
+				target = proxyTag(n)
 			}
 		case "pool":
 			if p, ok := poolByID[listener.TargetID]; ok && p.Enabled {
@@ -363,7 +371,14 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	return cfg, nil
 }
 
-func nodeTag(id string) string                { return "n-" + id }
+func nodeTag(id string) string    { return "n-" + id }
+func sidecarTag(id string) string { return "x-" + id }
+func proxyTag(node model.Node) string {
+	if node.IsSidecar() {
+		return sidecarTag(node.ID)
+	}
+	return nodeTag(node.ID)
+}
 func poolTag(id string) string                { return "p-" + id }
 func chainHopTag(id string, index int) string { return "c-" + id + "-" + strconv.Itoa(index) }
 func listenerTag(id string) string            { return "l-" + id }
@@ -437,6 +452,38 @@ func validTestURL(raw string) error {
 		return errors.New("test URL must be an HTTP(S) URL without credentials or a fragment")
 	}
 	return nil
+}
+
+// outboundProxy chooses the native Mihomo adapter or the loopback SOCKS
+// adapter that represents a sidecar node. The real remote address is never
+// copied into the Mihomo document for a sidecar node.
+func outboundProxy(node model.Node) (map[string]any, error) {
+	if node.IsSidecar() {
+		return sidecarProxy(node)
+	}
+	return nativeProxy(node)
+}
+
+func sidecarProxy(node model.Node) (map[string]any, error) {
+	endpoint := node.SidecarEndpoint
+	if endpoint == nil {
+		return nil, errors.New("sidecar 节点缺少本地端点")
+	}
+	ip, err := netip.ParseAddr(endpoint.Host)
+	if err != nil || !ip.IsLoopback() || ip.String() != "127.0.0.1" {
+		return nil, errors.New("sidecar 端点必须监听 127.0.0.1")
+	}
+	if endpoint.Port < 1024 || endpoint.Port > 65535 {
+		return nil, errors.New("sidecar endpoint port is invalid")
+	}
+	if endpoint.Username == "" || len(endpoint.Username) > 255 || strings.ContainsAny(endpoint.Username, ":\r\n\x00") || endpoint.Password == "" || len(endpoint.Password) > 255 || strings.ContainsAny(endpoint.Password, "\r\n\x00") {
+		return nil, errors.New("sidecar endpoint credentials are invalid")
+	}
+	proxy := map[string]any{
+		"name": sidecarTag(node.ID), "type": "socks5", "server": "127.0.0.1", "port": float64(endpoint.Port),
+		"username": endpoint.Username, "password": endpoint.Password, "udp": node.UDP,
+	}
+	return proxy, nil
 }
 
 func nativeProxy(node model.Node) (map[string]any, error) {

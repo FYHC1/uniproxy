@@ -52,7 +52,9 @@ func TestVLESSEncryptionAccepts1184ByteKey(t *testing.T) {
 	q.Set("security", "tls")
 	q.Set("encryption", value)
 	n := parseOne(t, "vless://"+testUUID+"@example.com:443?"+q.Encode())
-	requireConfig(t, n.Config, "encryption", value)
+	if user := xrayVLESSUser(t, n); user["encryption"] != value {
+		t.Fatalf("VLESS encryption was not preserved: %#v", user)
+	}
 }
 
 func TestParsePreviewDropsRealityCustomALPN(t *testing.T) {

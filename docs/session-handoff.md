@@ -1,6 +1,104 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-03 16:22（Asia/Shanghai）。v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest，源码提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`。本版汇总 M30 协议适配三档，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+**最后核对：2026-11-04 17:04（Asia/Shanghai；发布与用户实例信息为 11:43 观察，本轮未重新核对）。v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest，源码提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`。本版汇总 M30 协议适配三档，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+
+## 2026-11-04 — 真实 GitHub 网络下载验证（开发分支，未提交）
+
+- 用户要求：验证侧车 Xray 安装器的真实 GitHub 网络下载。
+- 固定资产：官方 `Xray-windows-64.zip` 16,623,726 bytes，SHA256 `2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a` 与 `internal/sidecarinstall` 内置 windows-amd64 pin 一致；`gh release download` 得到的 ZIP 摘要一致，展开后 xray.exe 34,555,392、geoip.dat 3,312,784、geosite.dat 7,554,929、wintun.dll 427,552、LICENSE 16,725、LICENSE-Wintun 5,431 bytes；`xray.exe version` 输出 `Xray 26.10.31 (Xray, Penetrates Everything.) a4a3dff (go1.27.3 windows/amd64) A unified platform for anti-censorship.`。
+- 生产安装路径：临时 `internal/sidecarinstall/live_github_temp_test.go` 的 `TestLiveGitHubInstall` 通过 `gh api` 获取真实 release metadata，仅注入 `api.github.com` 测试响应；资产字节由真实 GitHub CDN 下载，`install(...)` 完整走 metadata/downloading/verifying/extracting/installing，PASS 4.60s（下载 16,623,726 bytes、3.784s；发布目录含 xray.exe/geoip.dat/geosite.dat/wintun.dll/LICENSE/LICENSE-Wintun，版本检测包含 26.10.31）。
+- 匿名 API 边界：本机共享出口的 GitHub 匿名 API 配额耗尽，直接 `Install` 返回 `GitHub 返回 HTTP 403（访问受限或请求过于频繁）；请稍后重试，并检查服务器能否直连 GitHub`；响应头 `X-RateLimit-Limit: 60`、`Remaining: 0`、`Used: 60`、`Reset: 1793786276`（2026-11-04 17:57:56 +08）。安装器仍保持 API metadata/digest 校验，不因验证接受 token 或放宽检查。
+- 验证（2026-11-04 17:03）：删除临时测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.143s、core 6.822s、sidecar 0.874s、sidecarinstall 0.204s、importer 0.830s、store 0.361s、e2e 0.029s、integration 0.030s）。
+- 清理：临时测试与 `.local/final-go-*.log` 已删除；未修改生产代码、未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未发布、未部署。
+
+## 2026-11-04 — 工作树复审与 kr-vps 真实远端订阅 E2E（开发分支，未提交）
+
+- 用户要求：审阅当前工作树 diff，并用 ssh 工具中的 kr-vps 的 21443 端口部署协议测试和真实订阅验收。
+- 复审范围：59 个 modified + 17 个 untracked（40 个 tracked 文件 1045 insertions/244 deletions 的核心 diff，加 `internal/sidecar`、`internal/sidecarinstall`、`internal/e2e`、Xray importer 与前端安装面板）；逐项检查 model/compiler/validate/app/relay/sidecar/sidecarinstall/importer/前端和测试。
+- 修复 4 项真实缺陷：1）`internal/importer/xray_vmess.go` 把 VMess cipher `security=none` 误当 transport security 覆盖 `tls=tls`，拒绝合法 XHTTP 节点；2）`internal/sidecar/install.go` 在文件已发布后版本探测失败时未清理安装目录，导致 `CanInstall=false` 无法重试；3）`internal/store/store.go` 归一化外层 `Node.Engine` 与嵌入 `ParsedNode.Engine`，并在 `internal/app/relay.go` 重算 Xray 指纹前同步 engine，修复备份恢复后指纹漂移；4）`internal/app/relay.go` 的 `exportNativeNodes` 递归排除依赖 Xray sidecar 的原生节点，避免导出悬空 `dialer-proxy`。
+- 回归补强：`TestXrayVMessXHTTPNoneCipherWithTLS`、`TestXrayManagerVersionProbeFailureIsRetryable`、`TestNormalizeSyncsParsedNodeEngineAfterJSONRoundTrip`、`TestBackupRestoreKeepsXrayFingerprint`，并扩展 `TestExportNativeNodesOmitsXraySidecarNodes` 覆盖 leaf/chain-leaf 依赖。
+- 远端 fixture：kr-vps 为 Alpine Linux 3.24.2 x86_64 容器（210.109.205.7）；只有公网 21443 真正映射到容器 Xray，21444/21445 未转发。Xray 26.10.31 a4a3dff linux/amd64 使用官方 `Xray-linux-64.zip`（16,692,690 bytes，SHA256 与内置 linux-amd64 pin 一致）。订阅 `http://210.109.205.7:20080/links-xray.txt`，远端正文本目标 `http://210.109.205.7:20080/ok-remote.txt`（`remote-e2e-ok`）；远端 freedom 禁止回环目标，必须用公网地址。
+- 新增 `internal/e2e/real_remote_test.go`：`TestRealRemoteSubscription` 通过 `UNIPROXY_E2E_REMOTE_SUB` 启用，`UNIPROXY_E2E_REMOTE_NODES` 支持单协议（默认 3），覆盖真实 HTTP 订阅导入、EngineXray 调度、sidecar 启动、mixed listener、远端目标读取、强制刷新和 app 重启后复验。
+- 远端结果（2026-11-04 16:40–16:41）：VLESS Encryption PASS 10.23s、VMess XHTTP PASS 6.12s、Reality PASS 5.66s；每个协议首次导入/强制刷新/应用重启三次均返回 `remote-e2e-ok`。VLESS Encryption ticket 约 600 秒过期，每次测试前需重新生成；当前远端 21443 保留 Reality fixture。
+- 验证（2026-11-04 16:43）：删除临时 debug 测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.412s、core 6.753s、sidecar 0.938s、sidecarinstall 0.235s、importer 0.909s、store 0.364s）。前端于 16:49 完整重跑：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`（Vite 7.3.7，4656 modules；CSS 112.77kB、JS 566.93kB，仅 chunk 提示）、`pnpm test:e2e` 52/52（1.3m）全部通过。
+- 边界：kr-vps 仅单端口单节点顺序协议，未验证三协议并发、多端口映射、UDP、公网带宽、容量/长期运行、其他发行版或裸机；未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未发布、未部署。
+- 决策：新增 D38，记录真实远端 E2E 采用单端口顺序协议、不把测试用端口复用放入产品。
+- 下一步：如需保留远端测试环境，可直接访问 `http://210.109.205.7:20080/links-xray.txt` 当前的 Reality 订阅；后续改协议需重新部署 21443 并重建链接。
+
+## 2026-11-04 — Xray 在线安装器与设置页接入（开发分支，未提交）
+
+- 用户要求：继续 handoff 后续批次，完成固定版本 Xray 在线安装器、多文件 Xray ZIP 安全解压、sidecar 自动发现、app/API 安装状态与设置页安装/重试；不提交、不发布、不部署。
+- 新增 `internal/sidecarinstall`：固定 Xray 26.10.31；仅支持 windows/linux × amd64/arm64，四平台官方资产名与内置 SHA256 pin；只允许 GitHub API/官方 release 资产域名，GitHub digest 必须与内置 pin 一致；下载/解压/单项/总量均有上限；ZIP 仅接受平坦白名单文件（Windows 必含 xray.exe/geoip.dat/geosite.dat/wintun.dll，Linux 必含 xray/geoip.dat/geosite.dat，可选 LICENSE/LICENSE-Wintun），拒绝路径穿越、符号链接、加密项和大小写重复；先校验后解压，目标已存在直接拒绝，逐文件硬链接无覆盖发布，失败清理已发布文件和空目录；错误文案不泄露敏感信息。
+- `internal/sidecar` 接入安装管理：可执行文件发现顺序为显式 `BinaryPath` → 安装目录 `WorkDir/xray/26.10.31/xray(.exe)` → PATH；`InstallationStatus` 纯文件发现 idle/installing/succeeded/failed，`PrepareInstall` 用 `opMu.TryLock` 预留，`RunInstall` 回写进度并在完成后执行 `xray.exe version`，实际版本必须等于固定版本；安装中 `Start/Apply` 返回“Xray sidecar 正在安装，请等待完成后再应用配置”，并发安装返回“Xray sidecar 正在执行其他操作，请稍后重试”。
+- app/API：`GET /api/sidecars` 增加 `installation` 状态；新增 `POST /api/sidecars/install`（仅接受空对象，202）；安装期间 runtime/apply/stop 和内核安装均返回 409；安装完成后配置只保存、需用户手动重新应用；失败把中文原因写入 `applyError`，不伪造成功或运行状态。
+- 设置页：新增 `SidecarInstall` 面板，显示“Xray 可执行文件”、固定版本/平台/目标路径、在线安装/重试、下载与解压进度、成功/失败状态；安装中每 5 秒刷新 `GET /api/sidecars`。
+- 验证（2026-11-04 14:49）：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归，含安装面板断言）、`pnpm build:web`、`pnpm test:e2e` 52/52（1.4m）通过；删除临时安装测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 12.020s、core 6.778s、sidecar 0.861s、sidecarinstall 0.235s）。真实安装级验证用本地官方 `Xray-windows-64.zip`（16623726 bytes，SHA256 与内置 windows-amd64 pin 一致）模拟 GitHub metadata/asset，`TestLiveInstallLocalOfficialArchive` PASS 2.10s；发布目录含 xray.exe/geoip.dat/geosite.dat/wintun.dll/LICENSE/LICENSE-Wintun，版本输出 `Xray 26.10.31 (Xray, Penetrates Everything.) a4a3dff (go1.27.3 windows/amd64)`；临时测试文件已删除。实际 GitHub 网络下载未在本轮验证（后于 2026-11-04 17:04 小节完成真实 GitHub 资产下载与生产安装路径验证），Linux 资产只做单元测试与 pin/解压逻辑验证，未做真实 Linux 安装。
+- 截图：`src/web/tests/artifacts/settings-sidecar-desktop.png`（1440x2673）已人工查看，04 多引擎 Sidecar 面板无内容重叠；底部固定条覆盖属截图视口正常表现。
+- 边界：未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。安装器代码与 Windows 本地官方 ZIP 安装级验证完成，真实 GitHub 下载链路已于 17:04 小节验证，Linux 实机安装仍需后续验证。
+- 下一步：审阅安装器 diff；如需真实网络安装验收，在隔离临时数据目录执行，并保留版本/摘要/失败现场；随后按 handoff 汇报已完成/待做。
+
+## 2026-11-04 — Importer Xray-only 与真实订阅验收（开发分支，未提交）
+
+- 用户要求：补 `internal/importer` 的 Xray-only 识别并保留真实配置，再用 leidahub VLESS 订阅做真实 Xray sidecar 远端验收；不提交、不发布、不部署，临时资源最后清理。
+- importer：`model.ParsedNode` 增加 `Engine`，`addParsed` 复制到 `Node.Engine`，`Fingerprint` 加入 `engine,omitempty`（旧 Mihomo 指纹不变）。新增 `internal/importer/xray_uri.go`（fm/pqv/cs/spx、VLESS encryption、flow=xtls-rprx-vision-udp443、XHTTP、Reality 扩展、TLS cipher suites）和 `internal/importer/xray_vmess.go`（VMess JSON XHTTP）；`uri.go`/`vmess.go` 接入；合法 Xray-only 字段保留，坏 fm/cs 严格失败或预览降级，VLESS 明文公网 IP 回退 Mihomo 预览。
+- 测试：新增 `internal/importer/xray_uri_test.go`，覆盖 finalmask、Reality 扩展、cipher suites、VMess XHTTP authority/JSON、安全字段映射和坏样本降级；`go test ./internal/importer` 通过。
+- 真实订阅：`C:\Users\h2147\AppData\Local\Temp\leida-vless.txt` 解码 1394 条 VLESS；`ParsePreview` 得到 1383 个可显示节点（strict 914 = Mihomo 888 + Xray 26；degraded 469 = Mihomo 418 + Xray 51；错误 11）。77 个 Xray 节点逐节点 `xray -test` 全部通过，合并配置 `Configuration OK`。
+- 真实远端：临时探针启动 77 个真实 Xray 节点，用原始 SOCKS5 CONNECT + `GET http://api.ipify.org/` 验证，当前 38/77 可达（并发 8、单节点超时 10s）；失败多为 Cloudflare ws/tls `unexpected EOF`。结果只是单次快照。
+- 验证（2026-11-04 14:18）：删除两个临时探针后 `go test ./... -count=1 -p 1` 全通过（app 12.117s、core 9.812s、sidecar 2.081s、importer 1.335s）；`go vet ./...` 无输出。未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。
+- 下一步：安装器/多文件 Xray ZIP 安全解压已在后续小节完成；继续按 handoff 汇报已完成/待做。
+
+## 2026-11-04 — 多引擎 sidecar 真实流程验证（第 1–3 层，开发分支，未提交）
+
+- 用户要求：执行真实流程第 1–3 步，即 Windows 11 amd64 本机真实进程闭环、三协议本地端到端、Linux amd64 用 WSL 实跑；不包含真实远端 VPS/测试订阅、安装器与部署。
+- 新增 `internal/e2e/real_process_test.go`：用真实 `uniproxy` 子进程 + 真实 Mihomo/Xray 二进制，覆盖三个 Xray 节点（VLESS Encryption、VMess XHTTP、Reality）经 Mihomo mixed listener → sidecar SOCKS5 → 本地 Xray 服务端的完整链路；校验 `GET /api/sidecars`/`GET /api/runtime`、`POST /api/runtime/stop`、同 dataDir 重启恢复及强杀后 4 个占用端口全部释放。
+- Windows 11 实跑（Xray 26.10.31、Mihomo v1.19.32）：`TestRealAppProcessThreeProtocols` PASS 2.74s；三协议与重启均返回 `real-e2e-ok`，日志确认“abrupt application exit released 4 owned ports”。Phase 0 POC 与 `BuildXrayConfigAcceptedByXray` 同时 PASS（32300/32301/32302）。
+- WSL2 Fedora 44（Linux amd64，Go 1.26.10）：同一真实进程测试 PASS 2.12s，四项日志一致；`TestPhase0XrayPOC` PASS 0.38s；`go test ./... -count=1 -p 1` 全通过（app 2.390s、core 6.091s、sidecar 0.583s）。
+- 全量 Windows Go 测试：`go test ./... -count=1 -p 1` 全通过（app 9.014s、core 6.633s、sidecar 0.820s）。
+- 下一步：第 4 层真实远端 VPS/测试订阅需要用户提供受控节点与订阅；第 5 层安装器已完成，可在独立测试数据目录复跑真实安装与端到端链路。
+- 边界：真实远端 VPS、真实订阅、安装器、多文件 Xray ZIP 安全解压与跨平台非 WSL 裸机未验证；未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。详见[真实流程验证](<sidecar-real-process-verification.md>)。
+
+## 2026-11-04 — 双 sidecar 第四批产品化（端口范围、预检与脱敏，开发分支，未提交）
+
+- 用户要求：继续 handoff 下一批，先完成 Phase 2 可独立验收的端口范围持久化/校验/bind 预检、200 节点上限中文 UX 和 sidecar 凭据/日志脱敏；安装器留后续；不提交、不发布、不部署。
+- 设置与存储：`Settings.SidecarPortRangeStart/SidecarPortRangeEnd` 默认 30000/30999；旧 state 缺失或为 0 时由 `store.Normalize` 补默认值，不影响已有显式范围。
+- sidecar：新增 `XrayManager.ConfigurePortRange`（校验后热替换分配器）、`PortRange` 和 `Preflight`（跳过当前 Xray 进程已持有的回环端口，逐节点检查 TCP/UDP 绑定，重复/占用返回明确中文）；`Start/Apply` 超 200 节点统一返回中文上限错误；`Logs()` 与 `xray -test` 输出同时脱敏用户名和密码。
+- app：`Sidecar` 接口增加 `ConfigurePortRange`/`Preflight`；新增 `prepareSidecar` 统一执行范围校验、端点分配和预检，`mutate`、`Start`、`applyLocked` 共用；`GET /api/sidecars` 增加 `portRangeStart/portRangeEnd/maxNodes`；`PATCH /api/settings` 白名单接受两个新字段。
+- 校验：sidecar 范围必须在 1024–65535 且起点不大于终点；启用时不得与独立监听范围重叠、不得包含管理端口或已有监听端口；启用 Xray 节点超过 200 个直接拒绝。
+- UI：设置页 04 面板新增 Sidecar 起止端口输入、独立范围提示和 `启用节点 / 200` 展示，达到上限时显示拆分提示；保存前做范围与重叠校验。
+- 验证（2026-11-04 11:11）：变更 Go 文件 `gofmt` 检查无输出，`go vet ./...`、`go test ./... -count=1 -p 1` 全通过；`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52 通过；设置页 1440/375 截图无横向溢出。
+- 边界：本批未做安装器、多文件 Xray ZIP 安全解压、跨平台实跑、真实远端节点与真实订阅；跨平台实跑已由上方真实流程验证补充；未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。
+
+## 2026-11-04 — 双 sidecar 第三批 UI 接入（开发分支，未提交）
+
+- 用户要求：继续 handoff 下一批，完成 UI 接入并汇报已完成/待做；不提交、不发布、不部署。
+- 设置页：运行与设置 → 检测与端口新增“04 多引擎 Sidecar”，读取 `GET /api/sidecars`，显示实际进程状态、版本、启用节点数和功能开关；切换 `enableSidecar` 只在保存后生效；节点数大于 0 且关闭开关、或已有节点但进程未运行时显示明确警告；进程错误原样展示，不伪造运行状态。
+- 节点页：新增“引擎”列，显示 `Mihomo`/`Xray`/`sing-box` 徽章；Xray 行显示实际 sidecar 状态（运行中/未运行/异常），编辑弹窗补充引擎、Sidecar 状态、版本与错误。
+- 导入预览：协议列显示引擎徽章；导入器对合法 Xray-only 字段生成 `EngineXray` 节点，Mihomo 节点保持默认 `Mihomo`，降级预览节点只展示不导入。
+- 测试：`src/web/tests/utils.test.mjs` 增加 engine/sidecar 状态辅助函数用例（44/44）；`verify.mjs` 增加 Xray 节点徽章/编辑弹窗、设置开关保存、导入预览徽章及 375/768/1024 设置页无横向溢出断言；`core-install-regressions.mjs` 补充 `enableSidecar:false` 与 `/api/sidecars` fixture。
+- 验证（2026-11-04 10:30）：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52、`go vet ./...`、`go test ./... -count=1 -p 1` 全通过。
+- 边界：本批只做 UI 展示和开关，不新增后端 API、不做安装器/端口范围预检/跨平台实跑；真实 Xray 远端节点、真实订阅和用户实例仍未验证；未提交、未推送、未发布、未部署。
+
+## 2026-11-04 — 双 sidecar 第一批实现（开发分支，未提交）
+
+- 用户要求：按[交接](<multi-engine-sidecar-handoff.md>)第一批顺序实现模型字段、`internal/sidecar`、编译器本地 SOCKS 出站、链位置校验和 3 个离线 POC；不提交、不发布、不部署。
+- 模型：`internal/model/types.go` 增加 `Node.Engine`（空=mihomo）、`Node.SidecarEndpoint`、`SidecarStatus`；`internal/model/engine.go` 集中链位置校验；`internal/store/store.go` 归一空引擎。
+- `internal/sidecar`：`ports.go` 做 127.0.0.1 端口分配（1024–65535，建议 30000–30999）；`xray.go` 生成每节点一个 SOCKS inbound、同 tag outbound 的多节点配置并校验真实远端只来自 Node.Server/Port；`process.go` 单 Xray 进程启动/停止、`xray run -test -c`、SOCKS 健康检查和随机本地凭据，单进程最多 200 节点。
+- 编译器：`internal/core/compiler.go` 把 sidecar 节点编译为 `x-<NodeID>` 的 Mihomo `socks5` 出站（server 127.0.0.1、端口取 SidecarEndpoint），真实远端地址不进入 Mihomo YAML；`nodeTags` 保持检查/探针按实际 tag 查找；sidecar 节点禁止 DialerID，pool/listener 使用 `proxyTag`。
+- 链位置：`internal/app/validate.go` 与编译器双重校验，sidecar 只允许单独出站或链首，链中间/链尾返回“sidecar 节点只允许位于链首”。
+- Phase 0 POC：`internal/sidecar/poc_test.go` 的 `TestPhase0XrayPOC` 用 Xray 26.10.31 覆盖 VLESS Encryption（ML-KEM-768）、VMess XHTTP、Reality（mldsa65Seed/Verify + 大证书目标）三套配置，经本地 SOCKS 实际转发 `phase0-ok`，三节点全通过。
+- 验证（2026-11-04 02:25）：变更文件 `gofmt` 干净、`go vet ./...`、`go test ./... -count=1 -p 1` 全通过（含 `internal/sidecar`）；`pnpm typecheck`、`pnpm test:ui` 42/42、`pnpm build:web`、`pnpm test:e2e` 52/52 通过；POC 单测 PASS（vless-enc 32300、vmess-xhttp 32301、reality 32302）。
+- 边界：第一批 1–5 与第二批最小 app/API 集成已完成；UI 开关、节点引擎徽章和状态页展示尚未接入（功能设置默认关闭）；未接真实订阅、未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。
+
+## 2026-11-04 — 双 sidecar 第二批最小 app/API 集成（开发分支，未提交）
+
+- 用户要求：完成[交接](<multi-engine-sidecar-handoff.md>)第 6 项最小 app/API 集成，功能开关默认关闭，UI 暂不展示；不提交、不发布、不部署。
+- 设置与类型：`internal/model/types.go` 新增 `Settings.EnableSidecar`（默认 false，保持现有 Mihomo-only 路径）；`src/shared/types.ts` 同步 `enableSidecar` 及节点 `engine`/`sidecarEndpoint`/`sidecarStatus` 公开投影。
+- sidecar 生命周期：`internal/sidecar/endpoint.go` 的 `AssignEndpoints` 保留已有端点、为缺失端点分配 127.0.0.1 随机端口和随机凭据；`internal/sidecar/process.go` 的 `Apply` 按配置哈希复用单进程，配置变化时先停旧进程再启动新进程，失败时尝试恢复上一版；`NewXrayManager` 会创建 0700 工作目录，生产 `dataDir/sidecar` 不存在时也可直接启动；启动顺序为 sidecar 就绪后再应用 Mihomo，停止顺序为先停 Mihomo 再停 sidecar。
+- app 集成：`internal/app/app.go` 增加可选 `Sidecar` 注入（`Options.Sidecar`，nil 时完全保持原路径）；`mutate` 在保存前分配并持久化端点；`Start`/自动应用先校验功能开关和启用节点，再启动 sidecar，最后 `core.Apply`；sidecar 启动失败不会进入 Mihomo 应用，错误明确写入 `applyError`，不直连回退。
+- API 与脱敏：新增 `GET /api/sidecars -> {enabled,status,nodeCount}`；`PATCH /api/settings` 白名单增加 `enableSidecar`；`bootstrap` 清除 `SidecarStatus` 和端点用户名/密码，只保留 host/port，节点状态按当前管理器的实时状态注入；备份恢复对 EngineXray 节点跳过 Mihomo importer 解析但仍重算指纹；`GET /api/export/nodes` 只导出 Mihomo 原生节点，Xray sidecar 节点通过完整备份迁移。
+- 校验：EngineXray 仅允许 vless/vmess/trojan/ss/socks5/http，禁止 DialerID；启用 Xray 节点必须有 127.0.0.1 端点，端口全局唯一；功能开关关闭时保存或应用启用 Xray 节点会明确报错；链位置仍只允许单独出站或链首。
+- 验证（2026-11-04 08:45）：`gofmt`、`go build ./...`、`go vet ./...`、`go test ./... -count=1 -p 1` 全通过；`pnpm typecheck`、`pnpm test:ui` 42/42、`pnpm build:web`、`pnpm test:e2e` 52/52 通过；真实 Xray 26.10.31 的 `TestPhase0XrayPOC` 三样本和 `BuildXrayConfigAcceptedByXray` 均 PASS（vless-enc 32300、vmess-xhttp 32301、reality 32302）。
+- 边界：仅最小 app/API 集成；UI 开关/徽章/状态页、真实订阅和真实远端节点未验证；未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。
 
 ## 2026-11-03 16:22 — v0.2.9 协议适配三档（已发布，不含部署）
 

@@ -63,7 +63,7 @@ func (a *App) startCoreInstall(ctx context.Context) (model.CoreInstallation, err
 	if ctx.Err() != nil {
 		return model.CoreInstallation{}, &apiError{408, "安装请求已取消，请重新确认状态", "request_cancelled"}
 	}
-	if a.installPending {
+	if a.installPending || a.sidecarInstallPending {
 		return model.CoreInstallation{}, &apiError{409, "已有内核安装任务，请查看安装进度", "core_install_busy"}
 	}
 	c, ok := a.core.(installableCore)
@@ -113,7 +113,7 @@ func (a *App) inspectCore(ctx context.Context) (any, error) {
 	if a.closed || a.background.Err() != nil {
 		return nil, &apiError{503, "管理服务正在关闭", "shutting_down"}
 	}
-	if a.installPending {
+	if a.installPending || a.sidecarInstallPending {
 		return nil, &apiError{409, "内核正在安装，请等待完成后重新检测", "core_install_busy"}
 	}
 	inspectCtx, cancel := context.WithTimeout(ctx, 20*time.Second)

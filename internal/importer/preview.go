@@ -110,6 +110,7 @@ func parseURIForPreview(text string) (model.ParsedNode, []string, bool) {
 		add("WebSocket path 缺少前导 /，仅预览修正")
 	}
 
+	protocol := strings.ToLower(strings.TrimSpace(u.Scheme))
 	tlsEnabled := false
 	if value, ok := previewValue(values, "tls"); ok {
 		tlsEnabled = strings.EqualFold(strings.TrimSpace(value), "true") || strings.TrimSpace(value) == "1"
@@ -170,22 +171,59 @@ func parseURIForPreview(text string) (model.ParsedNode, []string, bool) {
 		}
 	}
 
-	// Xray-only Reality/finalmask fields have no equivalent in the pinned core.
+	// Xray refuses plaintext VLESS to a public IP. Drop the Xray-only knobs in
+	// preview so the same endpoint can still be described by the Mihomo adapter.
+	encryptionValue, _ := previewValue(values, "encryption")
+	plainVLESS := protocol == "vless" && (security == "" || security == "none") && !tlsEnabled && (encryptionValue == "" || strings.EqualFold(strings.TrimSpace(encryptionValue), "none")) && publicIPAddress(u.Hostname())
+	if plainVLESS {
+		for _, key := range []string{"fm", "cs", "pqv", "spx"} {
+			if previewDelete(values, key) {
+				add("VLESS 明文公网 IP 无法由 Xray 运行，仅预览回退 Mihomo 并忽略 Xray-only 字段")
+			}
+		}
+	}
+
+	// Xray-only Reality/finalmask fields are preserved for the Xray adapter when
+	// they are well formed; malformed values are dropped so the row can still be
+	// diagnosed as a degraded Mihomo preview.
+	xrayCapable := protocol == "vless" || protocol == "vmess" || protocol == "trojan"
+	securityValue, _ := previewValue(values, "security")
+	reality := strings.EqualFold(strings.TrimSpace(securityValue), "reality")
 	if value, ok := previewValue(values, "spx"); ok && value != "" && value != "/" {
-		previewDelete(values, "spx")
-		add("Reality spider-X 仅预览，固定内核无等价字段")
+		if !xrayCapable {
+			previewDelete(values, "spx")
+			add("Reality spider-X 仅预览，固定内核无等价字段")
+		} else if !reality {
+			previewDelete(values, "spx")
+			add("非 Reality 节点的 spider-X 已忽略")
+		}
 	}
 	if value, ok := previewValue(values, "pqv"); ok && value != "" {
-		previewDelete(values, "pqv")
-		add("Reality ML-DSA-65 校验仅预览，固定内核无等价字段")
+		if !xrayCapable {
+			previewDelete(values, "pqv")
+			add("Reality ML-DSA-65 校验仅预览，固定内核无等价字段")
+		} else if !reality {
+			previewDelete(values, "pqv")
+			add("非 Reality 节点的 ML-DSA-65 校验已忽略")
+		}
 	}
 	if value, ok := previewValue(values, "fm"); ok && value != "" {
-		previewDelete(values, "fm")
-		add("Xray finalmask 仅预览，固定内核无等价字段")
+		if !xrayCapable {
+			previewDelete(values, "fm")
+			add("Xray finalmask 仅预览，固定内核无等价字段")
+		} else if _, err := parseFinalMask(value); err != nil {
+			previewDelete(values, "fm")
+			add("Xray finalmask 无效，仅预览忽略")
+		}
 	}
 	if value, ok := previewValue(values, "cs"); ok && value != "" {
-		previewDelete(values, "cs")
-		add("Xray finalmask 子字段仅预览，固定内核无等价字段")
+		if !xrayCapable {
+			previewDelete(values, "cs")
+			add("Xray TLS cipher suites 仅预览，固定内核无等价字段")
+		} else if !validCipherSuites(value) {
+			previewDelete(values, "cs")
+			add("Xray TLS cipher suites 无效，仅预览忽略")
+		}
 	}
 
 	// An unparsable XHTTP extra object can still be useful as a preview, but it

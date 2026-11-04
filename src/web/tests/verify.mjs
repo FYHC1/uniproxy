@@ -18,10 +18,11 @@ console.log('PASS production Vite build (in memory, no output directory writes)'
 const now = '2026-01-01T00:00:00Z';
 let state = {
   nodes:[], groups:[], pools:[], chains:[], listeners:[], subscriptions:[], revision:0,
-  settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,outboundInterface:''},
+  settings:{testUrl:'https://example.com/generate_204',speedTestUrl:'https://example.com/download',testTimeoutMs:8000,testConcurrency:8,speedTestBytes:10485760,healthIntervalSeconds:300,portRangeStart:20000,portRangeEnd:20999,sidecarPortRangeStart:30000,sidecarPortRangeEnd:30999,outboundInterface:'',enableSidecar:false},
   interfaces:[{name:'以太网',up:true,loopback:false,addresses:['192.0.2.10/24']},{name:'WLAN',up:true,loopback:false,addresses:[]},{name:'离线网卡',up:false,loopback:false,addresses:['198.51.100.7/24']},{name:'Loopback Pseudo-Interface 1',up:true,loopback:true,addresses:['127.0.0.1/8']}],
   runtime:{available:false,running:false,applying:false,version:'',appliedRevision:0,lastError:'',startedAt:'',dirty:false,listeners:[]},
   coreInstallation:{state:'idle',stage:'',version:'1.19.32',os:'windows',arch:'amd64',path:'/fixture/core/mihomo.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:''},
+  sidecarInstallation:{state:'idle',stage:'',version:'26.10.31',os:'windows',arch:'amd64',path:'/fixture/sidecar/xray/26.10.31/xray.exe',installed:false,supported:true,canInstall:true,reason:'',bytesDownloaded:0,totalBytes:0,error:'',startedAt:'',finishedAt:''},
   activities:[], jobs:[]
 };
 let auth = true;
@@ -73,6 +74,8 @@ await context.route('http://uniproxy.test/**',async route => {
   if (path === '/api/bootstrap') {bootstrapCount++;await route.fulfill({json:state});return;}
   // The real endpoint responds with the raw object, not the {data,runtime} mutation envelope.
   if (path === '/api/interfaces') {await route.fulfill({json:{interfaces:state.interfaces}});return;}
+  if (path === '/api/sidecars') {await route.fulfill({json:{enabled:state.settings.enableSidecar,status:{engine:'xray',version:state.runtime.running ? '26.10.31' : '',running:state.runtime.running,error:''},nodeCount:state.nodes.filter(node => node.engine === 'xray' && node.enabled).length,portRangeStart:state.settings.sidecarPortRangeStart,portRangeEnd:state.settings.sidecarPortRangeEnd,maxNodes:200,installation:state.sidecarInstallation}});return;}
+  if (path === '/api/sidecars/install') {state.sidecarInstallation={...state.sidecarInstallation,state:'installing',stage:'metadata',canInstall:false,reason:'Xray 正在后台安装，关闭窗口不会中断安装',startedAt:now};await route.fulfill({status:202,json:state.sidecarInstallation});return;}
   if (path === '/api/import' && body.preview) {
     previewCount++;
     const reply = importMocks.preview ? await importMocks.preview(body) : {json:{nodes:[{name:'回归测试节点',protocol:'socks5',server:'127.0.0.1',port:1080,udp:true}],errors:[]}};
@@ -139,6 +142,7 @@ try {
   await page.getByLabel('同时新建分组',{exact:true}).fill('回归分组');
   await page.getByRole('button',{name:'预览解析',exact:true}).click();
   await page.getByRole('heading',{name:/导入预览/}).waitFor();
+  await page.locator('.preview-section').getByText('Mihomo',{exact:true}).first().waitFor();
   assert.equal(state.nodes.length,0,'preview never mutates state');
   assert.equal(previewCount,1);
   await page.getByRole('button',{name:'确认导入',exact:true}).click();
@@ -185,6 +189,15 @@ try {
   console.log('PASS listener password preservation');
   await clickNav('节点管理');
   while(await page.getByRole('button',{name:'关闭通知',exact:true}).count()) await page.getByRole('button',{name:'关闭通知',exact:true}).first().click();
+  state.nodes.push({id:'node-xray',name:'Xray 回归节点',protocol:'vless',server:'203.0.113.9',port:443,udp:true,enabled:true,manual:true,customName:true,groupIds:[],sourceIds:[],engine:'xray',sidecarEndpoint:{host:'127.0.0.1',port:32300},sidecarStatus:{engine:'xray',version:'26.10.31',running:true},status:'unknown',latencyMs:null,speedMbps:null,lastCheckedAt:'',lastError:'',createdAt:now,updatedAt:now});
+  await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname==='/api/bootstrap'),page.getByRole('button',{name:'立即同步数据',exact:true}).click()]);
+  const xrayRow=page.locator('tbody tr',{hasText:'Xray 回归节点'});
+  await xrayRow.getByText('Xray',{exact:true}).waitFor();
+  await xrayRow.getByText('运行中',{exact:true}).waitFor();
+  await xrayRow.getByRole('button',{name:'编辑 Xray 回归节点',exact:true}).click();
+  await page.getByText('Xray Sidecar',{exact:true}).waitFor();
+  await closeDialog();
+  console.log('PASS node engine badge and sidecar process status');
   await page.screenshot({path:'src/web/tests/artifacts/node-fixture-desktop.png',fullPage:true});
   for(const width of [375,768,1024]) {await page.setViewportSize({width,height:900});await noOverflow('Dashboard '+width);}
   await page.setViewportSize({width:375,height:900});
@@ -198,6 +211,19 @@ try {
   await page.setViewportSize({width:1440,height:1000});
   await clickNav('运行与设置');
   await page.getByRole('button',{name:'检测与端口',exact:true}).click();
+  await textVisible('多引擎 Sidecar');
+  assert(calls.some(call=>call.path==='/api/sidecars'),'settings loaded sidecar status');
+  await textVisible('Xray 可执行文件');
+  assert.equal(await page.getByText('Xray 26.10.31',{exact:true}).count(),1,'sidecar installer shows the pinned version');
+  await Promise.all([page.waitForResponse(response=>new URL(response.url()).pathname==='/api/sidecars/install'),page.getByRole('button',{name:'在线安装 Xray',exact:true}).click()]);
+  assert(calls.some(call=>call.path==='/api/sidecars/install' && call.method==='POST' && JSON.stringify(call.body)==='{}'),'sidecar install posts an empty request body');
+  await textVisible('获取发布信息');
+  assert.equal(await page.getByLabel('Sidecar 起始端口',{exact:true}).inputValue(),'30000');
+  assert.equal(await page.getByLabel('Sidecar 结束端口',{exact:true}).inputValue(),'30999');
+  const sidecarSwitch=page.getByRole('switch',{name:'启用 Xray Sidecar',exact:true});
+  assert.equal(await sidecarSwitch.getAttribute('aria-checked'),'false');
+  await sidecarSwitch.click();
+  assert.equal(await sidecarSwitch.getAttribute('aria-checked'),'true');
   await page.getByLabel('并发数量',{exact:true}).fill('12');
   const interfaceSelect = page.getByLabel('全局出站网卡',{exact:true});
   await textVisible('仅列出已启用且非回环的网卡。');
@@ -208,6 +234,14 @@ try {
   await textVisible('设置已同步');
   assert.equal(state.settings.testConcurrency,12);
   assert.equal(state.settings.outboundInterface,'以太网');
+  assert.equal(state.settings.enableSidecar,true);
+  assert.equal(state.settings.sidecarPortRangeStart,30000);
+  assert.equal(state.settings.sidecarPortRangeEnd,30999);
+  await page.screenshot({path:'src/web/tests/artifacts/settings-sidecar-desktop.png',fullPage:true});
+  for(const width of [375,768,1024]) {await page.setViewportSize({width,height:900});await noOverflow('Settings '+width);}
+  await page.setViewportSize({width:375,height:900});
+  await page.screenshot({path:'src/web/tests/artifacts/settings-sidecar-mobile.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});
   state.interfaces = state.interfaces.filter(item => item.name !== '以太网');
   await page.getByRole('button',{name:'刷新网卡列表',exact:true}).click();
   await page.getByText('当前不可用（可能已禁用或拔出）').first().waitFor();

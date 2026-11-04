@@ -136,6 +136,9 @@ func parseURI(text string) (model.ParsedNode, error) {
 		return model.ParsedNode{}, errors.New("URI paths must use an explicit transport path option")
 	}
 	q := newQuery(u.RawQuery)
+	if xrayOnlyURI(protocol, q) {
+		return parseXrayURI(u, protocol, q)
+	}
 	out := map[string]any{"type": protocol, "server": u.Hostname(), "name": u.Fragment}
 	port := u.Port()
 	if port == "" {

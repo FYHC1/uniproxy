@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/json"
@@ -10,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/uniproxy/uniproxy/internal/model"
 	"gopkg.in/yaml.v3"
@@ -138,13 +140,25 @@ func (a *App) Handler() http.Handler {
 		return a.inspectCore(r.Context())
 	})
 	route("GET /api/runtime", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.Runtime(), nil })
+	route("GET /api/sidecars", func(w http.ResponseWriter, r *http.Request) (any, error) { return a.sidecarInfo(), nil })
+	route("POST /api/sidecars/install", func(w http.ResponseWriter, r *http.Request) (any, error) {
+		if err := emptySidecarInstallRequest(w, r); err != nil {
+			return nil, err
+		}
+		status, err := a.startSidecarInstall(r.Context())
+		if err != nil {
+			return nil, err
+		}
+		respond(w, http.StatusAccepted, status)
+		return nil, nil
+	})
 	route("POST /api/runtime/apply", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 		if a.closed || a.background.Err() != nil {
 			return nil, &apiError{503, "管理服务正在关闭", "shutting_down"}
 		}
-		if a.installPending {
+		if a.installPending || a.sidecarInstallPending {
 			return nil, &apiError{409, "内核正在安装，请等待完成后再应用配置", "core_install_busy"}
 		}
 		a.core.Inspect(r.Context())
@@ -156,7 +170,7 @@ func (a *App) Handler() http.Handler {
 	route("POST /api/runtime/stop", func(w http.ResponseWriter, r *http.Request) (any, error) {
 		a.mu.Lock()
 		defer a.mu.Unlock()
-		if a.installPending {
+		if a.installPending || a.sidecarInstallPending {
 			return nil, &apiError{409, "内核正在安装，没有运行中的代理需要停止，请等待安装完成", "core_install_busy"}
 		}
 		if e := a.core.Stop(r.Context()); e != nil {
@@ -165,6 +179,14 @@ func (a *App) Handler() http.Handler {
 		a.manuallyStopped = true
 		a.applyError = "代理内核已手动停止"
 		a.store.Activity("warning", "手动停止代理内核")
+		if a.sidecar != nil {
+			stopCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			if e := a.sidecar.Stop(stopCtx); e != nil {
+				a.applyError = "代理内核已手动停止；sidecar 停止失败：" + e.Error()
+				a.store.Activity("warning", a.applyError)
+			}
+			cancel()
+		}
 		return a.runtime(), nil
 	})
 	route("POST /api/import", func(w http.ResponseWriter, r *http.Request) (any, error) {
@@ -425,7 +447,7 @@ func (a *App) Handler() http.Handler {
 		if e := decode(w, r, &p); e != nil {
 			return nil, e
 		}
-		if e := filterPatch(p, "testUrl", "speedTestUrl", "testTimeoutMs", "testConcurrency", "speedTestBytes", "healthIntervalSeconds", "portRangeStart", "portRangeEnd", "outboundInterface"); e != nil {
+		if e := filterPatch(p, "testUrl", "speedTestUrl", "testTimeoutMs", "testConcurrency", "speedTestBytes", "healthIntervalSeconds", "portRangeStart", "portRangeEnd", "sidecarPortRangeStart", "sidecarPortRangeEnd", "outboundInterface", "enableSidecar"); e != nil {
 			return nil, e
 		}
 		return a.mutate(r.Context(), "更新全局设置", func(s *model.State) (any, error) {

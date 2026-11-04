@@ -1,4 +1,4 @@
-import type { ProxyNode, ProxyPool, RuntimeStatus } from '../shared/types';
+import type { ProxyNode, ProxyPool, RuntimeStatus, SidecarStatus } from '../shared/types';
 export const strategyLabels: Record<ProxyPool['strategy'],string> = { 'url-test':'最低延迟', 'round-robin':'轮询均衡', 'consistent-hashing':'一致性哈希', 'sticky-sessions':'粘性会话' };
 export const protocolLabels: Record<string,string> = { mixed:'HTTP / SOCKS5', http:'HTTP', socks:'SOCKS5' };
 export const protocolOptions = ['vless','vmess','trojan','ss','hysteria','hysteria2','tuic','ssh','socks5','http'] as const;
@@ -20,6 +20,14 @@ export function runtimeLabel(runtime:RuntimeStatus):string {
   return '内核运行中';
 }
 export function runtimeTone(runtime:RuntimeStatus):'success'|'warning'|'neutral' { return runtime.running && !runtime.dirty && !runtime.applying ? 'success' : runtime.dirty || runtime.lastError ? 'warning' : 'neutral'; }
+export function engineLabel(engine?:ProxyNode['engine']):string { return engine === 'xray' ? 'Xray' : engine === 'sing-box' ? 'sing-box' : 'Mihomo'; }
+export function engineTone(engine?:ProxyNode['engine']):'neutral'|'blue'|'teal'|'warning' { return engine === 'xray' ? 'blue' : engine === 'sing-box' ? 'warning' : 'neutral'; }
+export function sidecarState(status?:SidecarStatus):{label:string;tone:'success'|'warning'|'danger'|'neutral'} {
+  if (!status) return {label:'状态未知',tone:'neutral'};
+  if (status.running) return {label:'运行中',tone:'success'};
+  if (status.error) return {label:'异常',tone:'danger'};
+  return {label:'未运行',tone:'warning'};
+}
 export function isIP(host:string):boolean {
   const value = host.trim();
   if (/^(?:\d{1,3}\.){3}\d{1,3}$/.test(value)) return value.split('.').every(part => Number(part) <= 255 && String(Number(part)) === part);

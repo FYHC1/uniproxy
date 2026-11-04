@@ -1,7 +1,7 @@
 import test from 'node:test';
 import './core-install.test.mjs';
 import assert from 'node:assert/strict';
-import {address,checkHttpUrl,formatDate,isIP,isLoopback,poolMembers,runtimeLabel} from '../utils.ts';
+import {address,checkHttpUrl,engineLabel,engineTone,formatDate,isIP,isLoopback,poolMembers,runtimeLabel,sidecarState} from '../utils.ts';
 import {emptyNodeGroupFilter,matchesNodeFilter,matchesNodeGroups,nodeRelay} from '../nodeFilters.ts';
 import {changePoolSelection,constrainPoolSelection,matchesPoolNodeStatus,poolSelectionScope,selectedPoolNodes,sortPoolNodes,withoutDeletedPoolNodes} from '../poolSelection.ts';
 import {selectScope} from '../selection.ts';
@@ -54,6 +54,19 @@ test('absent core and unknown dates are never presented as running or measured',
   assert.equal(runtimeLabel({available:true,running:false,applying:false,dirty:false}),'内核未运行');
   assert.equal(formatDate(''),'尚无记录');
   assert.equal(formatDate('0001-01-01T00:00:00Z'),'尚无记录');
+});
+test('engine badges never present a sidecar node as native mihomo',()=>{
+  assert.equal(engineLabel(undefined),'Mihomo');
+  assert.equal(engineLabel('mihomo'),'Mihomo');
+  assert.equal(engineLabel('xray'),'Xray');
+  assert.equal(engineTone('xray'),'blue');
+  assert.equal(engineTone('mihomo'),'neutral');
+});
+test('sidecar state distinguishes running, failure and stopped process',()=>{
+  assert.deepEqual(sidecarState(undefined),{label:'状态未知',tone:'neutral'});
+  assert.deepEqual(sidecarState({engine:'xray',running:true}),{label:'运行中',tone:'success'});
+  assert.deepEqual(sidecarState({engine:'xray',running:false,error:'xray exited'}),{label:'异常',tone:'danger'});
+  assert.deepEqual(sidecarState({engine:'xray',running:false}),{label:'未运行',tone:'warning'});
 });
 
 const nodeGroups = patch => nodes.filter(node => matchesNodeGroups(node,{...emptyNodeGroupFilter(),...patch})).map(node=>node.id);

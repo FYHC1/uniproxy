@@ -26,7 +26,12 @@ func parseOne(t *testing.T, content string) model.ParsedNode {
 	if _, ok := node.Config["name"]; ok {
 		t.Fatal("native config must not contain untrusted name")
 	}
-	if node.Config["type"] != node.Protocol || node.Config["server"] != node.Server || node.Config["port"] != node.Port {
+	if node.Engine == model.EngineXray {
+		outbound, ok := node.Config["xray"].(map[string]any)
+		if !ok || outbound["protocol"] != node.Protocol {
+			t.Fatal("Xray config disagrees with metadata")
+		}
+	} else if node.Config["type"] != node.Protocol || node.Config["server"] != node.Server || node.Config["port"] != node.Port {
 		t.Fatal("native config disagrees with metadata")
 	}
 	if len(Fingerprint(node)) != 64 {
@@ -34,6 +39,48 @@ func parseOne(t *testing.T, content string) model.ParsedNode {
 	}
 	return node
 }
+func xrayVLESSUser(t *testing.T, node model.ParsedNode) map[string]any {
+	t.Helper()
+	outbound, ok := node.Config["xray"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing Xray outbound: %#v", node.Config)
+	}
+	settings, ok := outbound["settings"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing Xray settings: %#v", outbound)
+	}
+	vnext, ok := settings["vnext"].([]any)
+	if !ok || len(vnext) != 1 {
+		t.Fatalf("unexpected Xray vnext: %#v", settings["vnext"])
+	}
+	entry, ok := vnext[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected Xray vnext entry: %#v", vnext[0])
+	}
+	users, ok := entry["users"].([]any)
+	if !ok || len(users) != 1 {
+		t.Fatalf("unexpected Xray users: %#v", entry["users"])
+	}
+	user, ok := users[0].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected Xray user: %#v", users[0])
+	}
+	return user
+}
+
+func xrayStream(t *testing.T, node model.ParsedNode) map[string]any {
+	t.Helper()
+	outbound, ok := node.Config["xray"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing Xray outbound: %#v", node.Config)
+	}
+	stream, ok := outbound["streamSettings"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing Xray stream settings: %#v", outbound)
+	}
+	return stream
+}
+
 func requireInvalid(t *testing.T, content string) {
 	t.Helper()
 	result := Parse(content)

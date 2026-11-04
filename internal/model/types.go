@@ -2,13 +2,57 @@ package model
 
 import "time"
 
+// NodeEngine identifies which kernel owns a node's outbound protocol. Empty is
+// normalized to EngineMihomo so states written before engines existed keep
+// their original behavior.
+type NodeEngine string
+
+const (
+	EngineMihomo  NodeEngine = "mihomo"
+	EngineXray    NodeEngine = "xray"
+	EngineSingBox NodeEngine = "sing-box"
+)
+
+// EngineName returns the effective engine, treating an empty value as Mihomo.
+func (n Node) EngineName() NodeEngine {
+	if n.Engine == "" {
+		return EngineMihomo
+	}
+	return n.Engine
+}
+
+// IsSidecar reports whether the node is served by a local sidecar process.
+func (n Node) IsSidecar() bool { return n.EngineName() != EngineMihomo }
+
+// SidecarEndpoint is the loopback SOCKS5 entry Mihomo uses for a sidecar node.
+// It must never contain the real remote node address: that stays in Server/Port
+// and is read only by the sidecar configuration generator.
+type SidecarEndpoint struct {
+	Host     string `json:"host" yaml:"host"`
+	Port     int    `json:"port" yaml:"port"`
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+}
+
+// SidecarStatus is transient process state for one engine. It is not a health
+// verdict for individual nodes and must not be treated as persistent config.
+type SidecarStatus struct {
+	Engine  NodeEngine `json:"engine" yaml:"engine"`
+	Version string     `json:"version,omitempty" yaml:"version,omitempty"`
+	Running bool       `json:"running" yaml:"running"`
+	Error   string     `json:"error,omitempty" yaml:"error,omitempty"`
+}
+
 type ParsedNode struct {
-	Name     string         `json:"name"`
-	Protocol string         `json:"protocol"`
-	Server   string         `json:"server"`
-	Port     int            `json:"port"`
-	UDP      bool           `json:"udp"`
-	Config   map[string]any `json:"config,omitempty"`
+	Name     string `json:"name"`
+	Protocol string `json:"protocol"`
+	// Engine is the kernel selected by the parser for this node. Empty means
+	// Mihomo, preserving parsed values produced before sidecars existed.
+	Engine NodeEngine     `json:"engine,omitempty"`
+	Server string         `json:"server"`
+	Port   int            `json:"port"`
+	UDP    bool           `json:"udp"`
+	Config map[string]any `json:"config,omitempty"`
 	// Parsed-only same-document dependency; never passed through in Config.
 	DialerProxy       string `json:"dialerProxy,omitempty"`
 	DialerFingerprint string `json:"-"`
@@ -30,26 +74,29 @@ type ParseResult struct {
 }
 type Node struct {
 	ParsedNode
-	ID             string              `json:"id"`
-	Fingerprint    string              `json:"fingerprint,omitempty"`
-	DialerID       string              `json:"dialerId,omitempty"`
-	DialerIdentity string              `json:"dialerIdentity,omitempty"` // last validated upstream fingerprint, retained if relay is deleted
-	DialerName     string              `json:"dialerName,omitempty"`
-	DialerError    string              `json:"dialerError,omitempty"`
-	Enabled        bool                `json:"enabled"`
-	Manual         bool                `json:"manual"`
-	CustomName     bool                `json:"customName"`
-	GroupIDs       []string            `json:"groupIds"`
-	ManualGroupIDs []string            `json:"manualGroupIds,omitempty"`
-	SourceGroups   map[string][]string `json:"sourceGroups,omitempty"`
-	SourceIDs      []string            `json:"sourceIds"`
-	Status         string              `json:"status"`
-	LatencyMS      *int64              `json:"latencyMs"`
-	SpeedMbps      *float64            `json:"speedMbps"`
-	LastCheckedAt  string              `json:"lastCheckedAt"`
-	LastError      string              `json:"lastError"`
-	CreatedAt      string              `json:"createdAt"`
-	UpdatedAt      string              `json:"updatedAt"`
+	ID              string              `json:"id"`
+	Fingerprint     string              `json:"fingerprint,omitempty"`
+	DialerID        string              `json:"dialerId,omitempty"`
+	DialerIdentity  string              `json:"dialerIdentity,omitempty"` // last validated upstream fingerprint, retained if relay is deleted
+	DialerName      string              `json:"dialerName,omitempty"`
+	DialerError     string              `json:"dialerError,omitempty"`
+	Enabled         bool                `json:"enabled"`
+	Manual          bool                `json:"manual"`
+	CustomName      bool                `json:"customName"`
+	GroupIDs        []string            `json:"groupIds"`
+	ManualGroupIDs  []string            `json:"manualGroupIds,omitempty"`
+	SourceGroups    map[string][]string `json:"sourceGroups,omitempty"`
+	SourceIDs       []string            `json:"sourceIds"`
+	Status          string              `json:"status"`
+	LatencyMS       *int64              `json:"latencyMs"`
+	SpeedMbps       *float64            `json:"speedMbps"`
+	LastCheckedAt   string              `json:"lastCheckedAt"`
+	LastError       string              `json:"lastError"`
+	CreatedAt       string              `json:"createdAt"`
+	UpdatedAt       string              `json:"updatedAt"`
+	Engine          NodeEngine          `json:"engine,omitempty"`
+	SidecarEndpoint *SidecarEndpoint    `json:"sidecarEndpoint,omitempty"`
+	SidecarStatus   *SidecarStatus      `json:"sidecarStatus,omitempty"`
 }
 type Group struct {
 	ID        string `json:"id"`
@@ -120,6 +167,12 @@ type Subscription struct {
 	CreatedAt       string   `json:"createdAt"`
 	UpdatedAt       string   `json:"updatedAt"`
 }
+
+const (
+	DefaultSidecarPortRangeStart = 30000
+	DefaultSidecarPortRangeEnd   = 30999
+)
+
 type Settings struct {
 	TestURL               string `json:"testUrl"`
 	SpeedTestURL          string `json:"speedTestUrl"`
@@ -129,10 +182,18 @@ type Settings struct {
 	HealthIntervalSeconds int    `json:"healthIntervalSeconds"`
 	PortRangeStart        int    `json:"portRangeStart"`
 	PortRangeEnd          int    `json:"portRangeEnd"`
+	// SidecarPortRangeStart and SidecarPortRangeEnd reserve loopback ports for
+	// local proxy-engine SOCKS inbounds. They are deliberately separate from
+	// the public listener range above and never migrate existing endpoints.
+	SidecarPortRangeStart int `json:"sidecarPortRangeStart"`
+	SidecarPortRangeEnd   int `json:"sidecarPortRangeEnd"`
 	// OutboundInterface pins one native interface as the source of every
 	// core-originated outbound dial. Empty means the system default route.
 	// It is administrator-only: per-node interface-name stays blocked.
 	OutboundInterface string `json:"outboundInterface"`
+	// EnableSidecar is the opt-in switch for local proxy-engine sidecars. It is
+	// false by default so existing installations keep the native-only path.
+	EnableSidecar bool `json:"enableSidecar"`
 }
 type State struct {
 	Nodes         []Node         `json:"nodes"`
@@ -221,7 +282,7 @@ type ImportResult struct {
 
 func Now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 func DefaultState() State {
-	return State{Nodes: []Node{}, Groups: []Group{}, Pools: []Pool{}, Chains: []Chain{}, Listeners: []Listener{}, Subscriptions: []Subscription{}, Settings: Settings{TestURL: "https://www.gstatic.com/generate_204", SpeedTestURL: "https://speed.cloudflare.com/__down?bytes=10485760", TestTimeoutMS: 8000, TestConcurrency: 8, SpeedTestBytes: 10485760, HealthIntervalSeconds: 300, PortRangeStart: 20000, PortRangeEnd: 20999}}
+	return State{Nodes: []Node{}, Groups: []Group{}, Pools: []Pool{}, Chains: []Chain{}, Listeners: []Listener{}, Subscriptions: []Subscription{}, Settings: Settings{TestURL: "https://www.gstatic.com/generate_204", SpeedTestURL: "https://speed.cloudflare.com/__down?bytes=10485760", TestTimeoutMS: 8000, TestConcurrency: 8, SpeedTestBytes: 10485760, HealthIntervalSeconds: 300, PortRangeStart: 20000, PortRangeEnd: 20999, SidecarPortRangeStart: 30000, SidecarPortRangeEnd: 30999}}
 }
 
 // PoolMembers resolves stable, ordered membership. Health remains a core decision, not a stale DB filter.

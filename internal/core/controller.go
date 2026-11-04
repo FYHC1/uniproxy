@@ -158,7 +158,11 @@ func (m *Manager) verifyProxies(ctx context.Context, cfg *compiledConfig) error 
 		if lastErr == nil {
 			missing := false
 			for id := range cfg.nodes {
-				if _, ok := reply.Proxies[nodeTag(id)]; !ok {
+				tag := nodeTag(id)
+				if mapped, tagged := cfg.nodeTags[id]; tagged {
+					tag = mapped
+				}
+				if _, ok := reply.Proxies[tag]; !ok {
 					missing = true
 					break
 				}

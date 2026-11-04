@@ -54,6 +54,7 @@
 | R33 | 继续优化新建/编辑代理池弹窗：监听区上移、包含分组固定四行可滚动、包含节点区更宽更高；节点管理批量栏常驻 | 本地实现/浏览器验证：监听面板只在新建时置于名称下方、成员选择之前；分组列表固定 177px 内滚显示四整行；节点列表最高 420px、弹窗宽 1060px，卡片显示协议/UDP/健康；保留即时勾选、筛选、排序与真实延迟检测，暂存按钮不恢复；批量栏未选择时可见且操作禁用。严格 TS、生产 Web 构建、UI 42/42、浏览器 52/52 通过；已随 v0.2.8 发布（不含部署），见[验收](<pool-layout-verification.md>) |
 | R34 | 代理池卡片紧凑化：出口节点卡片更紧凑、桌面两列以提高同屏节点数量，减少重复二级标签 | 本地实现/浏览器验证：池卡片每页 10 个节点，节点卡首行显示健康/名称/延迟/测速/移除，次行仅协议徽章并可展开地址、中转、检测与错误；节点区使用容器查询在桌面两列、≤430px 单列，列表最高 380px，触控按钮 44px；严格 TS、生产 Web 构建、UI 42/42、浏览器 52/52 通过；已随 v0.2.8 发布（不含部署），见[验收](<pool-card-verification.md>) |
 | R35 | 协议适配分三档：严格 native 映射、宽松解析预览/degraded、真实可用性验证 | 本地实现/验证：`Parse` 保持严格，`ParsePreview` 只对 URI 列表做预览级归一并在 `Degraded` 标记原因；真实订阅 1064 条中严格 697、预览可展示 697+365=1062、2 条未恢复；降级节点不进入 `addParsed`/SQLite/运行配置，订阅提交仍 all-or-nothing。见[验证](<protocol-adaptation-tiers.md>)、[计划](<development-plan.md>) M30、[决策](<decisions.md>) D33；已随 v0.2.9 发布（不含部署） |
+| R36 | 研究并实现 Mihomo 主核 + Xray/sing-box 双 sidecar 的协议补全方案 | 第一批与最小 app/API 已实现并验证，UI 未接入：主核保持 Mihomo；Xray sidecar 补 Xray-only VLESS/VMess 字段；sing-box sidecar 仅在需要 AnyTLS/Snell/ShadowTLS/Naive/Tor 等 R01 之外协议时启用；本地 sidecar 限单独出站/链首。详见[需求分析](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)；开发分支 `feat/multi-engine-sidecars`；未提交/未发布/未部署 |
 
 验收来源：[首版验收](<verification.md>)、[中转修复验收](<relay-fix-verification.md>)、[代理池优化验收](<pool-workflow-verification.md>)、[订阅/分组验收](<subscription-groups-verification.md>)；已完成源码不代表用户当前运行的二进制已更新。
 

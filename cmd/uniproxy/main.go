@@ -22,6 +22,7 @@ import (
 	"github.com/uniproxy/uniproxy/internal/appdata"
 	"github.com/uniproxy/uniproxy/internal/core"
 	"github.com/uniproxy/uniproxy/internal/processguard"
+	"github.com/uniproxy/uniproxy/internal/sidecar"
 	"github.com/uniproxy/uniproxy/internal/store"
 	"github.com/uniproxy/uniproxy/internal/version"
 	"github.com/uniproxy/uniproxy/internal/webui"
@@ -44,9 +45,9 @@ func failureExitCode(err error) int {
 }
 
 type options struct {
-	host, data, binary, token string
-	port                      int
-	showVersion, healthcheck  bool
+	host, data, binary, xray, token string
+	port                            int
+	showVersion, healthcheck        bool
 }
 
 func parseOptions(args []string, output io.Writer) (options, error) {
@@ -63,6 +64,7 @@ func parseOptions(args []string, output io.Writer) (options, error) {
 	flags.IntVar(&opts.port, "port", portDefault, "admin listen port")
 	flags.StringVar(&opts.data, "data", env("UNIPROXY_DATA_DIR", ""), "persistent data directory (default: platform standard location)")
 	flags.StringVar(&opts.binary, "core", env("UNIPROXY_CORE_PATH", ""), "Mihomo executable path")
+	flags.StringVar(&opts.xray, "xray", env("UNIPROXY_XRAY_PATH", ""), "Xray executable path")
 	flags.BoolVar(&opts.showVersion, "version", false, "show version")
 	flags.BoolVar(&opts.healthcheck, "healthcheck", false, "check running local service health")
 	if err := flags.Parse(args); err != nil {
@@ -180,7 +182,16 @@ func serve(ctx context.Context, opts options, logger *log.Logger) error {
 	}
 	defer s.Close()
 	manager := core.New(core.Options{BinaryPath: opts.binary, DataDir: filepath.Join(dataDir, "core"), Log: func(level, message string) { s.Activity(level, message) }})
-	appOpts := app.Options{Token: opts.token, Host: opts.host, AdminPort: opts.port, AllowPrivateSubscriptions: os.Getenv("UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS") == "true", Version: version.Version}
+	sidecarOpts := sidecar.DefaultXrayOptions()
+	if opts.xray != "" {
+		sidecarOpts.BinaryPath = opts.xray
+	}
+	sidecarOpts.WorkDir = filepath.Join(dataDir, "sidecar")
+	xrayManager, err := sidecar.NewXrayManager(sidecarOpts)
+	if err != nil {
+		return fmt.Errorf("initialize Xray sidecar: %w", err)
+	}
+	appOpts := app.Options{Token: opts.token, Host: opts.host, AdminPort: opts.port, AllowPrivateSubscriptions: os.Getenv("UNIPROXY_ALLOW_PRIVATE_SUBSCRIPTIONS") == "true", Version: version.Version, Sidecar: xrayManager}
 	for _, v := range strings.Split(os.Getenv("UNIPROXY_ALLOWED_ORIGINS"), ",") {
 		if v = strings.TrimSpace(v); v != "" {
 			appOpts.AllowedOrigins = append(appOpts.AllowedOrigins, v)

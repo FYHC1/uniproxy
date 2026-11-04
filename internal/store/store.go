@@ -194,8 +194,31 @@ func Normalize(s *model.State) {
 	if s.Subscriptions == nil {
 		s.Subscriptions = []model.Subscription{}
 	}
+	if s.Settings.SidecarPortRangeStart == 0 {
+		s.Settings.SidecarPortRangeStart = model.DefaultSidecarPortRangeStart
+	}
+	if s.Settings.SidecarPortRangeEnd == 0 {
+		s.Settings.SidecarPortRangeEnd = model.DefaultSidecarPortRangeEnd
+	}
 	for i := range s.Nodes {
 		n := &s.Nodes[i]
+		if n.Engine == "" {
+			if n.ParsedNode.Engine != "" {
+				n.Engine = n.ParsedNode.Engine
+			} else {
+				n.Engine = model.EngineMihomo
+			}
+		}
+		// Node and ParsedNode both expose an engine JSON field for backwards
+		// compatibility. encoding/json resolves the duplicate to the outer field
+		// on load, so keep the embedded parser view in sync for fingerprints and
+		// import/export round trips. An empty parsed engine preserves the legacy
+		// Mihomo fingerprint byte-for-byte.
+		if n.Engine != model.EngineMihomo {
+			n.ParsedNode.Engine = n.Engine
+		} else {
+			n.ParsedNode.Engine = ""
+		}
 		if n.GroupIDs == nil {
 			n.GroupIDs = []string{}
 		}

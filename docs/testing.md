@@ -10,6 +10,8 @@
 - pnpm test:e2e：启动隔离测试服务并执行浏览器功能流（不写用户数据）。
 - pnpm test:ui：前端工具单元测试+内存构建fixture浏览器测试，不启动服务器。
 - UNIPROXY_TEST_CORE_PATH：指向已验证的 Mihomo 后执行真实内核测试；没设置时这些测试跳过而非伪造结果。
+- 真实多引擎 sidecar E2E（本地）：设置 `UNIPROXY_E2E_REAL=1`、`UNIPROXY_E2E_XRAY`、`UNIPROXY_E2E_MIHOMO` 后运行 `go test ./internal/e2e -run TestRealAppProcessThreeProtocols -count=1 -v -timeout 5m`；未设置显式跳过。测试构建临时 `uniproxy`、使用临时数据目录与随机管理端口，启动真实 Mihomo/Xray，不读取用户数据。
+- 真实远端订阅 E2E：设置 `UNIPROXY_E2E_REMOTE_SUB`（例如 `http://210.109.205.7:20080/links-xray.txt`）、`UNIPROXY_E2E_XRAY`、`UNIPROXY_E2E_MIHOMO` 后运行 `go test ./internal/e2e -run '^TestRealRemoteSubscription$' -count=1 -v -timeout 5m`；可选 `UNIPROXY_E2E_REMOTE_TARGET`、`UNIPROXY_E2E_REMOTE_NODES`、`UNIPROXY_E2E_REMOTE_NAMES`。测试会实际抓取远端订阅、启动本地 app/Mihomo/Xray 并访问远端目标，不读取用户数据库或凭据；未设置 `UNIPROXY_E2E_REMOTE_SUB` 时显式跳过。
 
 ## Windows 启动、关闭与同目录重启
 
@@ -95,6 +97,14 @@ $env:UNIPROXY_TEST_CORE_DOWNLOAD = ""
 
 真实上游协议互通和公网吞吐需要用户提供受控测试节点。测试不访问或修改浏览器系统代理，不修改防火墙或用户全局网络配置。
 
+## 多引擎 sidecar 真实流程验证（2026-11-04）
+
+- Windows 11 amd64：Xray 26.10.31 + Mihomo v1.19.32，`TestRealAppProcessThreeProtocols` PASS 2.74s；VLESS Encryption、VMess XHTTP、Reality 三路经真实 app → Mihomo → sidecar SOCKS5 → Xray 得到 `real-e2e-ok`，同 dataDir 重启恢复，强杀后 4 个占用端口释放。
+- WSL2 Fedora 44 Linux amd64：同一真实进程测试 PASS 2.12s，四项日志一致；`TestPhase0XrayPOC` PASS 0.38s；`go test ./... -count=1 -p 1` 全通过。
+- kr-vps 真实远端订阅 E2E（2026-11-04 16:40–16:41）：Alpine Linux 3.24.2 容器 `210.109.205.7`，仅公网 21443 映射到容器 Xray；`TestRealRemoteSubscription` 使用 `http://210.109.205.7:20080/links-xray.txt` 与目标 `http://210.109.205.7:20080/ok-remote.txt`，VLESS Encryption PASS 10.23s、VMess XHTTP PASS 6.12s、Reality PASS 5.66s；每协议首次导入/强制刷新/应用重启三次均返回 `remote-e2e-ok`，sidecar 状态为 `engine=xray version=26.10.31 running=true`。
+- 前端全量回归（2026-11-04 16:49）：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`（Vite 7.3.7，4656 modules；CSS 112.77kB、JS 566.93kB，仅 chunk 提示）、`pnpm test:e2e` 52/52（1.3m）通过。
+- sidecar 安装器：`internal/sidecarinstall` 单测覆盖四平台资产/摘要、白名单解压、无覆盖发布与失败清理；2026-11-04 临时 `TestLiveGitHubInstall` 使用真实 `Xray-windows-64.zip` 16,623,726 bytes（SHA256 与 windows-amd64 pin 一致），在注入 `gh api` 真实 release metadata 的条件下完整走生产 `install(...)`，PASS 4.60s。匿名 GitHub API 配额耗尽时直接 API 请求返回 403（Remaining=0，Reset 17:57:56），该边界仍存在；Linux 实机安装未验证。
+- 边界：Windows/WSL 只验证本机回环合成上游；kr-vps 仅单端口单节点顺序协议，未验证三协议并发、多端口映射、UDP、公网带宽、容量/长期运行、其他发行版或裸机；真实 GitHub 资产下载已用 Windows amd64 官方 ZIP 验证，匿名 API 配额耗尽时 403，Linux 实机安装仍待验证。详见[真实流程验证](<sidecar-real-process-verification.md>)。
 ## 已有执行记录（历史，不是每轮自动重测）
 
 首版证据见[历史验收](<verification.md>)，中转修复证据见[修复验收](<relay-fix-verification.md>)。20:31文档整理轮没有重跑产品测试；随后代理池优化轮已重新执行完整相关验证，见[代理池优化验收](<pool-workflow-verification.md>)。

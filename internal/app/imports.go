@@ -235,7 +235,7 @@ func addParsed(s *model.State, parsed []model.ParsedNode, groupIDs []string, sou
 		p.DialerProxy = ""
 		p.DialerFingerprint = ""
 		if idx < 0 {
-			n := model.Node{ParsedNode: p, ID: id, Fingerprint: fp, DialerID: dialerID, Enabled: true, Manual: sourceID == "", GroupIDs: []string{}, ManualGroupIDs: []string{}, SourceIDs: []string{}, SourceGroups: map[string][]string{}, Status: "unknown", CreatedAt: now, UpdatedAt: now}
+			n := model.Node{ParsedNode: p, ID: id, Fingerprint: fp, DialerID: dialerID, Enabled: true, Manual: sourceID == "", GroupIDs: []string{}, ManualGroupIDs: []string{}, SourceIDs: []string{}, SourceGroups: map[string][]string{}, Status: "unknown", CreatedAt: now, UpdatedAt: now, Engine: p.Engine}
 			s.Nodes = append(s.Nodes, n)
 			idx = len(s.Nodes) - 1
 			out.Added++

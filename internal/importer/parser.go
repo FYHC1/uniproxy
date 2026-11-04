@@ -447,13 +447,14 @@ func Fingerprint(node model.ParsedNode) string {
 		}
 	}
 	identity := struct {
-		Protocol          string         `json:"protocol"`
-		Server            string         `json:"server"`
-		Port              int            `json:"port"`
-		UDP               bool           `json:"udp"`
-		Config            map[string]any `json:"config"`
-		DialerFingerprint string         `json:"dialerFingerprint,omitempty"`
-	}{node.Protocol, node.Server, node.Port, node.UDP, config, node.DialerFingerprint}
+		Protocol          string           `json:"protocol"`
+		Engine            model.NodeEngine `json:"engine,omitempty"`
+		Server            string           `json:"server"`
+		Port              int              `json:"port"`
+		UDP               bool             `json:"udp"`
+		Config            map[string]any   `json:"config"`
+		DialerFingerprint string           `json:"dialerFingerprint,omitempty"`
+	}{node.Protocol, node.Engine, node.Server, node.Port, node.UDP, config, node.DialerFingerprint}
 	data, err := json.Marshal(identity)
 	if err != nil {
 		return ""

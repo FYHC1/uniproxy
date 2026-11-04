@@ -8,12 +8,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/uniproxy/uniproxy/internal/model"
 	"github.com/uniproxy/uniproxy/internal/safehttp"
+	"github.com/uniproxy/uniproxy/internal/sidecar"
 	"github.com/uniproxy/uniproxy/internal/store"
 )
 
@@ -27,6 +29,17 @@ type Core interface {
 	CheckChain(context.Context, string, string, time.Duration) (model.CheckResult, error)
 	Speed(context.Context, string, string, time.Duration, int64) (model.CheckResult, error)
 }
+
+// Sidecar is the optional local proxy-engine lifecycle used by app. Nil keeps
+// every installation on the native Mihomo-only path.
+type Sidecar interface {
+	ConfigurePortRange(start, end int) error
+	AssignEndpoints([]model.Node) ([]model.Node, error)
+	Preflight([]model.Node) error
+	Apply(context.Context, []model.Node) (map[string]model.SidecarEndpoint, error)
+	Status() model.SidecarStatus
+	Stop(context.Context) error
+}
 type Options struct {
 	Token                     string
 	Host                      string
@@ -36,26 +49,30 @@ type Options struct {
 	// Version is reported by /api/health so a running instance can be matched to
 	// the release it came from. Empty means "development build".
 	Version string
+	// Sidecar is nil when this build has no local sidecar manager.
+	Sidecar Sidecar
 }
 type App struct {
-	mu                sync.Mutex
-	store             *store.Store
-	core              Core
-	opts              Options
-	client            *http.Client
-	jobMu             sync.Mutex
-	jobs              map[string]*model.Job
-	cancels           map[string]context.CancelFunc
-	background        context.Context
-	cancel            context.CancelFunc
-	wg                sync.WaitGroup
-	refreshing        map[string]bool
-	lastHealth        time.Time
-	applyError        string
-	manuallyStopped   bool
-	installPending    bool
-	awaitingCoreApply bool
-	closed            bool
+	mu                    sync.Mutex
+	store                 *store.Store
+	core                  Core
+	sidecar               Sidecar
+	opts                  Options
+	client                *http.Client
+	jobMu                 sync.Mutex
+	jobs                  map[string]*model.Job
+	cancels               map[string]context.CancelFunc
+	background            context.Context
+	cancel                context.CancelFunc
+	wg                    sync.WaitGroup
+	refreshing            map[string]bool
+	lastHealth            time.Time
+	applyError            string
+	manuallyStopped       bool
+	installPending        bool
+	sidecarInstallPending bool
+	awaitingCoreApply     bool
+	closed                bool
 }
 type apiError struct {
 	Status        int
@@ -74,7 +91,7 @@ func ID() string {
 }
 func New(s *store.Store, c Core, opts Options) *App {
 	ctx, cancel := context.WithCancel(context.Background())
-	return &App{store: s, core: c, opts: opts, client: safehttp.NewClient(opts.AllowPrivateSubscriptions), jobs: map[string]*model.Job{}, cancels: map[string]context.CancelFunc{}, background: ctx, cancel: cancel, refreshing: map[string]bool{}}
+	return &App{store: s, core: c, sidecar: opts.Sidecar, opts: opts, client: safehttp.NewClient(opts.AllowPrivateSubscriptions), jobs: map[string]*model.Job{}, cancels: map[string]context.CancelFunc{}, background: ctx, cancel: cancel, refreshing: map[string]bool{}}
 }
 func (a *App) Start() {
 	a.mu.Lock()
@@ -83,7 +100,17 @@ func (a *App) Start() {
 		return
 	}
 	a.core.Inspect(a.background)
-	a.applyLocked(a.store.Snapshot())
+	state := a.store.Snapshot()
+	original := state
+	if e := a.assignSidecarEndpoints(&state); e != nil {
+		a.applyError = "配置已保存但尚未生效：" + e.Error()
+	} else if sidecarEndpointsChanged(original.Nodes, state.Nodes) {
+		state.Revision++
+		if e := a.store.Save(state); e != nil {
+			a.applyError = "配置已保存但尚未生效：" + e.Error()
+		}
+	}
+	a.applyLocked(state)
 	a.wg.Add(1)
 	a.mu.Unlock()
 	go a.scheduler()
@@ -100,8 +127,13 @@ func (a *App) Close() {
 	a.jobMu.Unlock()
 	a.wg.Wait()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 	_ = a.core.Stop(ctx)
+	cancel()
+	sidecarCtx, sidecarCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer sidecarCancel()
+	if a.sidecar != nil {
+		_ = a.sidecar.Stop(sidecarCtx)
+	}
 }
 func (a *App) runtime() model.RuntimeStatus {
 	r := a.core.Status()
@@ -120,6 +152,10 @@ func (a *App) applyLocked(s model.State) {
 		a.applyError = "Mihomo 正在安装；更改仅保存，安装完成后请手动应用配置"
 		return
 	}
+	if a.sidecarInstallPending {
+		a.applyError = "Xray 正在安装；更改仅保存，安装完成后请手动应用配置"
+		return
+	}
 	if a.awaitingCoreApply {
 		a.applyError = "安装操作后尚未应用配置；更改仅保存，请点击重新应用配置"
 		return
@@ -128,14 +164,58 @@ func (a *App) applyLocked(s model.State) {
 		a.applyError = "内核已手动停止；更改仅保存，点击重新应用后恢复代理"
 		return
 	}
+	fail := func(err error) {
+		a.applyError = "配置已保存但尚未生效：" + err.Error()
+		a.store.Activity("warning", a.applyError)
+	}
 	ctx, cancel := context.WithTimeout(a.background, 45*time.Second)
 	defer cancel()
-	if e := a.core.Apply(ctx, s); e != nil {
-		a.applyError = "配置已保存但尚未生效：" + e.Error()
-		a.store.Activity("warning", a.applyError)
-	} else {
-		a.applyError = ""
+	sidecarActive := false
+	if hasEnabledXray(s.Nodes) {
+		if !s.Settings.EnableSidecar {
+			fail(errors.New("Xray sidecar 功能未启用"))
+			return
+		}
+		if a.sidecar == nil {
+			fail(errors.New("Xray sidecar 未配置"))
+			return
+		}
+		if err := a.prepareSidecar(&s); err != nil {
+			fail(err)
+			return
+		}
+		endpoints, err := a.sidecar.Apply(ctx, s.Nodes)
+		if err != nil {
+			fail(errors.New("Xray sidecar 启动失败：" + err.Error()))
+			return
+		}
+		for i := range s.Nodes {
+			node := &s.Nodes[i]
+			if !node.Enabled || node.EngineName() != model.EngineXray {
+				continue
+			}
+			endpoint, ok := endpoints[node.ID]
+			if !ok {
+				fail(fmt.Errorf("sidecar 未返回节点 %s 的端点", node.ID))
+				return
+			}
+			copy := endpoint
+			node.SidecarEndpoint = &copy
+		}
+		sidecarActive = true
 	}
+	if e := a.core.Apply(ctx, s); e != nil {
+		fail(e)
+		return
+	}
+	if a.sidecar != nil && !sidecarActive {
+		if e := a.sidecar.Stop(ctx); e != nil {
+			a.applyError = "代理内核已应用，但 sidecar 停止失败：" + e.Error()
+			a.store.Activity("warning", a.applyError)
+			return
+		}
+	}
+	a.applyError = ""
 }
 func (a *App) mutate(ctx context.Context, label string, fn func(*model.State) (any, error)) (any, error) {
 	a.mu.Lock()
@@ -146,6 +226,9 @@ func (a *App) mutate(ctx context.Context, label string, fn func(*model.State) (a
 		return nil, e
 	}
 	store.Normalize(&s)
+	if e = a.assignSidecarEndpoints(&s); e != nil {
+		return nil, e
+	}
 	if e = ValidateState(s, a.opts.AdminPort); e != nil {
 		return nil, e
 	}
@@ -178,6 +261,23 @@ func (a *App) bootstrap() any {
 		s.Nodes[i].DialerIdentity = ""
 		s.Nodes[i].SourceGroups = nil
 		s.Nodes[i].ManualGroupIDs = nil
+		s.Nodes[i].SidecarStatus = nil
+		if s.Nodes[i].SidecarEndpoint != nil {
+			endpoint := *s.Nodes[i].SidecarEndpoint
+			endpoint.Username = ""
+			endpoint.Password = ""
+			s.Nodes[i].SidecarEndpoint = &endpoint
+		}
+	}
+	status := model.SidecarStatus{Engine: model.EngineXray}
+	if a.sidecar != nil {
+		status = a.sidecar.Status()
+	}
+	for i := range s.Nodes {
+		if s.Nodes[i].EngineName() == model.EngineXray {
+			nodeStatus := status
+			s.Nodes[i].SidecarStatus = &nodeStatus
+		}
 	}
 	for i := range s.Listeners {
 		s.Listeners[i] = publicListener(s.Listeners[i])
@@ -192,6 +292,85 @@ func (a *App) bootstrap() any {
 		Jobs             []model.Job            `json:"jobs"`
 		CoreInstallation model.CoreInstallation `json:"coreInstallation"`
 	}{s, a.runtime(), a.store.Activities(), a.jobList(), a.coreInstallation()}
+}
+func hasEnabledXray(nodes []model.Node) bool {
+	for _, node := range nodes {
+		if node.Enabled && node.EngineName() == model.EngineXray {
+			return true
+		}
+	}
+	return false
+}
+
+// prepareSidecar configures the allocator from settings, assigns any missing
+// endpoints, then binds-checks every endpoint before Xray starts. It mutates
+// only the caller's state copy; callers persist the returned nodes after
+// validation succeeds.
+func (a *App) prepareSidecar(s *model.State) error {
+	if !s.Settings.EnableSidecar || !hasEnabledXray(s.Nodes) {
+		return nil
+	}
+	if a.sidecar == nil {
+		return errors.New("Xray sidecar 未配置")
+	}
+	enabled := 0
+	for _, node := range s.Nodes {
+		if node.Enabled && node.EngineName() == model.EngineXray {
+			enabled++
+		}
+	}
+	if enabled > sidecar.MaxSidecarNodes {
+		return fmt.Errorf("Xray sidecar 单进程最多支持 %d 个节点（当前 %d 个），请拆分或仅启用 Xray-only 节点", sidecar.MaxSidecarNodes, enabled)
+	}
+	if err := a.sidecar.ConfigurePortRange(s.Settings.SidecarPortRangeStart, s.Settings.SidecarPortRangeEnd); err != nil {
+		return fmt.Errorf("sidecar 端口范围无效：%w", err)
+	}
+	nodes, err := a.sidecar.AssignEndpoints(s.Nodes)
+	if err != nil {
+		return fmt.Errorf("sidecar 端点分配失败：%w", err)
+	}
+	s.Nodes = nodes
+	if err := a.sidecar.Preflight(s.Nodes); err != nil {
+		return fmt.Errorf("sidecar 端口预检失败：%w", err)
+	}
+	return nil
+}
+
+func (a *App) assignSidecarEndpoints(s *model.State) error {
+	if err := a.prepareSidecar(s); err != nil {
+		return bad(err.Error())
+	}
+	return nil
+}
+
+func sidecarEndpointsChanged(before, after []model.Node) bool {
+	collect := func(nodes []model.Node) map[string]model.SidecarEndpoint {
+		out := map[string]model.SidecarEndpoint{}
+		for _, node := range nodes {
+			if node.SidecarEndpoint != nil {
+				out[node.ID] = *node.SidecarEndpoint
+			}
+		}
+		return out
+	}
+	return !reflect.DeepEqual(collect(before), collect(after))
+}
+
+func (a *App) sidecarInfo() any {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	s := a.store.Snapshot()
+	status := model.SidecarStatus{Engine: model.EngineXray}
+	if a.sidecar != nil {
+		status = a.sidecar.Status()
+	}
+	count := 0
+	for _, node := range s.Nodes {
+		if node.Enabled && node.EngineName() == model.EngineXray {
+			count++
+		}
+	}
+	return map[string]any{"enabled": s.Settings.EnableSidecar, "status": status, "nodeCount": count, "portRangeStart": s.Settings.SidecarPortRangeStart, "portRangeEnd": s.Settings.SidecarPortRangeEnd, "maxNodes": sidecar.MaxSidecarNodes, "installation": a.sidecarInstallationLocked()}
 }
 func publicListener(l model.Listener) model.Listener {
 	l.Users = append([]model.Credential{}, l.Users...)

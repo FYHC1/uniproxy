@@ -17,19 +17,23 @@ import (
 const MaxSpeedBytes int64 = 100 << 20
 const MaxSpeedDuration = 2 * time.Minute
 
-func (m *Manager) testSnapshot(nodeID string) (BuildOptions, error) {
+func (m *Manager) testSnapshot(nodeID string) (BuildOptions, string, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if !m.status.Running || !processAlive(m.process) || m.live == nil {
-		return BuildOptions{}, ErrNotRunning
+		return BuildOptions{}, "", ErrNotRunning
 	}
 	if m.status.Applying {
-		return BuildOptions{}, errors.New("core configuration is being applied; retry the test")
+		return BuildOptions{}, "", errors.New("core configuration is being applied; retry the test")
 	}
 	if _, ok := m.live.nodes[nodeID]; !ok {
-		return BuildOptions{}, errors.New("node is disabled or absent from the live configuration")
+		return BuildOptions{}, "", errors.New("node is disabled or absent from the live configuration")
 	}
-	return m.buildOpts, nil
+	tag, ok := m.live.nodeTags[nodeID]
+	if !ok {
+		return BuildOptions{}, "", errors.New("node has no live outbound tag")
+	}
+	return m.buildOpts, tag, nil
 }
 func failedCheck(result model.CheckResult, err error) (model.CheckResult, error) {
 	result.OK = false
@@ -72,10 +76,11 @@ func (m *Manager) checkProxyTag(ctx context.Context, tag, testURL string, timeou
 // Check uses Mihomo's actual outbound URL-test, not a TCP reachability ping.
 func (m *Manager) Check(ctx context.Context, nodeID, testURL string, timeout time.Duration) (model.CheckResult, error) {
 	result := model.CheckResult{NodeID: nodeID}
-	if _, err := m.testSnapshot(nodeID); err != nil {
+	_, tag, err := m.testSnapshot(nodeID)
+	if err != nil {
 		return failedCheck(result, err)
 	}
-	delay, err := m.checkProxyTag(ctx, nodeTag(nodeID), testURL, timeout)
+	delay, err := m.checkProxyTag(ctx, tag, testURL, timeout)
 	if err != nil {
 		return failedCheck(result, err)
 	}
@@ -117,7 +122,7 @@ func (m *Manager) CheckChain(ctx context.Context, chainID, testURL string, timeo
 // contents to the caller. Cancellation and byte/time limits apply during reads.
 func (m *Manager) Speed(ctx context.Context, nodeID, testURL string, timeout time.Duration, maxBytes int64) (model.CheckResult, error) {
 	result := model.CheckResult{NodeID: nodeID}
-	opts, err := m.testSnapshot(nodeID)
+	opts, _, err := m.testSnapshot(nodeID)
 	if err != nil {
 		return failedCheck(result, err)
 	}
