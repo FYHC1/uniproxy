@@ -202,7 +202,7 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 边界：预览不等于可应用；`Degraded` 永不进入 `addParsed`/SQLite/编译器；订阅提交仍 `TotalErrors == 0`；真实节点连通性/吞吐/握手未验证。详见[验证](<protocol-adaptation-tiers.md>)、[需求 R35](<requirements.md>)、[决策 D33](<decisions.md>)。
 - 发布（2026-11-03 16:22:39 +08）：提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag `v0.2.9` 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`；main CI `41602628999`、tag CI `41602671353`、Release `41602671127` 均成功；四平台资产与正式 Windows 程序验收完成；只发布，不含部署。
 
-## M31 — Mihomo 主核 + Xray/sing-box 双 sidecar（2026-11-04 第一至四批、真实流程、真实订阅、Xray 在线安装器、复审与远端 E2E 完成，已提交 `00e3350`）
+## M31 — Mihomo 主核 + Xray/sing-box 双 sidecar（2026-11-04 第一至四批、真实流程、真实订阅、Xray 在线安装器、复审修复与 v0.3.0 发布准备完成）
 
 - 用户要求：按[交接](<multi-engine-sidecar-handoff.md>)实现第一批：模型字段、`internal/sidecar`（Xray 配置生成、`xray -test`、单进程启动/停止/健康检查）、编译器本地 SOCKS 出站、链位置校验、3 个离线 POC。
 - 已完成：`internal/model/types.go` 增加 `Node.Engine`/`Node.SidecarEndpoint`/`SidecarStatus`，`internal/model/engine.go` 集中 `ValidateSidecarChainPlacement`；`internal/store/store.go` 将空 Engine 归一为 mihomo；`internal/sidecar/ports.go`、`xray.go`、`process.go` 实现 127.0.0.1 端口分配、每节点 SOCKS inbound 的 Xray 配置、`xray run -test -c`、单进程启动/停止和 SOCKS 健康检查（最多 200 节点、随机凭据）。
@@ -289,6 +289,15 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 结果（2026-11-04 16:40–16:41）：VLESS Encryption PASS 10.23s、VMess XHTTP PASS 6.12s、Reality PASS 5.66s；每协议首次导入/强制刷新/应用重启三次均返回 `remote-e2e-ok`。VLESS Encryption ticket 约 600 秒过期，每次测试前需重新生成；当前远端 21443 保留 Reality fixture。
 - 验证（2026-11-04 16:43）：删除临时 debug 测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.412s、core 6.753s、sidecar 0.938s、sidecarinstall 0.235s、importer 0.909s、store 0.364s）。前端于 16:49 完整重跑 `pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`（Vite 7.3.7，4656 modules；CSS 112.77kB、JS 566.93kB，仅 chunk 提示）、`pnpm test:e2e` 52/52（1.3m）通过。
 - 边界：kr-vps 仅单端口单节点顺序协议，未验证三协议并发、多端口映射、UDP、公网带宽、容量/长期运行、其他发行版或裸机；未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未发布、未部署。详见[真实流程验证](<sidecar-real-process-verification.md>)。
+
+### 合并前代码复审与修复（2026-11-04）
+
+- 用户要求：对开发分支全量 diff 做代码 review，修复后合并 `main` 并发布新 release；不部署。
+- 三路只读审查（core/store/app、sidecar/installer、importer/UI）无未闭环 P1。修复 P1：`internal/core/compiler.go` 原生节点以 Xray 节点为中转时，`dialer-proxy` 必须使用 `proxyTag(dialer)`（`x-<ID>`）而非原生节点 tag；新增 `TestBuildNativeDialerUsesSidecarProxyTag`。
+- 修复 P2：`internal/app/http.go` PATCH 节点响应使用公开投影，清除 sidecar 用户名/密码与瞬时状态；`internal/app/sidecar_install.go` 安装失败复位 `awaitingCoreApply`；`internal/app/app.go` 在 `core.Apply` 失败时用独立 45s 上下文将 sidecar 回滚到上一轮成功应用的节点集，手动停止后清空 `appliedNodes`，`core.Status().Running=false` 时回滚改为停止 sidecar，`App.Start` 端点分配/保存失败时不再调用 `applyLocked` 覆盖错误；`runtime` 读取 `sidecar.Status().Error` 使崩溃可见；`internal/sidecar/process.go` 增加 bounded backoff 自动重启（最多 3 次）并把崩溃状态映射到 bootstrap 节点 `unhealthy`；`internal/sidecar/endpoint.go` 先保留 enabled Xray 端点并修复 disabled 历史重复端口，只补缺失的用户名/密码；`internal/sidecar/install.go` 外部 PATH/自定义路径不冒充固定版本，未配置自定义路径时允许在线安装托管版本；`internal/sidecar/xray.go` 对 HTTP 出站关闭 SOCKS UDP 并拒绝固定 Xray 26.10.31 已移除的 Trojan flow；`internal/core/compiler.go` 对 HTTP sidecar 出站写 `udp=false`；`internal/importer/xray_uri.go` 直接拒绝 Trojan flow。
+- 过程保护：`internal/sidecar/process.go` 的 `runXrayTest` 与 `internal/sidecar/install.go` 的 `probeXrayVersion` 统一 `processguard.PrepareCommand`，Linux 父进程退出时带子进程。
+- 回归：`TestBuildNativeDialerUsesSidecarProxyTag`、`TestPatchNodeDoesNotExposeSidecarCredentials`、`TestSidecarInstallFailureClearsAwaitingCoreApply`、`TestApplyFailureRollsBackSidecarToLastAppliedNodes`、`TestApplyFailureAfterManualStopDoesNotRestartSidecar`、`TestRuntimeMarksDirtyWhenSidecarReportsCrash`、`TestXrayManagerRestartsAfterUnexpectedExit`、`TestAssignEndpointsRepairsHistoricalDisabledDuplicate`、`TestXrayInstallationStatusExternalPathAllowsManagedInstall`、`TestBuildXrayConfigDisablesUDPForHTTPOutbound`、`TestBuildSidecarHTTPOutboundDisablesUDP`、`TestXrayTrojanFlowRejected`、`TestBuildXrayConfigRejectsTrojanFlow`。
+- 验证（2026-11-04 19:38）：`go vet ./...` 无输出；`go test ./... -count=1 -p 1` 全通过（app 11.747s、core 6.714s、sidecar 1.754s、sidecarinstall 0.198s、importer 0.709s、store 0.347s、cmd/uniproxy 0.128s）；`pnpm typecheck` 通过、`pnpm test:ui` 44/44、`pnpm build:web`（Vite 7.3.7，4656 modules）、`pnpm test:e2e` 52/52（1.3m）通过。工作树 27 files, +776/−56（复审修复 + v0.3.0 发布准备）；版本文件、README、CHANGELOG、发布说明与验收记录已同步；待提交、推送、合并、打标签、CI 后回填资产，未部署。
 
 ## 运行观察 — 菜鸟 25 节点延迟（2026-11-01，仅诊断）
 

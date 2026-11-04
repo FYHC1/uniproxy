@@ -143,6 +143,29 @@ func TestXrayManagerVersionProbeFailureIsRetryable(t *testing.T) {
 	}
 }
 
+func TestXrayInstallationStatusExternalPathAllowsManagedInstall(t *testing.T) {
+	externalDir := t.TempDir()
+	binary := filepath.Join(externalDir, xrayBinaryName())
+	if err := os.WriteFile(binary, []byte("fixture"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", externalDir)
+	manager, err := NewXrayManager(XrayOptions{WorkDir: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	status := manager.InstallationStatus()
+	if !status.Installed || status.Version != "未知（外部路径）" {
+		t.Fatalf("external binary should be reported without a pinned version: %#v", status)
+	}
+	if !status.CanInstall {
+		t.Fatalf("external PATH binary should not block managed install: %#v", status)
+	}
+	if status.Path != binary {
+		t.Fatalf("external path = %q, want %q", status.Path, binary)
+	}
+}
+
 func TestXrayManagerRequiresConfiguredWorkDirForInstall(t *testing.T) {
 	manager, err := NewXrayManager(XrayOptions{BinaryPath: filepath.Join(t.TempDir(), "missing", "xray.exe")})
 	if err != nil {

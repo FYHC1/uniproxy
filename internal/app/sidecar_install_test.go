@@ -174,4 +174,14 @@ func TestSidecarInstallFailureIsReported(t *testing.T) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	a.mu.Lock()
+	awaiting := a.awaitingCoreApply
+	a.mu.Unlock()
+	if awaiting {
+		t.Fatal("failed install left awaitingCoreApply set")
+	}
+	code, body := request(t, a, "POST", "/api/runtime/apply", map[string]any{})
+	if code != 200 {
+		t.Fatalf("apply after failed install = %d %#v", code, body)
+	}
 }

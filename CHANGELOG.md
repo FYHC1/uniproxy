@@ -2,7 +2,7 @@
 
 日期按 Asia/Shanghai。v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
 
-## 未发布 — 多引擎 sidecar 第一批、app/API、UI、端口产品化、真实流程、真实订阅、Xray 在线安装器与 kr-vps 远端 E2E（开发分支）
+## 0.3.0 — 2026-11-04 · 多引擎 sidecar（发布准备中）
 
 - 新增 `Node.Engine`、`Node.SidecarEndpoint`、`SidecarStatus`；旧 state 中空 Engine 归一为 mihomo。
 - 新增 `ParsedNode.Engine` 与 `internal/importer/xray_uri.go`、`internal/importer/xray_vmess.go`：识别 VLESS Encryption、VLESS/VMess XHTTP、Reality spiderX/mldsa65Verify、FinalMask、TLS cipher suites、flow=xtls-rprx-vision-udp443，保留真实 Xray 配置；合法字段保留，坏 fm/cs 严格失败或预览降级，VLESS 明文公网 IP 回退 Mihomo 预览。
@@ -25,6 +25,7 @@
 - `GET /api/sidecars` 增加 `installation`；新增 `POST /api/sidecars/install`（空对象、202）；安装期间 runtime/apply/stop 与内核安装返回 409；安装完成只保存配置，需手动重新应用，失败原因写入 `applyError`。
 - 设置页新增 Xray 可执行文件安装面板：固定版本/平台/目标路径、在线安装/重试、下载与解压进度、成功/失败状态；安装中每 5 秒刷新侧车状态。
 - 工作树复审修复 4 项真实缺陷：VMess JSON `security=none` 被误当 transport security、Xray 安装版本探测失败后目录残留导致无法重试、备份恢复后外层/嵌入 engine 不同步导致 Xray 指纹漂移、导出原生节点留下指向已过滤 Xray sidecar 的悬空 `dialer-proxy`；对应新增回归测试。
+- 合并前复审修复：原生节点以 Xray sidecar 为中转时 `dialer-proxy` 使用 `x-<ID>` tag；PATCH 节点响应不再泄露 sidecar 凭据；安装失败复位待应用状态；Mihomo 应用失败时回滚 sidecar；手动停止后的失败应用不再重启旧 sidecar；sidecar 崩溃使用 bounded backoff 自动重启（最多 3 次）并使相关节点标记不可用；disabled 节点历史重复端口自动修复；外部 PATH Xray 不再冒充固定版本且允许在线安装托管版本；HTTP 出站关闭 SOCKS UDP，Mihomo socks5 出站同步 `udp=false`；固定 Xray 26.10.31 已移除的 Trojan flow 在导入和配置生成时直接拒绝；`xray -test`/版本探测进程树受进程保护。
 - 新增 `internal/e2e/real_remote_test.go` 的 `TestRealRemoteSubscription`：`UNIPROXY_E2E_REMOTE_SUB` 启用，支持 `UNIPROXY_E2E_REMOTE_TARGET`、`UNIPROXY_E2E_REMOTE_NODES`、`UNIPROXY_E2E_REMOTE_NAMES`，覆盖真实 HTTP 订阅导入、EngineXray 节点和 sidecar 状态、mixed listener、远端目标读取、强制刷新及 app 重启后复验。
 - kr-vps 真实远端验收（2026-11-04 16:40–16:41）：Alpine Linux 3.24.2 容器 210.109.205.7:21443，Xray 26.10.31 linux/amd64；VLESS Encryption PASS 10.23s、VMess XHTTP PASS 6.12s、Reality PASS 5.66s，每协议首次导入/强制刷新/应用重启三次均返回 `remote-e2e-ok`。远端只映射 21443，三协议为顺序切换；VLESS Encryption ticket 约 600 秒过期，需重新生成；当前保留 Reality fixture。
 - 真实 GitHub 资产下载验证（2026-11-04）：官方 `Xray-windows-64.zip` 16,623,726 bytes，SHA256 `2e04a9995a6f2ad1b28c0bb25c708ecb2695e43a1c9c7889c4b6ac2b48cf7a6a` 与内置 windows-amd64 pin 一致；`gh release download` 内容与 `xray.exe version` 26.10.31 a4a3dff 均核对。临时 `TestLiveGitHubInstall` 以 `gh api` 真实 metadata 仅注入 `api.github.com` 响应，资产字节从真实 GitHub CDN 下载，生产 `install(...)` 路径 PASS 4.60s（下载 16,623,726 bytes、3.784s）；未认证 GitHub API 在本机返回 403（Remaining=0，Reset 17:57:56），安装器仍保持 API digest 校验。临时测试已删除。

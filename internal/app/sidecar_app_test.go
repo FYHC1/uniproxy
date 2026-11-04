@@ -192,6 +192,81 @@ func TestStartAssignsSidecarEndpointsBeforeCoreApply(t *testing.T) {
 	}
 }
 
+func TestApplyFailureRollsBackSidecarToLastAppliedNodes(t *testing.T) {
+	a, core, sidecar := newSidecarFixture(t)
+	addXrayNode(t, a, "xray-node")
+
+	core.mu.Lock()
+	core.applyError = errors.New("reload failed")
+	core.mu.Unlock()
+	if _, err := a.mutate(context.Background(), "重命名 Xray 节点", func(s *model.State) (any, error) {
+		s.Nodes[0].Name = "renamed-node"
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(a.applyError, "已回滚 sidecar") {
+		t.Fatalf("apply error does not record rollback: %q", a.applyError)
+	}
+	sidecar.mu.Lock()
+	applied := append([]model.Node(nil), sidecar.applied...)
+	applyCalls := sidecar.applyCalls
+	sidecar.mu.Unlock()
+	if applyCalls != 3 {
+		t.Fatalf("sidecar apply calls = %d, want initial + failed + rollback", applyCalls)
+	}
+	if len(applied) != 1 || applied[0].Name != "xray-node" {
+		t.Fatalf("sidecar was not rolled back to last applied nodes: %#v", applied)
+	}
+}
+
+func TestApplyFailureAfterManualStopDoesNotRestartSidecar(t *testing.T) {
+	a, core, sidecar := newSidecarFixture(t)
+	addXrayNode(t, a, "xray-node")
+
+	if code, out := request(t, a, "POST", "/api/runtime/stop", nil); code != 200 {
+		t.Fatalf("runtime stop = %d %#v", code, out)
+	}
+	if core.isRunning() {
+		t.Fatal("core is still running after manual stop")
+	}
+	sidecar.mu.Lock()
+	applyCallsBefore := sidecar.applyCalls
+	stopCallsBefore := sidecar.stopCalls
+	sidecar.mu.Unlock()
+	if applyCallsBefore != 1 || stopCallsBefore != 1 {
+		t.Fatalf("sidecar before apply = apply %d stop %d, want 1/1", applyCallsBefore, stopCallsBefore)
+	}
+	if _, err := a.mutate(context.Background(), "重命名 Xray 节点", func(s *model.State) (any, error) {
+		s.Nodes[0].Name = "renamed-node"
+		return nil, nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	core.mu.Lock()
+	core.applyError = errors.New("reload failed")
+	core.mu.Unlock()
+	if code, out := request(t, a, "POST", "/api/runtime/apply", nil); code != 200 {
+		t.Fatalf("runtime apply = %d %#v", code, out)
+	}
+	if !strings.Contains(a.applyError, "已回滚 sidecar") {
+		t.Fatalf("apply error does not record rollback: %q", a.applyError)
+	}
+
+	sidecar.mu.Lock()
+	defer sidecar.mu.Unlock()
+	if sidecar.applyCalls != applyCallsBefore+1 {
+		t.Fatalf("sidecar apply calls = %d, want %d (failed apply only, no restart of old config)", sidecar.applyCalls, applyCallsBefore+1)
+	}
+	if sidecar.stopCalls != stopCallsBefore+1 {
+		t.Fatalf("sidecar stop calls = %d, want %d (manual stop + rollback stop)", sidecar.stopCalls, stopCallsBefore+1)
+	}
+	if len(sidecar.applied) != 1 || sidecar.applied[0].Name != "renamed-node" {
+		t.Fatalf("sidecar reapplied an old configuration: %#v", sidecar.applied)
+	}
+}
+
 func TestSidecarLifecycleStatusAndBootstrapRedaction(t *testing.T) {
 	a, core, sidecar := newSidecarFixture(t)
 	addXrayNode(t, a, "xray-node")
@@ -239,6 +314,65 @@ func TestSidecarLifecycleStatusAndBootstrapRedaction(t *testing.T) {
 	}
 	if boot.Nodes[0].SidecarStatus == nil || !boot.Nodes[0].SidecarStatus.Running {
 		t.Fatalf("bootstrap missing sidecar status: %#v", boot.Nodes[0].SidecarStatus)
+	}
+
+	// PATCH returns the mutated node too; it must use the same public projection
+	// as bootstrap instead of leaking the loopback SOCKS credentials.
+	code, patched := request(t, a, "PATCH", "/api/nodes/"+saved.ID, map[string]any{"enabled": true})
+	if code != 200 {
+		t.Fatalf("patch node = %d %#v", code, patched)
+	}
+	raw, err = json.Marshal(patched)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(raw, []byte("pass-xray-node")) || bytes.Contains(raw, []byte("user-xray-node")) {
+		t.Fatalf("node patch leaked sidecar credentials: %s", raw)
+	}
+	data, ok := patched["data"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing patched node: %#v", patched)
+	}
+	endpoint, ok := data["sidecarEndpoint"].(map[string]any)
+	if !ok || endpoint["port"].(float64) != 30100 {
+		t.Fatalf("patched node lost endpoint address: %#v", data)
+	}
+	if endpoint["username"] != nil || endpoint["password"] != nil {
+		t.Fatalf("patched node retained sidecar credentials: %#v", endpoint)
+	}
+}
+
+func TestRuntimeMarksDirtyWhenSidecarReportsCrash(t *testing.T) {
+	a, _, sidecar := newSidecarFixture(t)
+	addXrayNode(t, a, "crash-node")
+	sidecar.mu.Lock()
+	sidecar.status.Running = false
+	sidecar.status.Error = "xray sidecar exited unexpectedly"
+	sidecar.mu.Unlock()
+
+	runtime := a.Runtime()
+	if !runtime.Dirty {
+		t.Fatal("runtime should be dirty after a sidecar crash")
+	}
+	if !strings.Contains(runtime.LastError, "exited unexpectedly") {
+		t.Fatalf("runtime last error = %q", runtime.LastError)
+	}
+
+	raw, err := json.Marshal(a.bootstrap())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var boot struct {
+		Nodes []model.Node `json:"nodes"`
+	}
+	if err := json.Unmarshal(raw, &boot); err != nil {
+		t.Fatal(err)
+	}
+	if len(boot.Nodes) != 1 {
+		t.Fatalf("bootstrap nodes = %d", len(boot.Nodes))
+	}
+	if boot.Nodes[0].Status != "unhealthy" || !strings.Contains(boot.Nodes[0].LastError, "exited unexpectedly") {
+		t.Fatalf("crashed sidecar node is still usable: %#v", boot.Nodes[0])
 	}
 }
 

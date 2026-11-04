@@ -68,6 +68,7 @@ type App struct {
 	refreshing            map[string]bool
 	lastHealth            time.Time
 	applyError            string
+	appliedNodes          []model.Node
 	manuallyStopped       bool
 	installPending        bool
 	sidecarInstallPending bool
@@ -102,15 +103,23 @@ func (a *App) Start() {
 	a.core.Inspect(a.background)
 	state := a.store.Snapshot()
 	original := state
+	var prepareErr error
 	if e := a.assignSidecarEndpoints(&state); e != nil {
-		a.applyError = "配置已保存但尚未生效：" + e.Error()
+		prepareErr = e
 	} else if sidecarEndpointsChanged(original.Nodes, state.Nodes) {
 		state.Revision++
 		if e := a.store.Save(state); e != nil {
-			a.applyError = "配置已保存但尚未生效：" + e.Error()
+			prepareErr = e
 		}
 	}
-	a.applyLocked(state)
+	if prepareErr != nil {
+		// Do not apply a state that could not be persisted: a successful core
+		// apply would otherwise clear this error and leave runtime and disk out
+		// of sync. Start remains usable for a later explicit apply.
+		a.applyError = "启动配置未就绪，代理未应用：" + prepareErr.Error()
+	} else {
+		a.applyLocked(state)
+	}
 	a.wg.Add(1)
 	a.mu.Unlock()
 	go a.scheduler()
@@ -137,7 +146,16 @@ func (a *App) Close() {
 }
 func (a *App) runtime() model.RuntimeStatus {
 	r := a.core.Status()
-	r.Dirty = r.Dirty || r.AppliedRevision != a.store.Snapshot().Revision || !r.Running || a.applyError != ""
+	snapshot := a.store.Snapshot()
+	r.Dirty = r.Dirty || r.AppliedRevision != snapshot.Revision || !r.Running || a.applyError != ""
+	if a.sidecar != nil && hasEnabledXray(snapshot.Nodes) {
+		if status := a.sidecar.Status(); status.Error != "" {
+			r.Dirty = true
+			if r.LastError == "" {
+				r.LastError = status.Error
+			}
+		}
+	}
 	if r.Listeners == nil {
 		r.Listeners = []model.ListenerRuntime{}
 	}
@@ -164,13 +182,21 @@ func (a *App) applyLocked(s model.State) {
 		a.applyError = "内核已手动停止；更改仅保存，点击重新应用后恢复代理"
 		return
 	}
+	sidecarActive := false
 	fail := func(err error) {
-		a.applyError = "配置已保存但尚未生效：" + err.Error()
-		a.store.Activity("warning", a.applyError)
+		message := "配置已保存但尚未生效：" + err.Error()
+		if sidecarActive {
+			if rollbackErr := a.rollbackSidecar(); rollbackErr != nil {
+				message += "；sidecar 回滚失败：" + rollbackErr.Error()
+			} else {
+				message += "；已回滚 sidecar 到上一配置"
+			}
+		}
+		a.applyError = message
+		a.store.Activity("warning", message)
 	}
 	ctx, cancel := context.WithTimeout(a.background, 45*time.Second)
 	defer cancel()
-	sidecarActive := false
 	if hasEnabledXray(s.Nodes) {
 		if !s.Settings.EnableSidecar {
 			fail(errors.New("Xray sidecar 功能未启用"))
@@ -189,6 +215,7 @@ func (a *App) applyLocked(s model.State) {
 			fail(errors.New("Xray sidecar 启动失败：" + err.Error()))
 			return
 		}
+		sidecarActive = true
 		for i := range s.Nodes {
 			node := &s.Nodes[i]
 			if !node.Enabled || node.EngineName() != model.EngineXray {
@@ -202,12 +229,12 @@ func (a *App) applyLocked(s model.State) {
 			copy := endpoint
 			node.SidecarEndpoint = &copy
 		}
-		sidecarActive = true
 	}
 	if e := a.core.Apply(ctx, s); e != nil {
 		fail(e)
 		return
 	}
+	a.appliedNodes = copyAppliedNodes(s.Nodes)
 	if a.sidecar != nil && !sidecarActive {
 		if e := a.sidecar.Stop(ctx); e != nil {
 			a.applyError = "代理内核已应用，但 sidecar 停止失败：" + e.Error()
@@ -216,6 +243,32 @@ func (a *App) applyLocked(s model.State) {
 		}
 	}
 	a.applyError = ""
+}
+func copyAppliedNodes(nodes []model.Node) []model.Node {
+	out := append([]model.Node(nil), nodes...)
+	for i := range out {
+		if out[i].SidecarEndpoint != nil {
+			endpoint := *out[i].SidecarEndpoint
+			out[i].SidecarEndpoint = &endpoint
+		}
+		if out[i].SidecarStatus != nil {
+			status := *out[i].SidecarStatus
+			out[i].SidecarStatus = &status
+		}
+	}
+	return out
+}
+func (a *App) rollbackSidecar() error {
+	if a.sidecar == nil {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(a.background, 45*time.Second)
+	defer cancel()
+	if !a.core.Status().Running || !hasEnabledXray(a.appliedNodes) {
+		return a.sidecar.Stop(ctx)
+	}
+	_, err := a.sidecar.Apply(ctx, copyAppliedNodes(a.appliedNodes))
+	return err
 }
 func (a *App) mutate(ctx context.Context, label string, fn func(*model.State) (any, error)) (any, error) {
 	a.mu.Lock()
@@ -277,6 +330,12 @@ func (a *App) bootstrap() any {
 		if s.Nodes[i].EngineName() == model.EngineXray {
 			nodeStatus := status
 			s.Nodes[i].SidecarStatus = &nodeStatus
+			if s.Nodes[i].Enabled && status.Error != "" {
+				// A crashed/stopped sidecar makes all of its nodes unusable. Keep
+				// the failure visible instead of showing a stale healthy status.
+				s.Nodes[i].Status = "unhealthy"
+				s.Nodes[i].LastError = status.Error
+			}
 		}
 	}
 	for i := range s.Listeners {

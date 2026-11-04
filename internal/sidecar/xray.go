@@ -113,13 +113,16 @@ func BuildXrayConfigWithOptions(nodes []model.Node, opts XrayConfigOptions) ([]b
 	for _, node := range prepared {
 		inboundTag := "in-" + node.ID
 		outboundTag := "out-" + node.ID
+		// HTTP outbounds cannot carry UDP. Do not advertise a SOCKS UDP
+		// association that the selected outbound would silently drop.
+		udp := node.UDP && node.Protocol != "http"
 		inbounds = append(inbounds, map[string]any{
 			"tag": inboundTag, "listen": "127.0.0.1", "port": node.SidecarEndpoint.Port,
 			"protocol": "socks",
 			"settings": map[string]any{
 				"auth":     "password",
 				"accounts": []map[string]string{{"user": node.SidecarEndpoint.Username, "pass": node.SidecarEndpoint.Password}},
-				"udp":      node.UDP,
+				"udp":      udp,
 			},
 		})
 		outbound, err := xrayOutbound(node)
@@ -189,6 +192,13 @@ func xrayOutbound(node model.Node) (map[string]any, error) {
 	case "trojan", "shadowsocks", "socks", "http":
 		if err := setServerEntry(settings, "servers", node); err != nil {
 			return nil, err
+		}
+	}
+	if protocol == "trojan" {
+		entries := settings["servers"].([]any)
+		entry := entries[0].(map[string]any)
+		if flow, _ := entry["flow"].(string); flow != "" {
+			return nil, errors.New("Xray 26.10.31 does not support Flow for Trojan outbounds")
 		}
 	}
 	if stream, ok := outbound["streamSettings"]; ok {

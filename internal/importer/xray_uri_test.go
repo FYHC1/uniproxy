@@ -156,6 +156,46 @@ func TestXrayVMessXHTTPNoneCipherWithTLS(t *testing.T) {
 	}
 }
 
+func TestXrayTrojanFlowRejected(t *testing.T) {
+	for _, security := range []string{"tls", "none"} {
+		q := url.Values{}
+		q.Set("security", security)
+		q.Set("flow", "xtls-rprx-vision")
+		content := "trojan://password@example.com:443?" + q.Encode()
+		if result := Parse(content); result.TotalErrors == 0 {
+			t.Fatalf("strict parse accepted Trojan flow with security=%q", security)
+		}
+	}
+}
+
+func TestXrayTrojanDefaultsToTLS(t *testing.T) {
+	q := url.Values{}
+	q.Set("fm", `{"tcp":[{"type":"fragment","settings":{"packets":"tlshello"}}]}`)
+	n := parseOne(t, "trojan://password@example.com:443?"+q.Encode())
+	if n.Engine != model.EngineXray {
+		t.Fatalf("engine = %q, want xray", n.Engine)
+	}
+	stream := xrayStream(t, n)
+	if stream["security"] != "tls" {
+		t.Fatalf("security = %#v, want tls", stream["security"])
+	}
+	if _, ok := stream["tlsSettings"].(map[string]any); !ok {
+		t.Fatalf("tlsSettings missing: %#v", stream)
+	}
+}
+
+func TestXrayTrojanRejectsExplicitPlaintext(t *testing.T) {
+	for _, security := range []string{"none", "false", ""} {
+		q := url.Values{}
+		q.Set("cs", "TLS_AES_128_GCM_SHA256")
+		q.Set("security", security)
+		content := "trojan://password@example.com:443?" + q.Encode()
+		if result := Parse(content); result.TotalErrors == 0 {
+			t.Fatalf("strict parse accepted Trojan plaintext with security=%q", security)
+		}
+	}
+}
+
 func TestXrayBadFinalMaskFallsBackToPreview(t *testing.T) {
 	q := url.Values{}
 	q.Set("security", "tls")

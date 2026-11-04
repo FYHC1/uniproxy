@@ -176,6 +176,10 @@ func (a *App) Handler() http.Handler {
 		if e := a.core.Stop(r.Context()); e != nil {
 			return nil, bad(e.Error())
 		}
+		// No configuration is active after a manual stop. Clearing this
+		// prevents a later failed apply from resurrecting the previous
+		// sidecar while the core remains stopped.
+		a.appliedNodes = nil
 		a.manuallyStopped = true
 		a.applyError = "代理内核已手动停止"
 		a.store.Activity("warning", "手动停止代理内核")
@@ -227,6 +231,13 @@ func (a *App) Handler() http.Handler {
 			out.DialerIdentity = ""
 			out.SourceGroups = nil
 			out.ManualGroupIDs = nil
+			out.SidecarStatus = nil
+			if n.SidecarEndpoint != nil {
+				endpoint := *n.SidecarEndpoint
+				endpoint.Username = ""
+				endpoint.Password = ""
+				out.SidecarEndpoint = &endpoint
+			}
 			return out, nil
 		})
 	})

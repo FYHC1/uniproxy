@@ -78,6 +78,10 @@ func (a *App) runSidecarInstall(installer installableSidecar) {
 	defer a.mu.Unlock()
 	a.sidecarInstallPending = false
 	if err != nil {
+		// The install never produced a usable binary, so it must not leave the
+		// "needs explicit apply" latch behind. Otherwise every later saved config
+		// is silently blocked until a manual runtime apply.
+		a.awaitingCoreApply = false
 		message := err.Error()
 		if errors.Is(err, context.Canceled) || a.background.Err() != nil {
 			message = "管理服务关闭，安装已取消；下次启动可重新尝试"

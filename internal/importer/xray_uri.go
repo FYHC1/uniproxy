@@ -37,6 +37,12 @@ func xrayOnlyURI(protocol string, q *query) bool {
 			return true
 		}
 	}
+	if protocol == "trojan" && nonEmpty("flow") {
+		// Trojan flow is not representable by the pinned Mihomo adapter; the
+		// Xray parser consumes and validates it instead of rejecting the URI as
+		// an unknown native query option.
+		return true
+	}
 	if protocol == "vless" {
 		if nonEmpty("encryption") {
 			values := q.values["encryption"]
@@ -164,10 +170,10 @@ func parseXrayURI(u *url.URL, protocol string, q *query) (model.ParsedNode, erro
 		}
 		entry := map[string]any{"address": server, "port": port, "password": password}
 		if value, ok := q.take("flow"); ok && value != "" {
-			if !oneOf(value, "xtls-rprx-vision", "xtls-rprx-vision-udp443") {
-				q.fail("unsupported Trojan flow")
-			}
-			entry["flow"] = value
+			// The pinned Xray 26.10.31 rejects Flow on Trojan outbounds;
+			// accepting it here would produce a node that always fails
+			// xray -test at apply time.
+			q.fail("Trojan flow is not supported")
 		}
 		settings["servers"] = []any{entry}
 	}
@@ -176,11 +182,20 @@ func parseXrayURI(u *url.URL, protocol string, q *query) (model.ParsedNode, erro
 	if err != nil {
 		return model.ParsedNode{}, err
 	}
-	if err := xrayTLS(q, stream); err != nil {
+	if err := xrayTLS(q, stream, protocol == "trojan"); err != nil {
 		return model.ParsedNode{}, err
 	}
 	if protocol == "vless" && stream["security"] == "none" && (vlessEncryption == "" || vlessEncryption == "none") && publicIPAddress(server) {
 		return model.ParsedNode{}, errors.New("VLESS without TLS or encryption is not permitted for a public IP address")
+	}
+	if protocol == "trojan" {
+		if servers, ok := settings["servers"].([]any); ok && len(servers) == 1 {
+			if entry, ok := servers[0].(map[string]any); ok {
+				if flow, _ := entry["flow"].(string); flow != "" && stream["security"] != "tls" && stream["security"] != "reality" {
+					return model.ParsedNode{}, errors.New("Trojan flow requires TLS or Reality")
+				}
+			}
+		}
 	}
 	if value, ok := q.take("fm"); ok && value != "" {
 		mask, err := parseFinalMask(value)
@@ -238,10 +253,10 @@ func parseXrayURI(u *url.URL, protocol string, q *query) (model.ParsedNode, erro
 	}, nil
 }
 
-func xrayTLS(q *query, stream map[string]any) error {
+func xrayTLS(q *query, stream map[string]any, defaultTLS bool) error {
 	security, hasSecurity := q.take("security")
 	tlsOption, hasTLS := q.take("tls")
-	enabled, reality := false, false
+	enabled, reality := defaultTLS, false
 	if hasSecurity {
 		switch strings.ToLower(strings.TrimSpace(security)) {
 		case "tls":
@@ -249,6 +264,7 @@ func xrayTLS(q *query, stream map[string]any) error {
 		case "reality":
 			enabled, reality = true, true
 		case "false", "none", "":
+			enabled = false
 		default:
 			q.fail("unsupported TLS security variant")
 		}
@@ -262,6 +278,9 @@ func xrayTLS(q *query, stream map[string]any) error {
 			q.fail("conflicting TLS options")
 		}
 		enabled = b
+	}
+	if defaultTLS && !enabled {
+		q.fail("TLS cannot be disabled for this URI scheme")
 	}
 
 	serverName := ""

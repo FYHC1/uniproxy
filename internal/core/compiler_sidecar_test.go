@@ -44,6 +44,19 @@ func TestBuildSidecarUsesOnlyLoopbackSocksOutbound(t *testing.T) {
 	}
 }
 
+func TestBuildSidecarHTTPOutboundDisablesUDP(t *testing.T) {
+	s := testState()
+	node := sidecarTestNode("http", 39014)
+	node.Protocol = "http"
+	node.UDP = true
+	s.Nodes = append(s.Nodes, node)
+	doc := decodedBuild(t, s)
+	proxy := proxyByName(t, doc, "x-http")
+	if proxy["udp"] != false {
+		t.Fatalf("HTTP sidecar outbound advertises UDP: %#v", proxy)
+	}
+}
+
 func TestBuildSidecarAllowedAtChainHead(t *testing.T) {
 	s := testState()
 	s.Nodes = []model.Node{sidecarTestNode("s", 39011), testNode("a", false)}
@@ -58,6 +71,27 @@ func TestBuildSidecarAllowedAtChainHead(t *testing.T) {
 	}
 	if second["dialer-proxy"] != "c-route-1" {
 		t.Fatalf("chain did not relay through the sidecar head: %#v", second)
+	}
+}
+
+func TestBuildNativeRelayThroughSidecarUsesSidecarTag(t *testing.T) {
+	s := testState()
+	sidecar := sidecarTestNode("s", 39013)
+	leaf := testNode("leaf", true)
+	leaf.DialerID = "s"
+	// Put the referenced sidecar after the dependent node: compilation must
+	// resolve the whole graph rather than rely on slice order.
+	s.Nodes = []model.Node{leaf, sidecar}
+	s.Pools = nil
+	s.Listeners = []model.Listener{{ID: "relay-in", Kind: "node", TargetID: "leaf", Protocol: "mixed", Host: "127.0.0.1", Port: 20201, Enabled: true}}
+	doc := decodedBuild(t, s)
+	proxy := proxyByName(t, doc, "n-leaf")
+	if proxy["dialer-proxy"] != "x-s" {
+		t.Fatalf("native relay did not target the sidecar outbound tag: %#v", proxy)
+	}
+	sideProxy := proxyByName(t, doc, "x-s")
+	if sideProxy["type"] != "socks5" || sideProxy["server"] != "127.0.0.1" {
+		t.Fatalf("sidecar outbound missing or invalid: %#v", sideProxy)
 	}
 }
 

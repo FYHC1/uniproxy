@@ -47,21 +47,29 @@ func DefaultXrayOptions() XrayOptions {
 // XrayManager owns exactly one Xray process. Start is transactional: the
 // generated document must pass xray -test and every local SOCKS inbound must
 // answer an authenticated handshake before the manager reports success.
+const (
+	maxXrayRestarts = 3
+	xrayRestartBase = 500 * time.Millisecond
+)
+
 type XrayManager struct {
-	mu        sync.Mutex
-	opMu      sync.Mutex
-	opts      XrayOptions
-	alloc     *PortAllocator
-	cmd       *exec.Cmd
-	done      chan struct{}
-	stopping  bool
-	status    model.SidecarStatus
-	endpoints map[string]model.SidecarEndpoint
-	active    []model.Node
-	hash      [32]byte
-	dir       string
-	config    string
-	logs      *tailBuffer
+	mu                sync.Mutex
+	opMu              sync.Mutex
+	opts              XrayOptions
+	alloc             *PortAllocator
+	cmd               *exec.Cmd
+	done              chan struct{}
+	stopping          bool
+	ready             bool
+	restartAttempt    int
+	restartGeneration uint64
+	status            model.SidecarStatus
+	endpoints         map[string]model.SidecarEndpoint
+	active            []model.Node
+	hash              [32]byte
+	dir               string
+	config            string
+	logs              *tailBuffer
 
 	installation  model.CoreInstallation
 	installWorker bool
@@ -204,8 +212,22 @@ func (m *XrayManager) Endpoints() map[string]model.SidecarEndpoint {
 // Start launches one Xray process for all enabled Xray nodes. It returns the
 // endpoint assignment so the caller can persist it in the encrypted state.
 func (m *XrayManager) Start(ctx context.Context, nodes []model.Node) (map[string]model.SidecarEndpoint, error) {
+	return m.start(ctx, nodes, true, 0)
+}
+
+// start is the shared implementation for explicit applies and crash recovery.
+// resetAttempt starts a new crash-recovery budget; expectedGeneration prevents
+// a delayed recovery from resurrecting a process after Stop or a newer apply.
+func (m *XrayManager) start(ctx context.Context, nodes []model.Node, resetAttempt bool, expectedGeneration uint64) (map[string]model.SidecarEndpoint, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if expectedGeneration != 0 && m.restartGeneration != expectedGeneration {
+		return nil, errors.New("xray sidecar restart was cancelled")
+	}
+	if resetAttempt {
+		m.restartAttempt = 0
+		m.restartGeneration++
+	}
 	if m.cmd != nil {
 		return nil, errors.New("xray sidecar is already running")
 	}
@@ -213,6 +235,7 @@ func (m *XrayManager) Start(ctx context.Context, nodes []model.Node) (map[string
 		return nil, ErrSidecarInstalling
 	}
 	m.stopping = false
+	m.ready = false
 	active := make([]model.Node, 0, len(nodes))
 	for _, node := range nodes {
 		if !node.Enabled {
@@ -237,6 +260,20 @@ func (m *XrayManager) Start(ctx context.Context, nodes []model.Node) (map[string
 	if err != nil {
 		return nil, err
 	}
+	probe := m.probeVersion
+	if probe == nil {
+		probe = probeXrayVersion
+	}
+	probeCtx, cancelProbe := context.WithTimeout(ctx, m.opts.TestTimeout)
+	version, probeErr := probe(probeCtx, binary)
+	cancelProbe()
+	if probeErr != nil {
+		return nil, fmt.Errorf("Xray 版本检测失败：%w", probeErr)
+	}
+	if version != XrayVersion {
+		return nil, fmt.Errorf("Xray 版本不匹配：需要 %s，实际 %s", XrayVersion, version)
+	}
+	m.status.Version = version
 	m.alloc.Reset()
 	prepared := make([]model.Node, 0, len(active))
 	endpoints := make(map[string]model.SidecarEndpoint, len(active))
@@ -335,6 +372,7 @@ func (m *XrayManager) Start(ctx context.Context, nodes []model.Node) (map[string
 	m.config = ""
 	m.active = append([]model.Node(nil), prepared...)
 	m.hash = sha256.Sum256(config)
+	m.ready = true
 	return endpoints, nil
 }
 
@@ -342,14 +380,79 @@ func (m *XrayManager) waitForExit(cmd *exec.Cmd, done chan struct{}, logs *tailB
 	_ = cmd.Wait()
 	close(done)
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	dir := ""
 	if m.cmd == cmd {
+		wasReady := m.ready
 		m.cmd = nil
+		m.ready = false
 		m.status.Running = false
 		if !m.stopping {
-			m.status.Error = "xray sidecar exited unexpectedly"
+			if wasReady {
+				m.scheduleRestartLocked()
+			} else {
+				m.status.Error = "xray sidecar exited before it became ready"
+			}
 		}
+		// The process no longer needs its transient configuration. Clean it up
+		// here as well so a crash followed by a new Start cannot orphan a temp
+		// directory containing upstream credentials.
+		dir = m.dir
+		m.dir = ""
+		m.config = ""
 	}
+	m.mu.Unlock()
+	if dir != "" {
+		_ = os.RemoveAll(dir)
+	}
+}
+
+// scheduleRestartLocked records a bounded backoff restart. The caller must hold
+// m.mu. Attempts are counted per explicit Start/Apply cycle, so one permanently
+// broken configuration cannot restart forever.
+func (m *XrayManager) scheduleRestartLocked() {
+	if m.stopping || len(m.active) == 0 {
+		return
+	}
+	if m.restartAttempt >= maxXrayRestarts {
+		m.status.Error = "xray sidecar 异常退出；自动重启次数已达上限，相关节点不可用"
+		return
+	}
+	m.restartAttempt++
+	attempt := m.restartAttempt
+	delay := xrayRestartBase * time.Duration(1<<(attempt-1))
+	m.status.Error = fmt.Sprintf("xray sidecar 异常退出；正在自动重启（%d/%d）", attempt, maxXrayRestarts)
+	generation := m.restartGeneration
+	go m.restartAfterCrash(generation, delay)
+}
+
+func (m *XrayManager) restartAfterCrash(generation uint64, delay time.Duration) {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+	<-timer.C
+
+	m.mu.Lock()
+	if generation != m.restartGeneration || m.stopping || m.cmd != nil || len(m.active) == 0 {
+		m.mu.Unlock()
+		return
+	}
+	nodes := append([]model.Node(nil), m.active...)
+	m.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), m.opts.TestTimeout+m.opts.StartupTimeout+30*time.Second)
+	_, err := m.start(ctx, nodes, false, generation)
+	cancel()
+	if err == nil {
+		return
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if generation != m.restartGeneration || m.stopping || m.cmd != nil {
+		return
+	}
+	m.status.Running = false
+	m.status.Error = "xray sidecar 自动重启失败：" + err.Error()
+	m.scheduleRestartLocked()
 }
 
 // Apply reconciles the single Xray process with the enabled Xray nodes. A
@@ -420,7 +523,14 @@ func (m *XrayManager) Apply(ctx context.Context, nodes []model.Node) (map[string
 		return endpoints, nil
 	}
 	if len(previous) > 0 {
-		if _, rollbackErr := m.Start(ctx, previous); rollbackErr != nil {
+		// The failed attempt may have consumed most of the caller's timeout
+		// (xray -test + startup). The rollback is cleanup, not part of the user's
+		// original apply deadline, so give it a fresh bounded context instead of
+		// inheriting an almost-certainly-cancelled one.
+		rollbackCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 45*time.Second)
+		_, rollbackErr := m.Start(rollbackCtx, previous)
+		cancel()
+		if rollbackErr != nil {
 			m.mu.Lock()
 			m.status.Error = "xray sidecar apply failed; previous configuration rollback also failed"
 			m.mu.Unlock()
@@ -434,6 +544,11 @@ func (m *XrayManager) Apply(ctx context.Context, nodes []model.Node) (map[string
 // stop dependent Mihomo outbounds first; this package does not own that order.
 func (m *XrayManager) Stop(ctx context.Context) error {
 	m.mu.Lock()
+	// Invalidate any pending crash recovery before observing the process. A
+	// delayed goroutine must never restart Xray after an explicit Stop.
+	m.restartGeneration++
+	m.restartAttempt = 0
+	m.ready = false
 	cmd := m.cmd
 	done := m.done
 	dir := m.dir
@@ -505,6 +620,7 @@ func (m *XrayManager) Health(ctx context.Context) error {
 
 func runXrayTest(ctx context.Context, binary, configPath string, nodes []model.Node) error {
 	cmd := exec.CommandContext(ctx, binary, "run", "-test", "-c", configPath)
+	processguard.PrepareCommand(cmd)
 	logs := &tailBuffer{max: 8 << 10}
 	cmd.Stdout = logs
 	cmd.Stderr = logs

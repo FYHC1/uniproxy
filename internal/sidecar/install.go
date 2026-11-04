@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/uniproxy/uniproxy/internal/model"
+	"github.com/uniproxy/uniproxy/internal/processguard"
 	"github.com/uniproxy/uniproxy/internal/sidecarinstall"
 )
 
@@ -122,6 +123,13 @@ func (m *XrayManager) InstallationStatus() model.CoreInstallation {
 		s.Path = path
 	}
 	s.Installed = exists
+	managedBinary := exists && destinationBinary != "" && sameBinaryPath(path, destinationBinary)
+	externalBinary := exists && !managedBinary
+	if externalBinary {
+		// A PATH or -xray binary is not one of our pinned releases. Never claim
+		// that it is the pinned version before the runtime version probe runs.
+		s.Version = "未知（外部路径）"
+	}
 	destinationPresent := false
 	if destination != "" {
 		if _, err := os.Lstat(destination); err == nil {
@@ -130,14 +138,19 @@ func (m *XrayManager) InstallationStatus() model.CoreInstallation {
 			discoveryErr = errors.New("无法检查 Xray 安装目录，请确认目录访问权限")
 		}
 	}
+	overrideConfigured := strings.TrimSpace(m.opts.BinaryPath) != ""
 	s.CanInstall, s.Reason = false, ""
 	switch {
 	case s.State == "installing":
 		s.Reason = "Xray 正在后台安装，关闭窗口不会中断安装"
 	case running:
 		s.Reason = "Xray 正在运行，不能在线安装或替换"
-	case exists:
-		s.Reason = "已检测到 Xray 可执行文件，无需重复安装"
+	case exists && (!externalBinary || overrideConfigured):
+		if overrideConfigured && externalBinary {
+			s.Reason = "已配置自定义 Xray 路径；请清除 -xray 后再在线安装固定版本"
+		} else {
+			s.Reason = "已检测到固定版本 Xray，无需重复安装"
+		}
 	case discoveryErr != nil:
 		s.Reason = discoveryErr.Error()
 	case !s.Supported:
@@ -147,9 +160,22 @@ func (m *XrayManager) InstallationStatus() model.CoreInstallation {
 	case destinationPresent:
 		s.Reason = "Xray 安装目录已存在，不会覆盖；请检查文件完整性或手动处理"
 	default:
+		// An external PATH binary does not block installing our managed pinned
+		// build; after installation discoverBinary prefers the managed copy.
 		s.CanInstall = true
 	}
 	return s
+}
+
+func sameBinaryPath(a, b string) bool {
+	if strings.TrimSpace(a) == "" || strings.TrimSpace(b) == "" {
+		return false
+	}
+	cleanA, cleanB := filepath.Clean(a), filepath.Clean(b)
+	if runtime.GOOS == "windows" {
+		return strings.EqualFold(cleanA, cleanB)
+	}
+	return cleanA == cleanB
 }
 
 // PrepareInstall reserves the missing versioned destination before a background
@@ -266,6 +292,7 @@ func (m *XrayManager) RunInstall(ctx context.Context) error {
 
 func probeXrayVersion(ctx context.Context, binary string) (string, error) {
 	cmd := exec.CommandContext(ctx, binary, "version")
+	processguard.PrepareCommand(cmd)
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() != nil {
 		return "", errors.New("Xray 版本检测超时")

@@ -100,6 +100,10 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 	probeUsers := []map[string]string{}
 	probeRules := []string{}
 
+	// Resolve every node before compiling so a relay may refer to a node that
+	// appears later in the persisted slice. The compiled tag must use the same
+	// proxyTag mapping as the referenced outbound (sidecar nodes expose x-<ID>,
+	// native nodes expose n-<ID>); otherwise Mihomo refers to a missing outbound.
 	for _, node := range nodes {
 		if !safeID.MatchString(node.ID) {
 			return nil, errors.New("node has an invalid stable ID")
@@ -108,6 +112,8 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 			return nil, errors.New("duplicate node ID")
 		}
 		nodeByID[node.ID] = node
+	}
+	for _, node := range nodes {
 		if !node.Enabled || blocked[node.ID] != "" {
 			continue
 		}
@@ -122,7 +128,11 @@ func compile(state model.State, opts BuildOptions) (*compiledConfig, error) {
 			if !safeID.MatchString(node.DialerID) {
 				return nil, errors.New("invalid stable relay ID")
 			}
-			proxy["dialer-proxy"] = nodeTag(node.DialerID)
+			dialer, ok := nodeByID[node.DialerID]
+			if !ok {
+				return nil, errors.New("中转节点已删除或缺失，禁止直连回退")
+			}
+			proxy["dialer-proxy"] = proxyTag(dialer)
 		}
 		proxies = append(proxies, proxy)
 		cfg.nodes[node.ID] = struct{}{}
@@ -481,7 +491,7 @@ func sidecarProxy(node model.Node) (map[string]any, error) {
 	}
 	proxy := map[string]any{
 		"name": sidecarTag(node.ID), "type": "socks5", "server": "127.0.0.1", "port": float64(endpoint.Port),
-		"username": endpoint.Username, "password": endpoint.Password, "udp": node.UDP,
+		"username": endpoint.Username, "password": endpoint.Password, "udp": node.UDP && node.Protocol != "http",
 	}
 	return proxy, nil
 }

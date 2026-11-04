@@ -83,6 +83,66 @@ func TestAssignEndpointsPreservesExistingAndAllocatesMissing(t *testing.T) {
 	}
 }
 
+func TestAssignEndpointsReservesDisabledNodePorts(t *testing.T) {
+	manager := endpointTestManager(t)
+	disabledEndpoint := &model.SidecarEndpoint{Host: "127.0.0.1", Port: 32100, Username: "old-user", Password: "old-pass"}
+	assigned, err := manager.AssignEndpoints([]model.Node{
+		endpointTestNode("disabled", false, model.EngineXray, disabledEndpoint),
+		endpointTestNode("new", true, model.EngineXray, nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := assigned[1].SidecarEndpoint.Port; got == 32100 {
+		t.Fatal("new node reused the disabled node's reserved port")
+	}
+	// Re-enabling the disabled node must not collide with the new allocation.
+	assigned[0].Enabled = true
+	if _, err := manager.AssignEndpoints(assigned); err != nil {
+		t.Fatalf("re-enabled node collided with allocated port: %v", err)
+	}
+	if assigned[0].SidecarEndpoint.Username != "old-user" || assigned[0].SidecarEndpoint.Password != "old-pass" {
+		t.Fatal("disabled node credentials were not preserved")
+	}
+}
+
+func TestAssignEndpointsRepairsHistoricalDisabledDuplicate(t *testing.T) {
+	manager := endpointTestManager(t)
+	assigned, err := manager.AssignEndpoints([]model.Node{
+		endpointTestNode("enabled", true, model.EngineXray, &model.SidecarEndpoint{Host: "127.0.0.1", Port: 32102, Username: "enabled-user", Password: "enabled-pass"}),
+		endpointTestNode("disabled", false, model.EngineXray, &model.SidecarEndpoint{Host: "127.0.0.1", Port: 32102, Username: "disabled-user", Password: "disabled-pass"}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if assigned[0].SidecarEndpoint.Port != 32102 {
+		t.Fatalf("enabled endpoint changed: %#v", assigned[0].SidecarEndpoint)
+	}
+	if assigned[1].SidecarEndpoint.Port == 32102 {
+		t.Fatalf("disabled duplicate was not repaired: %#v", assigned[1].SidecarEndpoint)
+	}
+	if assigned[1].SidecarEndpoint.Username != "disabled-user" || assigned[1].SidecarEndpoint.Password != "disabled-pass" {
+		t.Fatalf("disabled credentials changed: %#v", assigned[1].SidecarEndpoint)
+	}
+}
+
+func TestAssignEndpointsOnlyFillsMissingCredentialHalf(t *testing.T) {
+	manager := endpointTestManager(t)
+	assigned, err := manager.AssignEndpoints([]model.Node{
+		endpointTestNode("partial", true, model.EngineXray, &model.SidecarEndpoint{Host: "127.0.0.1", Port: 32103, Username: "custom-user"}),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	endpoint := assigned[0].SidecarEndpoint
+	if endpoint.Username != "custom-user" {
+		t.Fatalf("custom username was overwritten: %#v", endpoint)
+	}
+	if endpoint.Password == "" {
+		t.Fatal("missing password was not generated")
+	}
+}
+
 func TestConfigurePortRangeAppliesToNewAssignments(t *testing.T) {
 	manager := endpointTestManager(t)
 	if err := manager.ConfigurePortRange(32200, 32202); err != nil {

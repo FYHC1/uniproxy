@@ -91,6 +91,41 @@ func TestBuildXrayConfigUsesLocalInboundAndRemoteOutbound(t *testing.T) {
 	}
 }
 
+func TestBuildXrayConfigDisablesUDPForHTTPOutbound(t *testing.T) {
+	node := testXrayNode("http-node")
+	node.Protocol = "http"
+	node.UDP = true
+	node.Config = map[string]any{"xray": map[string]any{
+		"protocol": "http",
+		"settings": map[string]any{"servers": []any{map[string]any{"address": "template.invalid", "port": 1}}},
+	}}
+	data, err := BuildXrayConfig([]model.Node{node})
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := decodeXrayConfig(t, data)
+	inbound := document["inbounds"].([]any)[0].(map[string]any)
+	settings := inbound["settings"].(map[string]any)
+	if settings["udp"] != false {
+		t.Fatalf("HTTP sidecar inbound advertises UDP: %#v", settings)
+	}
+}
+
+func TestBuildXrayConfigRejectsTrojanFlow(t *testing.T) {
+	node := testXrayNode("trojan-flow")
+	node.Protocol = "trojan"
+	node.Config = map[string]any{"xray": map[string]any{
+		"protocol": "trojan",
+		"settings": map[string]any{"servers": []any{map[string]any{
+			"address": "template.invalid", "port": 1, "password": "password", "flow": "xtls-rprx-vision",
+		}}},
+		"streamSettings": map[string]any{"security": "tls", "network": "tcp"},
+	}}
+	if _, err := BuildXrayConfig([]model.Node{node}); err == nil {
+		t.Fatal("accepted Trojan flow rejected by pinned Xray 26.10.31")
+	}
+}
+
 func TestBuildXrayConfigRejectsInvalidInputs(t *testing.T) {
 	node := testXrayNode("a")
 	node.Engine = model.EngineMihomo
