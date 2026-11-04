@@ -1,8 +1,8 @@
 # UniProxy 变更记录
 
-日期按 Asia/Shanghai。v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
+日期按 Asia/Shanghai。v0.3.0 于2026-11-04 19:43:33正式发布并设Latest（不含部署）；v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）；v0.2.7 于2026-11-02正式发布（不含部署）；v0.2.6 于2026-11-02正式发布（不含部署）；v0.2.5 于2026-11-02正式发布（不含部署）；v0.2.4 于2026-11-01正式发布并部署替换本机运行服务；v0.2.0/v0.2.1/v0.2.2/v0.2.3历史标签与资产保持不变。
 
-## 0.3.0 — 2026-11-04 · 多引擎 sidecar（发布准备中）
+## 0.3.0 — 2026-11-04 · 多引擎 sidecar
 
 - 新增 `Node.Engine`、`Node.SidecarEndpoint`、`SidecarStatus`；旧 state 中空 Engine 归一为 mihomo。
 - 新增 `ParsedNode.Engine` 与 `internal/importer/xray_uri.go`、`internal/importer/xray_vmess.go`：识别 VLESS Encryption、VLESS/VMess XHTTP、Reality spiderX/mldsa65Verify、FinalMask、TLS cipher suites、flow=xtls-rprx-vision-udp443，保留真实 Xray 配置；合法字段保留，坏 fm/cs 严格失败或预览降级，VLESS 明文公网 IP 回退 Mihomo 预览。
@@ -33,7 +33,7 @@
 - 验证（2026-11-04 14:51）：`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归，含安装面板断言）、`pnpm build:web`、`pnpm test:e2e` 52/52（1.4m）通过；删除临时安装测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 12.020s、core 6.778s、sidecar 0.861s、sidecarinstall 0.235s）。真实安装级验证用本地官方 `Xray-windows-64.zip`（16623726 bytes，SHA256 与内置 windows-amd64 pin 一致）模拟 GitHub metadata/asset，`TestLiveInstallLocalOfficialArchive` PASS 2.10s；版本输出 `Xray 26.10.31 (Xray, Penetrates Everything.) a4a3dff (go1.27.3 windows/amd64)`。
 - 验证（2026-11-04 11:38）：变更 Go 文件 `gofmt` 检查无输出、`go vet ./...`、`go test ./... -count=1 -p 1` 全通过；`pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52 通过；真实 Xray 26.10.31 的 Phase 0 POC 三样本与 `BuildXrayConfigAcceptedByXray` 沿用 08:45 PASS 记录；真实进程 E2E 在 Windows 11 PASS 2.74s、WSL2 Fedora 44 PASS 2.12s，Phase 0 POC 两平台 PASS，Windows 与 WSL 全量 `go test ./... -count=1 -p 1` 均通过。
 - 验证（2026-11-04 16:43）：删除临时 debug 测试后 `go vet ./...` 无输出、`go test ./... -count=1 -p 1` 全通过（app 11.412s、core 6.753s、sidecar 0.938s、sidecarinstall 0.235s、importer 0.909s、store 0.364s）。前端于 16:49 完整重跑 `pnpm typecheck`、`pnpm test:ui`（44/44 单测 + 全部浏览器回归）、`pnpm build:web`、`pnpm test:e2e` 52/52（1.3m）通过。
-- 仅开发分支本地实现并已提交 `00e3350`，未推送、未发布、未部署；安装器代码与 Windows 本地官方 ZIP 安装级验证完成，真实 GitHub 资产下载与生产安装路径已验证，kr-vps 真实远端订阅三协议已通过；匿名 GitHub API 配额耗尽时仍会 403，Linux 实机安装和非 WSL 裸机仍未验证。
+- 已合并 `main`（`e73644a`）、推送并发布 [v0.3.0](<https://github.com/FYHC1/uniproxy/releases/tag/v0.3.0>)（2026-11-04 19:43:33 +08，只发布、不部署）；四平台资产与 SHA256SUMS 已上线，Windows amd64 正式资产通过 `-version`、`TestBuiltCLIVersionAndPublicBindGuard` 与临时数据目录健康检查。安装器代码与 Windows 本地官方 ZIP 安装级验证完成，真实 GitHub 资产下载与生产安装路径已验证，kr-vps 真实远端订阅三协议已通过；匿名 GitHub API 配额耗尽时仍会 403，Linux 实机安装和非 WSL 裸机仍未验证。
 
 ## 0.2.9 — 2026-11-03 · 协议适配三档
 

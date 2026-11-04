@@ -1,7 +1,7 @@
 # UniProxy v0.3.0 发布验收
 
 更新日期：2026-11-04
-发布阶段状态：**发布准备中（本地验证完成；待提交、合并、标签、CI 与正式资产回填）；只发布，不部署。**
+发布阶段状态：**已发布（2026-11-04 19:43:33 +08；GitHub Release 与四平台资产已上线）；只发布，不部署。**
 
 ## 1. 范围
 
@@ -48,22 +48,32 @@
 
 ### 3.1 源码与 CI
 
-- 源码提交：待发布后回填。
-- main CI：待发布后回填。
-- annotated tag `v0.3.0`：待发布后回填。
-- 标签 CI / Release workflow：待发布后回填。
+- 源码提交：`e73644a5e70738a87145714050734446528f39d7`（`release: prepare v0.3.0 multi-engine sidecar`）。
+- main CI：[run 41822810042](<https://github.com/FYHC1/uniproxy/actions/runs/41822810042>) 成功（Windows、Ubuntu 双平台均通过）。
+- annotated tag `v0.3.0`：tag 对象 `dc64ffb82ef7024ed52008773f5c34812543612d`，指向提交 `e73644a5e70738a87145714050734446528f39d7`。
+- 标签 CI：[run 41823088724](<https://github.com/FYHC1/uniproxy/actions/runs/41823088724>) 成功；Release workflow：[run 41823088760](<https://github.com/FYHC1/uniproxy/actions/runs/41823088760>) 成功。
 
 ### 3.2 正式发布
 
-- 发布时间：待发布后回填。
-- Release：待发布后回填。
-- 正式资产与 SHA256：待发布后回填。
+- 发布时间：2026-11-04 19:43:33 +08。
+- Release：[UniProxy v0.3.0](<https://github.com/FYHC1/uniproxy/releases/tag/v0.3.0>)，已设为 Latest，非草稿、非预发布。
+- 正式资产与 SHA256：
+
+| 资产 | 字节 | SHA256 |
+|---|---:|---|
+| `uniproxy-linux-amd64` | 13,361,336 | `49fad3029921739246e5102858a66adb9ed0b5d6f8f0895d4925899f0b888536` |
+| `uniproxy-linux-arm64` | 12,648,632 | `db5b3bab8c0d91d1a5604085261cf442ef82061ab88ca09c9fd2b87d83e31f7e` |
+| `uniproxy-windows-amd64.exe` | 13,729,792 | `09d8f26de474cd300b5e85ba2c0b967316c23daead50d088d5b5bd6bdb0a8be3` |
+| `uniproxy-windows-arm64.exe` | 12,787,712 | `b8eb4433acb823ad048b582a8b27705491a5301149f8615f6e6b6f04999e974d` |
+| `SHA256SUMS.txt` | 360 | `4da04d736b1361e54d7a55a762fc7296f3452765f476392a3fb0e841b6fde485` |
+
+下载的 Windows amd64 资产经 `Get-FileHash` 复核为 `09d8f26d...8a8be3`，与 `SHA256SUMS.txt` 及 Release 元数据 digest 一致。
 
 ### 3.3 正式 Windows 程序验收
 
-- `-version`：待发布后回填。
-- `TestBuilt`：待发布后回填。
-- 真实 Windows 控制台：待发布后回填。
+- `-version`：`UniProxy 0.3.0 · commit e73644a5e707 · built 2026-11-04T11:42:50Z`。
+- `TestBuilt`：对下载的 `uniproxy-windows-amd64.exe` 设置 `UNIPROXY_TEST_APP_PATH` 运行 `go test ./tests/integration -run TestBuiltCLIVersionAndPublicBindGuard -count=1 -v`，PASS 0.16s（version、syntax、unexpected-positional、public-without-token 四个子测试全部通过）。
+- 真实 Windows 控制台：同一正式资产以临时 `-data` 目录和 `-port 19093` 启动，`GET /api/health` 返回 `{"ok":true,"version":"0.3.0"}`，同端口 `-healthcheck` 退出码 0；验证后已停止临时进程，未触碰用户运行实例。
 
 ## 4. 部署边界
 

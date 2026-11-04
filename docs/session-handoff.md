@@ -1,6 +1,6 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-04 19:38（Asia/Shanghai；发布与用户实例信息为 11:43 观察，本轮未重新核对）。v0.3.0 发布准备完成，开发分支待提交、合并、打标签与 CI；v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest，源码提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`。**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+**最后核对：2026-11-04 19:46（Asia/Shanghai；发布与用户实例信息为 11:43 观察，本轮未重新核对）。v0.3.0 已于 2026-11-04 19:43:33 +08 正式发布并设 Latest（只发布、不部署），源码提交 `e73644a5e70738a87145714050734446528f39d7`，annotated tag 对象 `dc64ffb82ef7024ed52008773f5c34812543612d`，Release `https://github.com/FYHC1/uniproxy/releases/tag/v0.3.0`；四平台资产与 SHA256SUMS 已上线，Windows amd64 正式资产通过 `-version`、`TestBuiltCLIVersionAndPublicBindGuard` 与临时数据目录健康检查。v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest。**未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
 
 ## 2026-11-04 — 合并前代码复审与修复（开发分支）
 
@@ -8,7 +8,7 @@
 - 三路只读审查覆盖 core/store/app、sidecar/installer、importer/UI；最终复查未发现未闭环 P1。已修复 P1：`internal/core/compiler.go` 原生节点指向 Xray 中转时 `dialer-proxy` 使用节点 tag 而非 `x-<ID>` 代理 tag（Mihomo 引用不存在出站）。已修复 P2：`PATCH /api/nodes/{id}` 响应未清除 sidecar 端点凭据；sidecar 安装失败未复位 `awaitingCoreApply`；`core.Apply` 失败后 sidecar 未回滚；手动停止后失败应用可能重启旧 sidecar；sidecar 崩溃只写状态不重启且节点未标记不可用；disabled 节点重复端口导致保存/启动失败；外部 PATH Xray 被误报固定版本且阻止在线安装；HTTP 出站仍生成 SOCKS UDP；Trojan flow 被固定 Xray 26.10.31 拒绝但导入仍接受；`xray -test`/版本探测子进程缺少进程树保护；`App.Start` 准备失败后仍应用配置会覆盖错误。
 - 修复落盘：`internal/app/app.go` 增加 `appliedNodes`/`rollbackSidecar`（core 未运行时停止 sidecar）与启动准备错误短路；`internal/app/http.go` 统一节点公开投影并在 runtime stop 清空 appliedNodes；`internal/app/sidecar_install.go` 失败复位；`internal/sidecar/process.go` 崩溃 bounded backoff 自动重启（最多 3 次）+ bootstrap 节点 `unhealthy`；`internal/sidecar/endpoint.go` 先保留 enabled 端点、再修复 disabled 冲突；`internal/sidecar/install.go` 区分托管/外部版本；`internal/sidecar/xray.go` 对 HTTP 关闭 UDP 并拒绝 Trojan flow；`internal/core/compiler.go` HTTP sidecar 出站 `udp=false`；`internal/importer/xray_uri.go` 拒绝 Trojan flow；`internal/sidecar/process.go`、`install.go` 使用 `processguard.PrepareCommand`；并补对应回归测试。
 - 验证（2026-11-04 19:38）：`go vet ./...` 无输出；`go test ./... -count=1 -p 1` 全通过（app 11.747s、core 6.714s、sidecar 1.754s、sidecarinstall 0.198s、importer 0.709s、store 0.347s、cmd/uniproxy 0.128s）；`pnpm typecheck`、`pnpm test:ui` 44/44（全部浏览器回归 PASS）、`pnpm build:web`（Vite 7.3.7，4656 modules）、`pnpm test:e2e` 52/52（1.3m）通过。Go 格式化核验：修改的 19 个 Go 文件按 LF 规范化后 `gofmt -d` 无差异（`GOFMT_BAD=0`），工作树 `gofmt -l` 的 CRLF 显示仅为 `core.autocrlf=true`，不作为格式缺陷。
-- 状态：27 个修改文件，+776/−56（复审修复 + v0.3.0 发布准备）；版本文件、README、CHANGELOG、发布说明与验收记录已同步；HEAD 仍为 `39a5955`，待提交、推送、合并、打标签、CI 后回填资产；未部署。
+- 发布：提交 `e73644a5e70738a87145714050734446528f39d7`（`release: prepare v0.3.0 multi-engine sidecar`）已快进合并 `main` 并推送；main CI run 41822810042、标签 CI run 41823088724、Release workflow run 41823088760 均成功；annotated tag `v0.3.0` 对象 `dc64ffb82ef7024ed52008773f5c34812543612d`；Release 于 2026-11-04 19:43:33 +08 上线，四平台资产与 SHA256SUMS 已回填验收记录。只发布，不部署。
 
 ## 2026-11-04 — 多引擎 sidecar 提交（开发分支）
 
