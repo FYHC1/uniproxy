@@ -1,6 +1,13 @@
 # UniProxy 会话接续快照
 
-**最后核对：2026-11-04 17:04（Asia/Shanghai；发布与用户实例信息为 11:43 观察，本轮未重新核对）。v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest，源码提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`。本版汇总 M30 协议适配三档，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+**最后核对：2026-11-04 17:20（Asia/Shanghai；发布与用户实例信息为 11:43 观察，本轮未重新核对）。v0.2.9 已于 2026-11-03 16:22:39 +08 正式发布并设 Latest，源码提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`。本版汇总 M30 协议适配三档，发布流程全部成功；**只发布、未部署**，未停止或替换任何运行实例，未触碰用户数据目录、数据库或主密钥。当前用户实例仍为 uniproxy PID18324（临时 go-build 路径，09:30:08 启动）与内核 mihomo PID24836（09:30:09 启动），监听 `127.0.0.1:9090` 与 20006；操作前仍须重新核对。**
+
+## 2026-11-04 — 多引擎 sidecar 提交（开发分支）
+
+- 用户要求提交当前工作树，并询问发布 release 前是否需要合并主分支。
+- 已提交 `00e3350` `feat: add multi-engine sidecar support`：71 files changed, 7993 insertions(+), 242 deletions(-)；提交前删除无代码引用的临时 `internal/sidecar/debug-generated.json`。
+- 分支 `feat/multi-engine-sidecars` 相对 `main`（`eb7675c`）领先 1 个功能提交；未推送、未发布、未部署。文档记录随后以独立提交补齐。
+- 发布流程核对：`.github/workflows/release.yml` 由 `v*.*.*` tag push 或 workflow_dispatch 触发；手动 dispatch 会在 `GITHUB_SHA` 创建 tag。正式发布前应先把 `feat/multi-engine-sidecars` 合并到 `main`，在 `main` 上验证后建 tag，不能从功能分支直接发。
 
 ## 2026-11-04 — 真实 GitHub 网络下载验证（开发分支，未提交）
 

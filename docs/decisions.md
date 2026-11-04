@@ -335,7 +335,7 @@ TLS/证书校验、SSRF/文件访问、节点身份、固定内核版本和原�
 
 ## D34 — Xray sidecar 采用单进程多入站，并以本地 socks5 出站接入 Mihomo
 
-**状态：2026-11-04 按 M31 第一批实现并验证，未提交/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
+**状态：2026-11-04 按 M31 第一批实现并验证，已提交 `00e3350`，未推送/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
 
 Mihomo 1.19.32 无法表达 VLESS Encryption、VMess XHTTP、Reality spiderX/mldsa65Verify 等字段，因此这些节点交给一个独立 Xray 进程；不为每个节点起进程，避免 200 节点时的进程与端口管理成本。每个节点在 Xray 配置中对应一个监听 `127.0.0.1` 的 SOCKS inbound（随机用户名/密码，`udp` 跟随节点），并有同 tag 的 Xray outbound 使用真实远端地址；Mihomo 只看到 `x-<NodeID>` 的 `socks5` 出站，真实地址和凭据不进入 Mihomo YAML。
 
@@ -345,7 +345,7 @@ Xray outbound 模板来源固定为 `Node.Config["xray"]`（或 Config 自身含
 
 ## D35 — sidecar 生命周期由 app 可选注入，端点先分配后持久化，设置默认关闭
 
-**状态：2026-11-04 按 M31 第二批最小 app/API 集成实现并验证，未提交/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
+**状态：2026-11-04 按 M31 第二批最小 app/API 集成实现并验证，已提交 `00e3350`，未推送/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
 
 app 保持对现有 `New(store, core, Options)` 调用的兼容，通过可选 `Options.Sidecar` 注入 `Sidecar` 接口；`nil` 时完全不创建 sidecar 进程，所有既有 Mihomo 节点路径不变。`Settings.EnableSidecar` 默认 false，只有显式开启且存在启用 Xray 节点时才进入 sidecar 分支。启用节点在 `mutate` 保存前用 `AssignEndpoints` 分配并持久化 127.0.0.1 端点，保证重启后同一节点复用端口和随机凭据；`bootstrap` 只返回 host/port 和实时 `SidecarStatus`，不返回用户名或密码。
 
@@ -357,7 +357,7 @@ app 保持对现有 `New(store, core, Options)` 调用的兼容，通过可选 `
 
 ## D36 — sidecar 使用独立端口范围并在保存前做 bind 预检
 
-**状态：2026-11-04 按 M31 第四批产品化实现并验证，未提交/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
+**状态：2026-11-04 按 M31 第四批产品化实现并验证，已提交 `00e3350`，未推送/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
 
 sidecar 的本地 SOCKS 入站使用独立于独立监听范围的端口集合：`Settings.SidecarPortRangeStart/End` 默认 30000–30999，旧 state 缺失时由 `store.Normalize` 补齐。这样管理服务可以分别调整对外监听范围和 Xray 本地端口，不会因为两套监听共用一个范围而互相挤占。已有 `SidecarEndpoint` 保留原端口（`AssignEndpoints` 只分配缺失端点），新范围只影响后续分配；`XrayManager.ConfigurePortRange` 在保存/应用前热替换分配器。
 
@@ -365,11 +365,11 @@ sidecar 的本地 SOCKS 入站使用独立于独立监听范围的端口集合�
 
 上限和脱敏：启用 Xray 节点超过 200 个返回中文错误，要求拆分或只启用必要节点；`XrayManager.Logs()` 和 `xray -test` 输出同时替换用户名与密码为 `[redacted]`，避免凭据进入日志或错误详情。
 
-边界：仅绑定检查，不证明远端节点可达；安装器、多文件 Xray ZIP 安全解压、跨平台实跑和真实订阅当时未验证，其中安装器与真实订阅已由后续记录完成。未提交、未推送、未发布、未部署。
+边界：仅绑定检查，不证明远端节点可达；安装器、多文件 Xray ZIP 安全解压、跨平台实跑和真实订阅当时未验证，其中安装器与真实订阅已由后续记录完成。已提交 `00e3350`，未推送、未发布、未部署。
 
 ## D37 — Xray 固定版本在线安装采用官方资产 pin、多文件白名单解压与安装期事务隔离
 
-**状态：2026-11-04 按 M31 安装器批次实现并验证，未提交/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
+**状态：2026-11-04 按 M31 安装器批次实现并验证，已提交 `00e3350`，未推送/未发布/未部署。见[需求](<multi-engine-sidecar-requirements.md>)、[交接](<multi-engine-sidecar-handoff.md>)、[计划](<development-plan.md>) M31。**
 
 安装器不接受用户输入版本、URL 或解压路径：固定 `PinnedVersion="26.10.31"`，只支持 windows/linux × amd64/arm64 四平台，只访问 `api.github.com` 与官方 release 资产域名；发布元数据中的 digest 必须与代码内置 SHA256 一致，下载后再按同一 pin 校验。这样安装结果可复现，避免把任意下载地址或 GitHub 账户泄露变成供应链入口。
 
@@ -377,11 +377,11 @@ sidecar 的本地 SOCKS 入站使用独立于独立监听范围的端口集合�
 
 安装生命周期由 sidecar 管理器串行化：`PrepareInstall` 用 `opMu.TryLock` 预留后异步下载/解压，`InstallationStatus` 只依据文件系统发现状态；完成后执行 `xray.exe version`，实际版本必须等于固定版本。安装中 `Start/Apply` 返回明确“正在安装”错误，app 侧 `sidecarInstallPending` 同时阻止 runtime/apply/stop 和内核安装；安装完成后只保存期望配置并提示用户手动重新应用，不自动启动 sidecar，不把安装成功当作运行成功。
 
-边界：Windows 本地官方 `Xray-windows-64.zip` 的安装级验证 PASS（摘要、文件清单、版本输出均符合 pin）；2026-11-04 真实 GitHub 资产下载与生产安装路径验证 PASS（官方 ZIP 16,623,726 bytes、SHA256 与 windows-amd64 pin 一致，`install(...)` 完整阶段 4.60s）。但本机匿名 GitHub API 配额耗尽时生产 `Install` 会返回 403（`Remaining: 0`，Reset 17:57:56），测试仅以 `gh api` 的真实 metadata 注入 `api.github.com` 响应；安装器仍保持 API metadata/digest 校验，不因验证接受 token 或放宽检查。Linux 实机安装、非 WSL 裸机和真实远端节点仍未验证。未启动/停止用户实例、未触碰用户数据库/主密钥；未提交、未推送、未发布、未部署。
+边界：Windows 本地官方 `Xray-windows-64.zip` 的安装级验证 PASS（摘要、文件清单、版本输出均符合 pin）；2026-11-04 真实 GitHub 资产下载与生产安装路径验证 PASS（官方 ZIP 16,623,726 bytes、SHA256 与 windows-amd64 pin 一致，`install(...)` 完整阶段 4.60s）。但本机匿名 GitHub API 配额耗尽时生产 `Install` 会返回 403（`Remaining: 0`，Reset 17:57:56），测试仅以 `gh api` 的真实 metadata 注入 `api.github.com` 响应；安装器仍保持 API metadata/digest 校验，不因验证接受 token 或放宽检查。Linux 实机安装、非 WSL 裸机和真实远端节点仍未验证。未启动/停止用户实例、未触碰用户数据库/主密钥；已提交 `00e3350`，未推送、未发布、未部署。
 
 ## D38 — 真实远端 E2E 采用单端口顺序协议，不把端口复用放入产品
 
-**状态：2026-11-04 按工作树复审后的 kr-vps 验收执行并记录，未提交/未发布/未部署。见[真实流程验证](<sidecar-real-process-verification.md>)、[计划](<development-plan.md>) M31。**
+**状态：2026-11-04 按工作树复审后的 kr-vps 验收执行并记录，已提交 `00e3350`，未推送/未发布/未部署。见[真实流程验证](<sidecar-real-process-verification.md>)、[计划](<development-plan.md>) M31。**
 
 kr-vps 容器只有公网 21443 映射到 Xray，且同一监听端口无法同时承载 VLESS Encryption、VMess XHTTP 与 Reality 三种握手。验收因此固定为“一次部署一种协议、重建订阅链接、跑完整 E2E 后切换下一种”，不为测试环境引入产品级端口复用。
 

@@ -50,7 +50,7 @@
 | [代理池卡片紧凑化与双列验收](<pool-card-verification.md>) | M29：每页 10 节点、节点卡两层结构、容器查询双列/单列、触控按钮 44px、42/42 UI 与 52/52 浏览器验证 | 2026-11-03 已随 v0.2.8 发布（不含部署） |
 | [现代VLESS/VMess协议验证](<modern-protocol-verification.md>) | M24：v2rayN/Mihomo 源码对照、XHTTP/HTTPUpgrade/VMess KCP/ECH/VLESS Encryption 映射、拒绝边界与本地测试 | 2026-11-02 已随 v0.2.6 发布（不含部署） |
 | [协议适配三档验证](<protocol-adaptation-tiers.md>) | M30：严格 native、宽松预览 degraded、真实可用性三档；真实订阅 1064 条统计、修复项、测试与边界 | 2026-11-03 已随 v0.2.9 发布（不含部署） |
-| [多引擎 sidecar 需求分析](<multi-engine-sidecar-requirements.md>) | M31：Mihomo 主核 + Xray/sing-box 双 sidecar 的需求、架构、能力矩阵、阶段计划、测试与风险 | 2026-11-04 第一至四批、真实流程、真实订阅与 Xray 在线安装器完成（模型/包/编译器/链校验/POC/端点状态 API/UI/端口预检/脱敏/Windows+WSL E2E/安装器与设置页）；真实 GitHub 资产下载与生产安装路径已验证，匿名 API 配额耗尽时 403；未提交/未发布/未部署，Linux 实机安装、非 WSL 裸机仍待验证（真实远端节点已由 kr-vps E2E 覆盖） |
+| [多引擎 sidecar 需求分析](<multi-engine-sidecar-requirements.md>) | M31：Mihomo 主核 + Xray/sing-box 双 sidecar 的需求、架构、能力矩阵、阶段计划、测试与风险 | 2026-11-04 第一至四批、真实流程、真实订阅与 Xray 在线安装器完成（模型/包/编译器/链校验/POC/端点状态 API/UI/端口预检/脱敏/Windows+WSL E2E/安装器与设置页）；真实 GitHub 资产下载与生产安装路径已验证，匿名 API 配额耗尽时 403；已提交 `00e3350`，未推送/未发布/未部署，Linux 实机安装、非 WSL 裸机仍待验证（真实远端节点已由 kr-vps E2E 覆盖） |
 | [多引擎 sidecar 开发交接](<multi-engine-sidecar-handoff.md>) | M31：新对话入口、分支/目录、第一批任务、验收与边界 | 2026-11-04 第一批 1–5、第 6 项 app/API、UI、端口产品化、真实流程第 1–3 层、真实订阅与 Xray 在线安装器已完成并验证；真实 GitHub 资产下载已验证，Linux 实机安装、非 WSL 裸机待验证（真实远端节点已由 kr-vps E2E 覆盖） |
 | [多引擎 sidecar 真实流程验证](<sidecar-real-process-verification.md>) | M31 真实流程第 1–4 层 + 安装器真实下载：Windows/WSL 三协议端到端、kr-vps 远端订阅、Phase 0、端口释放与 GitHub 资产安装 | 2026-11-04 开发分支证据；含真实远端与安装器真实下载，Linux 实机安装仍待验证 |
 | [WSL实机运行与Linux修复验收](<wsl-runtime-verification.md>) | Linux amd64 WSL2 真实启动、固定内核、回环HTTP/SOCKS、持久化重启、认证与异常终止观察，以及探针重试/Pdeathsig 修复复验 | M21实机证据与M22修复；修复随v0.2.5发布；不替代裸机/ARM64/Docker/容量与真实远端节点 |

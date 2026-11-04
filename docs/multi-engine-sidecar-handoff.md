@@ -4,7 +4,7 @@
 - 分支：`feat/multi-engine-sidecars`
 - 工作目录：`C:\CustomFiles\CodeProjects\Github\uniproxy-sidecar`
 - 基线：`main` = `eb7675c`；v0.2.9 tag = `6ff15a8`
-- 状态：第一批 1–5、第 6 项最小 app/API 集成、UI 接入、第四批端口范围/预检/脱敏、真实流程第 1–3 层（Windows/WSL）、importer Xray-only 识别与真实订阅验收、固定版本 Xray 在线安装器/多文件 ZIP 安全解压/设置页安装状态、工作树复审与 kr-vps 真实远端订阅 E2E（三协议 PASS），以及真实 GitHub 资产下载与生产安装路径验证均已实现；不提交、不发布、不部署。
+- 状态：第一批 1–5、第 6 项最小 app/API 集成、UI 接入、第四批端口范围/预检/脱敏、真实流程第 1–3 层（Windows/WSL）、importer Xray-only 识别与真实订阅验收、固定版本 Xray 在线安装器/多文件 ZIP 安全解压/设置页安装状态、工作树复审与 kr-vps 真实远端订阅 E2E（三协议 PASS），以及真实 GitHub 资产下载与生产安装路径验证均已实现；已在 `feat/multi-engine-sidecars` 提交为 `00e3350`，未推送、未发布、未部署。
 - 详细方案：[multi-engine-sidecar-requirements.md](<multi-engine-sidecar-requirements.md>)
 
 ## 1. 目标

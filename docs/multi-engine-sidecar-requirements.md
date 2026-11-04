@@ -4,7 +4,7 @@
 - 目标分支：`feat/multi-engine-sidecars`
 - 开发工作目录：`C:\CustomFiles\CodeProjects\Github\uniproxy-sidecar`
 - 基线：`main` = `eb7675c`（v0.2.9 发布后的文档提交）；发布 tag `v0.2.9` = `6ff15a8`
-- 当前状态：第一至四批（模型字段、`internal/sidecar`、编译器本地 SOCKS、链位置校验、3 个离线 POC、app/API、UI、端口范围与预检）、真实进程 E2E、importer Xray-only 识别与真实订阅验收，以及固定版本 Xray 在线安装器/多文件 ZIP 安全解压/app/API/设置页安装状态已完成并验证。真实 GitHub 资产下载与生产安装路径已验证（Windows amd64 官方 ZIP，摘要匹配内置 pin）；匿名 GitHub API 配额耗尽时仍会返回 403；Linux 实机安装待验证。未提交、未发布、未部署。
+- 当前状态：第一至四批（模型字段、`internal/sidecar`、编译器本地 SOCKS、链位置校验、3 个离线 POC、app/API、UI、端口范围与预检）、真实进程 E2E、importer Xray-only 识别与真实订阅验收，以及固定版本 Xray 在线安装器/多文件 ZIP 安全解压/app/API/设置页安装状态已完成并验证。真实 GitHub 资产下载与生产安装路径已验证（Windows amd64 官方 ZIP，摘要匹配内置 pin）；匿名 GitHub API 配额耗尽时仍会返回 403；Linux 实机安装待验证。已在 `feat/multi-engine-sidecars` 提交为 `00e3350`；未推送、未发布、未部署。
 
 ## 0. 结论先行
 

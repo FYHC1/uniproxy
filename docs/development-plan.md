@@ -1,8 +1,8 @@
 # UniProxy 开发计划与任务状态
 
-最后更新：2026-11-04 17:03（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
+最后更新：2026-11-04 17:20（Asia/Shanghai）。负责人：项目维护者/当前执行开发者；不依赖已经结束的子代理或聊天任务板。
 
-**当前结论：M0–M30完成，M30 协议适配三档已随 v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；M31 双 sidecar 第一至四批（含 UI 接入、端口产品化、真实流程、真实订阅、Xray 在线安装器及真实 GitHub 资产下载、工作树复审与 kr-vps 真实远端订阅 E2E）已在开发分支 `feat/multi-engine-sidecars` 实现并通过验证（未提交/未发布/未部署）；M26–M29 已随 v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功）；M27/M28/M29 随后完成并随 v0.2.8 发布。**
+**当前结论：M0–M30完成，M30 协议适配三档已随 v0.2.9 于2026-11-03 16:22:39正式发布并设Latest（不含部署）；M31 双 sidecar 第一至四批（含 UI 接入、端口产品化、真实流程、真实订阅、Xray 在线安装器及真实 GitHub 资产下载、工作树复审与 kr-vps 真实远端订阅 E2E）已在开发分支 `feat/multi-engine-sidecars` 实现并通过验证（已提交 `00e3350`，未推送/未发布/未部署）；M26–M29 已随 v0.2.8 于2026-11-03 10:28:28正式发布并设Latest（不含部署）。v0.2.4（M19代理池编辑体验）已于2026-11-01 12:18:53正式发布并设Latest并部署替换本机实例；2026-11-01 17:02 在 WSL2/Fedora 44 amd64 完成官方 Linux v0.2.4 程序实机运行验收（M21），随后完成 Linux 稳定性修复（M22）与全局出站网卡选择（M23）的本地实现与复验。M22 提交 `ede12bb`、M23 提交 `a4dd45d`，v0.2.5 已于2026-11-02 02:27:40正式发布并设Latest（不含部署）；历史v0.2.3/v0.2.4标签与资产不变。M24 现代 VLESS/VMess 协议兼容提交 `dba132c`，v0.2.6 已于2026-11-02 16:00:55正式发布并设Latest（不含部署）；发布验收时本机仍运行用户自行启动的 v0.2.5（主程序 PID29920 + 内核 PID11688），本轮未停止/替换；历史 v0.2.5 及更早标签与资产不变。M25 代理链已在本机实现并通过 Go/API/真实内核/浏览器验证，已随 v0.2.7 发布（不含部署）；M26 新建代理链弹窗布局调整已在本机完成并通过严格 TS/生产 Web 构建/链浏览器 6/6，已提交并推送 main（`607dc8b589836aa0a58782c41b8f5559617257d1`，main CI 41487587509 成功）；M27/M28/M29 随后完成并随 v0.2.8 发布。**
 
 相关：[需求基线](<requirements.md>) · [开发指南](<development-guide.md>) · [当前运行/构建快照](<session-handoff.md>)。
 
@@ -202,7 +202,7 @@ M10后口径：**32项真实API浏览器、31项工具**，safehttp23测试函�
 - 边界：预览不等于可应用；`Degraded` 永不进入 `addParsed`/SQLite/编译器；订阅提交仍 `TotalErrors == 0`；真实节点连通性/吞吐/握手未验证。详见[验证](<protocol-adaptation-tiers.md>)、[需求 R35](<requirements.md>)、[决策 D33](<decisions.md>)。
 - 发布（2026-11-03 16:22:39 +08）：提交 `6ff15a8c2a0fb44e3dbc14c4e024b1f7c6b4d54a`，annotated tag `v0.2.9` 对象 `4d05181f557445f5f6325bd57e3821d138c981a5`；main CI `41602628999`、tag CI `41602671353`、Release `41602671127` 均成功；四平台资产与正式 Windows 程序验收完成；只发布，不含部署。
 
-## M31 — Mihomo 主核 + Xray/sing-box 双 sidecar（2026-11-04 第一至四批、真实流程、真实订阅、Xray 在线安装器、复审与远端 E2E 完成，未提交）
+## M31 — Mihomo 主核 + Xray/sing-box 双 sidecar（2026-11-04 第一至四批、真实流程、真实订阅、Xray 在线安装器、复审与远端 E2E 完成，已提交 `00e3350`）
 
 - 用户要求：按[交接](<multi-engine-sidecar-handoff.md>)实现第一批：模型字段、`internal/sidecar`（Xray 配置生成、`xray -test`、单进程启动/停止/健康检查）、编译器本地 SOCKS 出站、链位置校验、3 个离线 POC。
 - 已完成：`internal/model/types.go` 增加 `Node.Engine`/`Node.SidecarEndpoint`/`SidecarStatus`，`internal/model/engine.go` 集中 `ValidateSidecarChainPlacement`；`internal/store/store.go` 将空 Engine 归一为 mihomo；`internal/sidecar/ports.go`、`xray.go`、`process.go` 实现 127.0.0.1 端口分配、每节点 SOCKS inbound 的 Xray 配置、`xray run -test -c`、单进程启动/停止和 SOCKS 健康检查（最多 200 节点、随机凭据）。
